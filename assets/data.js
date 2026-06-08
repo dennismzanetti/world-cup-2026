@@ -76,6 +76,25 @@ const WC_GROUPS = [
   ]},
 ];
 
+// Broadcast info lookup by venue city (simplified)
+const WC_BROADCAST = {
+  default: { tvEnglish: ['FOX / FS1'], tvSpanish: ['Telemundo / Universo'], streaming: ['FOX One', 'Peacock'] }
+};
+
+// Known fixture metadata keyed by "homeTeam|awayTeam"
+// Date format: YYYY-MM-DD, timeLocal: HH:MM, timezone label for display
+const WC_FIXTURE_META = {
+  'Mexico|South Africa':         { date:'2026-06-11', timeLocal:'21:00', tz:'CT',  venue:'Estadio Azteca',           city:'Mexico City, Mexico',           tvEnglish:['FOX'],  tvSpanish:['Telemundo'] },
+  'South Korea|Czechia':         { date:'2026-06-11', timeLocal:'18:00', tz:'CT',  venue:'Estadio Akron',            city:'Zapopan (Guadalajara), Mexico',  tvEnglish:['FS1'],  tvSpanish:['Telemundo'] },
+  'USA|Paraguay':                { date:'2026-06-12', timeLocal:'18:00', tz:'PT',  venue:'SoFi Stadium',             city:'Los Angeles, CA',               tvEnglish:['FOX'],  tvSpanish:['Telemundo'] },
+  'Brazil|Morocco':              { date:'2026-06-13', timeLocal:'18:00', tz:'ET',  venue:'MetLife Stadium',          city:'East Rutherford, NJ',           tvEnglish:['FOX'],  tvSpanish:['Telemundo'] },
+  'Netherlands|Japan':           { date:'2026-06-14', timeLocal:'16:00', tz:'CT',  venue:"AT&T Stadium",             city:'Arlington (Dallas), TX',        tvEnglish:['FOX'],  tvSpanish:['Telemundo'] },
+  'France|Senegal':              { date:'2026-06-16', timeLocal:'15:00', tz:'ET',  venue:'MetLife Stadium',          city:'East Rutherford, NJ',           tvEnglish:['FOX'],  tvSpanish:['Telemundo'] },
+  'Norway|Senegal':              { date:'2026-06-22', timeLocal:'20:00', tz:'ET',  venue:'MetLife Stadium',          city:'East Rutherford, NJ',           tvEnglish:['FS1'],  tvSpanish:['Telemundo'] },
+  'Ecuador|Germany':             { date:'2026-06-25', timeLocal:'16:00', tz:'ET',  venue:'MetLife Stadium',          city:'East Rutherford, NJ',           tvEnglish:['FOX'],  tvSpanish:['Telemundo'] },
+  'Panama|England':              { date:'2026-06-27', timeLocal:'17:00', tz:'ET',  venue:'MetLife Stadium',          city:'East Rutherford, NJ',           tvEnglish:['FOX'],  tvSpanish:['Telemundo'] },
+};
+
 // Generate group stage matches (each team plays the other 3 in their group)
 function generateMatches() {
   const matches = [];
@@ -84,11 +103,21 @@ function generateMatches() {
     const teams = group.teams;
     for (let i = 0; i < teams.length; i++) {
       for (let j = i + 1; j < teams.length; j++) {
+        const key = teams[i].name + '|' + teams[j].name;
+        const meta = WC_FIXTURE_META[key] || {};
         matches.push({
           id: id++,
           group: group.id,
           home: teams[i],
           away: teams[j],
+          date: meta.date || null,
+          timeLocal: meta.timeLocal || null,
+          tz: meta.tz || 'ET',
+          venue: meta.venue || null,
+          city: meta.city || null,
+          tvEnglish: meta.tvEnglish || WC_BROADCAST.default.tvEnglish,
+          tvSpanish: meta.tvSpanish || WC_BROADCAST.default.tvSpanish,
+          streaming: WC_BROADCAST.default.streaming,
           homeScore: null,
           awayScore: null,
           prediction: { home: null, away: null }
