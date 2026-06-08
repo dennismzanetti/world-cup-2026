@@ -8,6 +8,7 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
 
   // ─── State ────────────────────────────────────────────────────────────────
   let currentUser = null;
+  let authResolved = false;   // true after first watchAuth callback fires
   let userPredictions = {};
   let firestoreMatches = [];
   let authMode = 'signin';
@@ -142,10 +143,13 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
   // ─── Auth State Observer ──────────────────────────────────────────────────
   watchAuth(async (user) => {
     currentUser = user;
+    authResolved = true;
+
     if (user) {
       if (authBtn)       authBtn.textContent = 'Account';
       if (userBar)       userBar.hidden = false;
       if (userGreeting)  userGreeting.textContent = 'Hi, ' + (user.displayName || user.email);
+      // Always hide the prompt the moment a signed-in user is confirmed
       if (predictPrompt) predictPrompt.hidden = true;
       try {
         const preds = await getUserPredictions(user.uid);
@@ -157,6 +161,7 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
     } else {
       if (authBtn)       authBtn.textContent = 'Sign In';
       if (userBar)       userBar.hidden = true;
+      // Only show the prompt when auth is resolved AND user is definitely signed out
       if (predictPrompt) predictPrompt.hidden = false;
       userPredictions = {};
     }
@@ -222,16 +227,6 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
   }
 
   // ─── Match Card HTML ──────────────────────────────────────────────────────
-  // Shared by both Matches and Predictions views.
-  //
-  // Card layout:
-  //   Row 1 (.card-header):        Group/stage label  |  Home team name  vs  Away team name
-  //   Row 2 (.card-teams):         home flag | score col | away flag
-  //   Row 3 (.card-meta):          📅 date · time   📍 venue, city
-  //   Row 4 (.card-broadcast-row): TV / streaming badges
-  //
-  // stripLabel  — e.g. 'Group A'  or  'Round of 16'
-  // scoreColHTML — the action area in the centre (inputs, final score, etc.)
   function matchCardHTML(match, scoreColHTML, stripLabel) {
     const dateStr = match.date
       ? new Date(match.date + 'T12:00:00').toLocaleDateString('en-US',
@@ -241,7 +236,6 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
     const venue = match.venue || null;
     const city  = match.city  || null;
 
-    // Row 1: header — group/stage label on left, full team names on right
     const header = `
       <div class="card-header">
         <span class="card-header-group">${stripLabel || 'Match'}</span>
@@ -252,7 +246,6 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
         </span>
       </div>`;
 
-    // Row 2: flags + score column only
     const teamsRow = `
       <div class="card-teams">
         <div class="card-team home-team">
@@ -264,7 +257,6 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
         </div>
       </div>`;
 
-    // Row 3: date/time + venue
     const metaItems = [];
     if (dateStr || time) {
       metaItems.push(`<span class="card-meta-item">
@@ -287,7 +279,6 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
       ? `<div class="card-meta">${metaItems.join('')}</div>`
       : '';
 
-    // Row 4: broadcast badges
     const badges = broadcastBadgesHTML(match);
     const broadcastRow = badges ? `<div class="card-broadcast-row">${badges}</div>` : '';
 
@@ -374,11 +365,22 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
   function renderPredictions() {
     const container = document.getElementById('predictions-list');
     if (!container) return;
+
+    // While Firebase auth hasn't resolved yet, show nothing (avoids flash of
+    // the sign-in prompt for users who are already authenticated).
+    if (!authResolved) {
+      container.innerHTML = '';
+      if (predictPrompt) predictPrompt.hidden = true;
+      return;
+    }
+
     if (!currentUser) {
       container.innerHTML = '';
       if (predictPrompt) predictPrompt.hidden = false;
       return;
     }
+
+    // User is signed in — always hide the prompt
     if (predictPrompt) predictPrompt.hidden = true;
     container.innerHTML = '';
 
