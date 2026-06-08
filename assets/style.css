@@ -16,6 +16,10 @@
   --space-8:  2rem;    --space-10: 2.5rem;  --space-12: 3rem;
   --space-16: 4rem;
 
+  /* Header heights: top row + nav row */
+  --header-top-h: 3rem;
+  --header-nav-h: 2.75rem;
+  --header-h: calc(var(--header-top-h) + var(--header-nav-h));
   --footer-h: 2rem;
   --score-col-w: 9rem;
 
@@ -113,7 +117,7 @@
 
 /* ---- BASE RESET ---- */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { -webkit-font-smoothing: antialiased; scroll-behavior: smooth; scroll-padding-top: 5rem; }
+html { -webkit-font-smoothing: antialiased; scroll-behavior: smooth; scroll-padding-top: calc(var(--header-h) + 0.5rem); }
 body {
   min-height: 100dvh;
   line-height: 1.6;
@@ -147,21 +151,40 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
 .link-btn { background: none; border: none; color: var(--color-accent); font-size: var(--text-sm); text-decoration: underline; cursor: pointer; padding: 0; }
 .link-btn:hover { color: var(--color-accent-hover); }
 
-/* ---- HEADER ---- */
+/* ====================================================================
+   HEADER — two-row layout
+
+   Row 1 (.header-top):  logo  |  Sign In btn  +  theme toggle
+   Row 2 (.header-nav):  four nav tabs, equal width, full bleed
+
+   On desktop the header-top row uses the .container max-width;
+   on mobile both rows go edge-to-edge for maximum tap area.
+   ==================================================================== */
+
 .site-header {
-  position: sticky; top: 0; z-index: 100;
+  position: sticky;
+  top: 0;
+  z-index: 100;
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
   box-shadow: var(--shadow-sm);
 }
-.header-inner {
-  display: flex; align-items: center; gap: var(--space-4); height: 3.5rem;
+
+/* ---- Top row: logo + auth + theme ---- */
+.header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--header-top-h);
+  gap: var(--space-3);
 }
+
 .container {
   max-width: var(--content-default);
   margin-inline: auto;
   padding-inline: var(--space-6);
 }
+
 .logo {
   display: flex; align-items: center; gap: var(--space-2);
   text-decoration: none; color: var(--color-primary);
@@ -169,22 +192,61 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
   letter-spacing: 0.02em; flex-shrink: 0;
 }
 .logo-year { color: var(--color-text-muted); font-size: 0.75em; margin-left: 0.1em; }
-.main-nav { display: flex; gap: var(--space-1); margin-left: auto; }
-.nav-btn {
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-md);
-  font-size: var(--text-sm); font-weight: 500;
-  color: var(--color-text-muted);
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
 }
-.nav-btn:hover { background: var(--color-surface-2); color: var(--color-text); }
-.nav-btn.active { background: var(--color-primary); color: var(--color-text-inverse); }
-.header-actions { display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; }
+
 .theme-toggle {
   padding: var(--space-2); border-radius: var(--radius-full);
   color: var(--color-text-muted);
   display: flex; align-items: center; justify-content: center;
+  min-width: 2.25rem; min-height: 2.25rem;
 }
 .theme-toggle:hover { background: var(--color-surface-2); color: var(--color-text); }
+
+/* ---- Nav row: tabs ---- */
+.header-nav {
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+/* On desktop, constrain to content width; on mobile go full-bleed */
+.nav-inner {
+  display: flex;
+  /* each tab gets equal share of available space */
+}
+
+.nav-btn {
+  flex: 1;
+  height: var(--header-nav-h);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-muted);
+  border-radius: 0;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  transition:
+    color var(--transition-interactive),
+    border-color var(--transition-interactive),
+    background var(--transition-interactive);
+}
+.nav-btn:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+.nav-btn.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+  font-weight: 600;
+  background: transparent;
+}
 
 /* ---- USER BAR ---- */
 .user-bar { background: var(--color-accent); padding-block: var(--space-2); }
@@ -219,7 +281,7 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
 /* ---- VIEWS ---- */
 .view { display: none; }
 .view.active { display: block; }
-.main-content { padding-block: var(--space-10); min-height: calc(100dvh - 3.5rem - var(--footer-h)); }
+.main-content { padding-block: var(--space-10); min-height: calc(100dvh - var(--header-h) - var(--footer-h)); }
 .page-header { margin-bottom: var(--space-8); }
 .page-title { font-family: var(--font-display); font-size: var(--text-2xl); letter-spacing: 0.03em; color: var(--color-text); line-height: 1.1; }
 .page-subtitle { font-size: var(--text-sm); color: var(--color-text-muted); margin-top: var(--space-1); }
@@ -271,7 +333,6 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
   flex-wrap: wrap;
 }
 
-/* Group / stage pill on the left */
 .card-header-group {
   font-family: var(--font-display);
   font-size: var(--text-sm);
@@ -285,7 +346,6 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
   flex-shrink: 0;
 }
 
-/* Team names matchup — fills remaining space, centred */
 .card-header-matchup {
   flex: 1;
   display: flex;
@@ -332,7 +392,6 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
   font-size: var(--text-base);
   min-width: 0;
 }
-/* Flag is larger now that names moved to header */
 .card-team .team-flag {
   font-size: 2rem;
   flex-shrink: 0;
@@ -341,7 +400,6 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
 .home-team { justify-content: flex-start; }
 .away-team { justify-content: flex-end; }
 
-/* Score column — fixed width, centred */
 .card-score-col {
   width: var(--score-col-w);
   display: flex;
@@ -430,7 +488,7 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
   white-space: nowrap;
 }
 
-/* ── Row 3: meta (date · time | venue, city) ── */
+/* ── Row 3: meta ---- */
 .card-meta {
   display: flex;
   align-items: center;
@@ -515,9 +573,20 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
 .build-sha:hover { text-decoration: underline; color: var(--color-primary-hover); }
 
 /* ---- RESPONSIVE ---- */
-@media (max-width: 768px) {
-  .main-nav { gap: 0; }
-  .nav-btn { padding: var(--space-2) var(--space-2); font-size: var(--text-xs); }
+
+/* On mobile: shrink top row horizontal padding so buttons don't crowd logo */
+@media (max-width: 480px) {
+  .container { padding-inline: var(--space-3); }
+  /* Logo: hide SVG ball, show text only to save space */
+  .logo svg { display: none; }
+  .logo { font-size: var(--text-lg); }
+  /* Nav: remove container padding so tabs truly fill screen width */
+  .nav-inner {
+    padding-inline: 0;
+    max-width: 100%;
+  }
+  /* Slightly smaller nav tab text */
+  .nav-btn { font-size: 0.75rem; }
 }
 
 @media (max-width: 600px) {

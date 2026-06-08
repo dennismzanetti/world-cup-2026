@@ -48,7 +48,8 @@
 
   <!-- Header -->
   <header class="site-header">
-    <div class="container header-inner">
+    <!-- Top row: logo + auth + theme (always visible) -->
+    <div class="container header-top">
       <a href="#" class="logo" aria-label="World Cup 2026 Home">
         <svg width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
           <circle cx="18" cy="18" r="17" stroke="currentColor" stroke-width="2"/>
@@ -62,12 +63,6 @@
         </svg>
         <span class="logo-text">WC<span class="logo-year">2026</span></span>
       </a>
-      <nav class="main-nav" aria-label="Main navigation">
-        <button class="nav-btn active" data-view="groups">Groups</button>
-        <button class="nav-btn" data-view="matches">Matches</button>
-        <button class="nav-btn" data-view="predictions">Predictions</button>
-        <button class="nav-btn" data-view="standings">Standings</button>
-      </nav>
       <div class="header-actions">
         <button class="btn btn-ghost btn-sm" id="auth-btn" aria-label="Sign in">Sign In</button>
         <button class="theme-toggle" data-theme-toggle aria-label="Switch to light mode">
@@ -75,6 +70,15 @@
         </button>
       </div>
     </div>
+    <!-- Nav row: tabs always full-width -->
+    <nav class="header-nav" aria-label="Main navigation">
+      <div class="container nav-inner">
+        <button class="nav-btn active" data-view="groups">Groups</button>
+        <button class="nav-btn" data-view="matches">Matches</button>
+        <button class="nav-btn" data-view="predictions">Predictions</button>
+        <button class="nav-btn" data-view="standings">Standings</button>
+      </div>
+    </nav>
   </header>
 
   <!-- User Bar (visible when signed in) -->
