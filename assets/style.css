@@ -244,9 +244,9 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
 /* ============================================================
    MATCH CARD — 4-row layout (identical for Matches & Predictions)
 
-   Row 1 (.card-strip):        Group label  |  stage/date context  (navy bar)
-   Row 2 (.card-teams):        home team flag+name | score col | away flag+name
-   Row 3 (.card-meta):         📅 date · time   📍 venue, city
+   Row 1 (.card-header):        Group/stage label  |  Full Home Name  vs  Full Away Name
+   Row 2 (.card-teams):         home flag | score col | away flag
+   Row 3 (.card-meta):          📅 date · time   📍 venue, city
    Row 4 (.card-broadcast-row): TV / streaming badges
    ============================================================ */
 
@@ -259,34 +259,63 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
   margin-bottom: var(--space-3);
 }
 
-/* ── Row 1: group/stage strip ── */
-.card-strip {
+/* ── Row 1: card header — group/stage label + full team names ── */
+.card-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: var(--space-1) var(--space-4);
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
   background: var(--color-accent);
   color: #fff;
-  gap: var(--space-3);
-  min-height: 1.75rem;
-}
-.card-strip-label {
-  font-family: var(--font-display);
-  font-size: var(--text-sm);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  line-height: 1;
-}
-.card-strip-right {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-xs);
-  opacity: 0.75;
-  white-space: nowrap;
+  min-height: 2.25rem;
+  flex-wrap: wrap;
 }
 
-/* ── Row 2: teams + score ── */
+/* Group / stage pill on the left */
+.card-header-group {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
+  background: rgba(255,255,255,0.15);
+  border-radius: var(--radius-full);
+  padding: 0.2rem 0.6rem;
+  flex-shrink: 0;
+}
+
+/* Team names matchup — fills remaining space, centred */
+.card-header-matchup {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.card-header-home,
+.card-header-away {
+  font-weight: 700;
+  font-size: var(--text-sm);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 14ch;
+}
+
+.card-header-vs {
+  font-size: var(--text-xs);
+  opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  flex-shrink: 0;
+}
+
+/* ── Row 2: flags + score ── */
 .card-teams {
   display: grid;
   grid-template-columns: 1fr var(--score-col-w) 1fr;
@@ -300,20 +329,17 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  font-weight: 600;
   font-size: var(--text-base);
   min-width: 0;
 }
-.card-team .team-flag { font-size: 1.4rem; flex-shrink: 0; }
-/* Full name always visible — wrap on small screens instead of hiding */
-.card-team .team-name-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* Flag is larger now that names moved to header */
+.card-team .team-flag {
+  font-size: 2rem;
+  flex-shrink: 0;
 }
 
 .home-team { justify-content: flex-start; }
-.away-team { justify-content: flex-end; flex-direction: row-reverse; }
+.away-team { justify-content: flex-end; }
 
 /* Score column — fixed width, centred */
 .card-score-col {
@@ -500,11 +526,15 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
   .card-meta { gap: var(--space-2); }
   .card-meta-item { white-space: normal; }
   .card-broadcast-row { padding: var(--space-2) var(--space-3); }
+  .card-header { gap: var(--space-2); }
+  .card-header-home,
+  .card-header-away { max-width: 11ch; }
 }
 
 @media (max-width: 420px) {
   :root { --score-col-w: 7rem; }
-  /* Abbreviate long names on very small screens using font-size, not hiding */
-  .card-team .team-name-text { font-size: var(--text-xs); }
+  .card-team .team-flag { font-size: 1.6rem; }
   .score-input, .pred-input { width: 2.25rem; height: 2.25rem; font-size: var(--text-base); }
+  .card-header-home,
+  .card-header-away { max-width: 9ch; font-size: var(--text-xs); }
 }

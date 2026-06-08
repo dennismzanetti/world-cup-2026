@@ -223,6 +223,13 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
 
   // ─── Match Card HTML ──────────────────────────────────────────────────────
   // Shared by both Matches and Predictions views.
+  //
+  // Card layout:
+  //   Row 1 (.card-header):        Group/stage label  |  Home team name  vs  Away team name
+  //   Row 2 (.card-teams):         home flag | score col | away flag
+  //   Row 3 (.card-meta):          📅 date · time   📍 venue, city
+  //   Row 4 (.card-broadcast-row): TV / streaming badges
+  //
   // stripLabel  — e.g. 'Group A'  or  'Round of 16'
   // scoreColHTML — the action area in the centre (inputs, final score, etc.)
   function matchCardHTML(match, scoreColHTML, stripLabel) {
@@ -234,22 +241,25 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
     const venue = match.venue || null;
     const city  = match.city  || null;
 
-    // Row 1: navy strip with group/stage label
-    const strip = `
-      <div class="card-strip">
-        <span class="card-strip-label">${stripLabel || 'Match'}</span>
+    // Row 1: header — group/stage label on left, full team names on right
+    const header = `
+      <div class="card-header">
+        <span class="card-header-group">${stripLabel || 'Match'}</span>
+        <span class="card-header-matchup">
+          <span class="card-header-home">${match.home.name}</span>
+          <span class="card-header-vs">vs</span>
+          <span class="card-header-away">${match.away.name}</span>
+        </span>
       </div>`;
 
-    // Row 2: teams + score
+    // Row 2: flags + score column only
     const teamsRow = `
       <div class="card-teams">
         <div class="card-team home-team">
           <span class="team-flag">${match.home.flag}</span>
-          <span class="team-name-text">${match.home.name}</span>
         </div>
         <div class="card-score-col">${scoreColHTML}</div>
         <div class="card-team away-team">
-          <span class="team-name-text">${match.away.name}</span>
           <span class="team-flag">${match.away.flag}</span>
         </div>
       </div>`;
@@ -281,7 +291,7 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
     const badges = broadcastBadgesHTML(match);
     const broadcastRow = badges ? `<div class="card-broadcast-row">${badges}</div>` : '';
 
-    return strip + teamsRow + metaRow + broadcastRow;
+    return header + teamsRow + metaRow + broadcastRow;
   }
 
   // ─── Render Groups ────────────────────────────────────────────────────────
