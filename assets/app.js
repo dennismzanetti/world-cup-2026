@@ -1,7 +1,7 @@
 // World Cup 2026 App — Firebase-connected
 import { auth } from './firebase.js';
 import { signUp, signIn, logOut, watchAuth } from './auth.js';
-import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } from './db.js';
+import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 
 (function () {
   'use strict';
@@ -167,7 +167,8 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
 
   // ─── Live Firestore Match Listener ───────────────────────────────────────────
   // watchMatches() uses onSnapshot — Firestore pushes every score/status change
-  // instantly to all connected browsers. No polling required.
+  // instantly to all connected browsers. Scores are written exclusively by the
+  // server-side live-scores sync script (sync/live-scores.js). No polling required.
   function startMatchListener() {
     if (unsubscribeMatches) unsubscribeMatches(); // detach any previous listener
     unsubscribeMatches = watchMatches((liveMatches) => {
@@ -325,9 +326,9 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
 
   // ─── Build match card (Matches view) ─────────────────────────────────────────
   // Score column logic:
-  //   scheduled  → manual score inputs + Save button (admin use)
-  //   live / ht  → live score display + status badge (read-only)
-  //   finished   → final score + FT badge (read-only)
+  //   scheduled  → read-only kickoff time (scores come from live-scores sync script)
+  //   live / ht  → live score display + status badge
+  //   finished   → final score + FT badge
   function buildMatchCard(match) {
     const status = (match.status || 'scheduled').toLowerCase();
     const isLive     = status === 'live' || status === 'ht';
@@ -344,19 +345,11 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
         : `<div class="score-final score-pending">- : -</div>`;
       scoreColHTML = scoreDisplay + statusBadgeHTML(match);
     } else {
-      // Editable score inputs for scheduled matches (admin)
-      scoreColHTML = `
-        <div class="score-inputs-wrap">
-          <input class="score-input" type="number" min="0" max="20"
-            value="${hasScore ? match.homeScore : ''}" placeholder="-"
-            data-match="${match.id}" data-side="home">
-          <span class="score-sep">:</span>
-          <input class="score-input" type="number" min="0" max="20"
-            value="${hasScore ? match.awayScore : ''}" placeholder="-"
-            data-match="${match.id}" data-side="away">
-        </div>
-        <button class="btn-save" data-save="${match.id}">Save Result</button>
-        <span class="result-saved" id="saved-${match.id}">Saved ✓</span>`;
+      // Scheduled — show kickoff time only; scores are set by the live-scores sync script
+      const kickoff = match.timeLocal
+        ? `<div class="score-kickoff">${match.timeLocal}\u202f${match.tz || 'ET'}</div>`
+        : `<div class="score-kickoff score-pending">TBD</div>`;
+      scoreColHTML = kickoff;
     }
 
     const stripLabel = match.group ? 'Group ' + match.group : (match.stage || 'Match');
@@ -435,33 +428,6 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     }
 
     insertDateDividers(container, filtered);
-
-    // Attach save-result listeners (only present on scheduled cards)
-    container.querySelectorAll('.btn-save').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const id     = parseInt(btn.dataset.save);
-        const match  = WC_MATCHES.find(m => m.id === id);
-        const hInput = container.querySelector(`input[data-match="${id}"][data-side="home"]`);
-        const aInput = container.querySelector(`input[data-match="${id}"][data-side="away"]`);
-        if (!match || hInput.value === '' || aInput.value === '') return;
-        match.homeScore = parseInt(hInput.value);
-        match.awayScore = parseInt(aInput.value);
-        // Persist to Firestore if we have a firestoreId
-        if (match.firestoreId) {
-          try {
-            await updateMatchResult(match.firestoreId, {
-              homeScore: match.homeScore,
-              awayScore: match.awayScore,
-              status: 'finished'
-            });
-          } catch (err) { console.warn('Could not persist result:', err); }
-        }
-        const saved = document.getElementById('saved-' + id);
-        if (saved) { saved.style.display = 'inline'; setTimeout(() => { saved.style.display = 'none'; }, 2000); }
-        renderGroups();
-        renderStandings();
-      });
-    });
   }
 
   // ─── Render Predictions ───────────────────────────────────────────────────────
