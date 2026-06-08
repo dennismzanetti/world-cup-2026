@@ -17,6 +17,8 @@
   --space-16: 4rem;
 
   --footer-h: 2rem;
+  /* Fixed width for the score column — keeps it identical on every card */
+  --score-col-w: 9rem;
 
   --color-bg:             #f5f6f8;
   --color-surface:        #ffffff;
@@ -39,12 +41,13 @@
   --color-error:          #c0392b;
   --color-error-highlight: #fde8e6;
 
-  --color-tv-bg:      #dce8ff;
-  --color-tv-text:    #1a3a6b;
-  --color-esp-bg:     #fff0cc;
-  --color-esp-text:   #7a4100;
-  --color-stream-bg:  #d4f0db;
-  --color-stream-text:#1b5e20;
+  /* Broadcast badge colors */
+  --color-tv-bg:     #e8f0fe;
+  --color-tv-text:   #1a3a6b;
+  --color-esp-bg:    #fff3e0;
+  --color-esp-text:  #7a4100;
+  --color-stream-bg: #e8f5e9;
+  --color-stream-text: #1b5e20;
 
   --radius-sm: 0.375rem; --radius-md: 0.5rem;
   --radius-lg: 0.75rem;  --radius-xl: 1rem;
@@ -82,12 +85,13 @@
   --color-error:          #e05a4e;
   --color-error-highlight: #2e0c0a;
 
-  --color-tv-bg:      #1a2e55;
-  --color-tv-text:    #7aacf0;
-  --color-esp-bg:     #3a2500;
-  --color-esp-text:   #f0c060;
-  --color-stream-bg:  #0d2e16;
-  --color-stream-text:#48bb6a;
+  /* Broadcast badge colors — dark mode */
+  --color-tv-bg:     #1a2540;
+  --color-tv-text:   #7aacf0;
+  --color-esp-bg:    #2e1f00;
+  --color-esp-text:  #f0b860;
+  --color-stream-bg: #0d2e16;
+  --color-stream-text: #48bb6a;
 
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
   --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
@@ -102,9 +106,9 @@
     --color-text-inverse:#ffffff; --color-primary:#c8962a; --color-primary-hover:#a87820;
     --color-accent:#1a3a6b; --color-success:#2a7a3b; --color-success-highlight:#d4edda;
     --color-error:#c0392b; --color-error-highlight:#fde8e6;
-    --color-tv-bg:#dce8ff; --color-tv-text:#1a3a6b;
-    --color-esp-bg:#fff0cc; --color-esp-text:#7a4100;
-    --color-stream-bg:#d4f0db; --color-stream-text:#1b5e20;
+    --color-tv-bg:#e8f0fe; --color-tv-text:#1a3a6b;
+    --color-esp-bg:#fff3e0; --color-esp-text:#7a4100;
+    --color-stream-bg:#e8f5e9; --color-stream-text:#1b5e20;
     --shadow-sm:0 1px 3px rgba(0,0,0,0.08); --shadow-md:0 4px 12px rgba(0,0,0,0.10);
     --shadow-lg:0 12px 32px rgba(0,0,0,0.14);
   }
@@ -125,10 +129,7 @@ body {
 img, svg { display: block; max-width: 100%; }
 button { cursor: pointer; background: none; border: none; font: inherit; color: inherit; }
 input, select { font: inherit; color: inherit; }
-a, button, [role="button"], input, select {
-  transition: color var(--transition-interactive), background var(--transition-interactive),
-              border-color var(--transition-interactive), box-shadow var(--transition-interactive);
-}
+a, button, [role="button"], input, select { transition: color var(--transition-interactive), background var(--transition-interactive), border-color var(--transition-interactive), box-shadow var(--transition-interactive); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border-width: 0; }
 
 /* ---- BUTTONS ---- */
@@ -156,8 +157,14 @@ a, button, [role="button"], input, select {
   border-bottom: 1px solid var(--color-border);
   box-shadow: var(--shadow-sm);
 }
-.header-inner { display: flex; align-items: center; gap: var(--space-4); height: 3.5rem; }
-.container { max-width: var(--content-default); margin-inline: auto; padding-inline: var(--space-6); }
+.header-inner {
+  display: flex; align-items: center; gap: var(--space-4); height: 3.5rem;
+}
+.container {
+  max-width: var(--content-default);
+  margin-inline: auto;
+  padding-inline: var(--space-6);
+}
 .logo {
   display: flex; align-items: center; gap: var(--space-2);
   text-decoration: none; color: var(--color-primary);
@@ -168,7 +175,8 @@ a, button, [role="button"], input, select {
 .main-nav { display: flex; gap: var(--space-1); margin-left: auto; }
 .nav-btn {
   padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-md); font-size: var(--text-sm); font-weight: 500;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm); font-weight: 500;
   color: var(--color-text-muted);
 }
 .nav-btn:hover { background: var(--color-surface-2); color: var(--color-text); }
@@ -192,13 +200,7 @@ a, button, [role="button"], input, select {
 .auth-backdrop { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.55); backdrop-filter: blur(2px); }
 .auth-modal { position: fixed; inset: 0; z-index: 201; display: flex; align-items: center; justify-content: center; padding: var(--space-4); pointer-events: none; }
 .auth-modal[hidden] { display: none; }
-.auth-card {
-  pointer-events: all; position: relative;
-  background: var(--color-surface); border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl); box-shadow: var(--shadow-lg);
-  padding: var(--space-8) var(--space-8) var(--space-6);
-  width: 100%; max-width: 400px;
-}
+.auth-card { pointer-events: all; position: relative; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: var(--space-8) var(--space-8) var(--space-6); width: 100%; max-width: 400px; }
 .auth-heading { font-family: var(--font-display); font-size: var(--text-xl); letter-spacing: 0.04em; color: var(--color-text); margin-bottom: var(--space-1); }
 .auth-sub { font-size: var(--text-sm); color: var(--color-text-muted); margin-bottom: var(--space-6); }
 .auth-close { position: absolute; top: var(--space-4); right: var(--space-4); font-size: 1.5rem; line-height: 1; color: var(--color-text-faint); padding: var(--space-1); border-radius: var(--radius-sm); }
@@ -234,7 +236,7 @@ a, button, [role="button"], input, select {
 .group-teams { padding: var(--space-2) 0; }
 .group-team-row { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-4); border-bottom: 1px solid var(--color-divider); font-size: var(--text-sm); }
 .group-team-row:last-child { border-bottom: none; }
-.team-flag { font-size: 1.25rem; width: 1.75rem; text-align: center; flex-shrink: 0; }
+.team-flag { font-size: 1.25rem; width: 1.75rem; text-align: center; }
 .team-name { flex: 1; font-weight: 500; }
 .team-pts { font-weight: 700; color: var(--color-primary); font-size: var(--text-sm); min-width: 2rem; text-align: right; }
 
@@ -242,123 +244,34 @@ a, button, [role="button"], input, select {
 .matches-filter { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-6); font-size: var(--text-sm); color: var(--color-text-muted); }
 .matches-filter select { padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); border: 1px solid var(--color-border); background: var(--color-surface); font-size: var(--text-sm); }
 
-/* ==========================================================================
-   MATCH CARD
-   ┌──────────────────────────────────────────────────────────────────────┐
-   │  FIXTURE HEADER: date/time  ·  venue, city          │  Group badge  │
-   ├──────────────────────────────────────────────────────────────────────┤
-   │  🏳 Home Team Name   │   [ score ] : [ score ]  Save  │  Away 🏳    │
-   ├──────────────────────────────────────────────────────────────────────┤
-   │  📺 TV BADGES (FOX · FS1)   🌐 STREAMING (Peacock · FOX One)        │
-   └──────────────────────────────────────────────────────────────────────┘
-   ========================================================================== */
+/* ============================================================
+   MATCH CARD — new 3-row layout
+   Row 1 (.card-header):  home team | score col (fixed w) | away team | group badge
+   Row 2 (.card-meta):    date/time  ·  venue, city
+   Row 3 (.card-broadcast-row): TV / streaming badges
+   ============================================================ */
 
 .match-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
-  margin-bottom: var(--space-3);
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  container-type: inline-size;  /* enables container queries */
+  margin-bottom: var(--space-3);
 }
 
-/* ── Fixture header strip ──────────────────────────────────────────────── */
-.card-fixture-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
-  background: var(--color-surface-offset);
-  border-bottom: 1px solid var(--color-divider);
-  min-height: 2.25rem;
-  flex-wrap: wrap;
-  row-gap: var(--space-1);
-}
-
-/* Left cluster: date+time then venue */
-.fh-left {
-  display: flex;
+/* ── Row 1: header ── */
+.card-header {
+  display: grid;
+  /* home | score-col (fixed) | away | badge (auto) */
+  grid-template-columns: 1fr var(--score-col-w) 1fr auto;
   align-items: center;
   gap: var(--space-3);
-  flex: 1;
-  min-width: 0;
-  flex-wrap: wrap;
-  row-gap: var(--space-1);
-}
-
-.card-fixture-header .fh-right {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-shrink: 0;
-}
-
-/* Inline SVG icons inside fixture header */
-.fh-icon {
-  display: inline-block;
-  width: 0.85em; height: 0.85em;
-  vertical-align: -0.1em;
-  margin-right: 0.3em;
-  flex-shrink: 0;
-  overflow: visible;
-}
-
-.fh-datetime {
-  display: inline-flex;
-  align-items: center;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--color-text-muted);
-  white-space: nowrap;
-}
-
-/* Pipe divider between date and venue */
-.fh-divider {
-  display: inline-block;
-  width: 1px;
-  height: 0.9em;
-  background: var(--color-divider);
-  flex-shrink: 0;
-  align-self: center;
-}
-
-.fh-venue {
-  display: inline-flex;
-  align-items: center;
-  font-size: var(--text-xs);
-  color: var(--color-text-faint);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 40ch;
-}
-
-.fh-group {
-  display: inline-block;
-  font-size: var(--text-xs);
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  background: var(--color-primary-highlight);
-  color: var(--color-primary);
-  border-radius: var(--radius-full);
-  padding: 0.1rem var(--space-2);
-}
-
-/* ── Card body: teams + score ─────────────────────────────────────────── */
-.card-body {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: var(--space-4);
   padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-divider);
 }
 
-/* Team cell */
-.match-team {
+.card-team {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -366,93 +279,166 @@ a, button, [role="button"], input, select {
   font-size: var(--text-base);
   min-width: 0;
 }
-.match-team .team-name-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.match-team.away {
-  flex-direction: row-reverse;
-  text-align: right;
-}
+.card-team .team-flag { font-size: 1.4rem; flex-shrink: 0; }
+.card-team .team-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* Centre column */
-.match-center {
+/* Home left-aligned, away right-aligned */
+.home-team { justify-content: flex-start; }
+.away-team { justify-content: flex-end; flex-direction: row-reverse; }
+
+/* Score column — fixed width, centred, never changes size */
+.card-score-col {
+  width: var(--score-col-w);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--space-1);
   flex-shrink: 0;
 }
-.match-score-inputs { display: flex; align-items: center; gap: var(--space-2); }
-.score-input {
-  width: 2.75rem; height: 2.75rem;
-  text-align: center; font-size: var(--text-lg); font-weight: 700;
+
+.score-inputs-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.score-input, .pred-input {
+  width: 2.75rem;
+  height: 2.75rem;
+  text-align: center;
+  font-size: var(--text-lg);
+  font-weight: 700;
   border: 2px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface-2);
   color: var(--color-text);
+  /* remove browser number spinners */
+  -moz-appearance: textfield;
+  appearance: textfield;
 }
-.score-input:focus { outline: none; border-color: var(--color-primary); }
-.score-sep { font-size: var(--text-lg); font-weight: 700; color: var(--color-text-faint); }
+.score-input::-webkit-inner-spin-button,
+.score-input::-webkit-outer-spin-button,
+.pred-input::-webkit-inner-spin-button,
+.pred-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.score-input:focus, .pred-input:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-highlight); }
 
-.match-group-badge {
-  display: inline-block; font-size: var(--text-xs);
-  background: var(--color-primary-highlight); color: var(--color-primary);
-  border-radius: var(--radius-full); padding: 0.1rem var(--space-2);
-  font-weight: 600; letter-spacing: 0.04em;
+.score-sep {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--color-text-faint);
+  user-select: none;
 }
-.result-badge { background: var(--color-success-highlight) !important; color: var(--color-success) !important; }
+
+/* Final score display (predictions view) */
+.score-final {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--color-text);
+  line-height: 1;
+}
 
 .btn-save {
+  display: inline-flex; align-items: center; justify-content: center;
   padding: var(--space-1) var(--space-3);
-  background: var(--color-primary); color: var(--color-text-inverse);
-  border-radius: var(--radius-md); font-size: var(--text-xs);
-  font-weight: 600; min-height: 2rem;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
 }
 .btn-save:hover { background: var(--color-primary-hover); }
 .btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
 .pred-btn { background: var(--color-accent) !important; }
 .pred-btn:hover { background: var(--color-accent-hover) !important; }
-.result-saved { font-size: var(--text-xs); color: var(--color-success); display: none; }
 
-/* ── Broadcast footer strip ───────────────────────────────────────────── */
-.card-broadcast {
-  display: flex;
-  flex-wrap: wrap;
+.result-saved {
+  font-size: var(--text-xs);
+  color: var(--color-success);
+  display: none;
+  white-space: nowrap;
+}
+.pred-saving { font-size: var(--text-xs); color: var(--color-text-muted); }
+.pred-was { font-size: var(--text-xs); color: var(--color-text-faint); font-style: italic; }
+
+/* Group badge — top-right corner of the header row */
+.card-group-badge {
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
-  background: var(--color-surface-2);
-  border-top: 1px solid var(--color-divider);
-  /* Label before badges */
-  row-gap: var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--color-primary-highlight);
+  color: var(--color-primary);
+  border-radius: var(--radius-full);
+  padding: 0.2rem 0.55rem;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-/* Optional section label "📺 Watch on:" */
-.bc-label {
-  font-size: 0.68rem;
-  font-weight: 600;
-  text-transform: uppercase;
+.card-result-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--text-xs);
+  font-weight: 700;
   letter-spacing: 0.06em;
-  color: var(--color-text-faint);
+  text-transform: uppercase;
+  background: var(--color-success-highlight);
+  color: var(--color-success);
+  border-radius: var(--radius-full);
+  padding: 0.2rem 0.55rem;
   white-space: nowrap;
-  margin-right: var(--space-1);
+}
+
+/* ── Row 2: meta (date · time  |  venue, city) ── */
+.card-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-5);
+  background: var(--color-surface-2);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.card-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.meta-icon {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+/* ── Row 3: broadcast badges ── */
+.card-broadcast-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: center;
+  padding: var(--space-2) var(--space-5);
+  background: var(--color-bg);
 }
 
 .bc-badge {
   display: inline-flex; align-items: center;
-  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em;
-  padding: 0.2rem 0.6rem;
+  font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  padding: 0.15rem 0.45rem;
   border-radius: var(--radius-full);
   white-space: nowrap;
-  gap: 0.3em;
 }
-/* TV (English) — navy/blue */
 .bc-tv     { background: var(--color-tv-bg);     color: var(--color-tv-text); }
-/* Spanish — gold/amber */
 .bc-esp    { background: var(--color-esp-bg);    color: var(--color-esp-text); }
-/* Streaming — green */
 .bc-stream { background: var(--color-stream-bg); color: var(--color-stream-text); }
 
 /* ---- STANDINGS ---- */
@@ -467,160 +453,57 @@ a, button, [role="button"], input, select {
 .standings-table tr.qualified { background: color-mix(in oklch, var(--color-success) 8%, transparent); }
 .standings-table tr.qualified td:first-child { border-left: 3px solid var(--color-success); padding-left: calc(var(--space-3) - 3px); }
 
-/* ---- PREDICTIONS ---- */
-.pred-inputs { display: flex; align-items: center; gap: var(--space-2); }
-.pred-input {
-  width: 2.75rem; height: 2.75rem;
-  text-align: center; font-size: var(--text-lg); font-weight: 700;
-  border: 2px solid var(--color-border); border-radius: var(--radius-md);
-  background: var(--color-surface-2); color: var(--color-text);
-}
-.pred-input:focus { outline: none; border-color: var(--color-accent); }
-.pred-score-display { font-size: var(--text-lg); font-weight: 700; color: var(--color-accent); text-align: center; min-width: 4rem; }
-.pred-was { font-size: var(--text-xs); color: var(--color-text-faint); font-style: italic; }
-.pred-saving { font-size: var(--text-xs); color: var(--color-text-muted); }
-
 /* ---- BUILD FOOTER ---- */
 .build-footer {
   position: fixed;
   bottom: 0; left: 0; right: 0;
   height: var(--footer-h);
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 0 var(--space-4);
   background: var(--color-surface);
   border-top: 1px solid var(--color-divider);
   z-index: 50;
 }
-#build-badge { font-size: var(--text-xs); color: var(--color-text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+#build-badge {
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
 .build-sha { color: var(--color-primary); font-weight: 600; text-decoration: none; }
 .build-sha:hover { text-decoration: underline; color: var(--color-primary-hover); }
 
-/* ==========================================================================
-   RESPONSIVE — Tablet (≤768px)
-   ========================================================================== */
+/* ---- RESPONSIVE ---- */
 @media (max-width: 768px) {
   .main-nav { gap: 0; }
   .nav-btn { padding: var(--space-2) var(--space-2); font-size: var(--text-xs); }
-  .container { padding-inline: var(--space-4); }
-
-  .card-fixture-header { gap: var(--space-2); }
-  .fh-venue { max-width: 28ch; }
 }
 
-/* ==========================================================================
-   RESPONSIVE — Mobile (≤520px)
-   Full-width card; compact single-column layout; touch-friendly targets
-   ========================================================================== */
-@media (max-width: 520px) {
-  .container { padding-inline: var(--space-3); }
-  .header-actions .btn-ghost { display: none; }
+@media (max-width: 600px) {
+  --score-col-w: 8rem;
 
-  /* ── Fixture header: two-row stacked layout ─────────────────────────── */
-  .card-fixture-header {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0;
-    padding: var(--space-2) var(--space-3);
-    row-gap: 0;
+  .card-header {
+    /* On small screens: stack into two rows
+       Row A: home  |  score  |  away
+       Row B: group badge (full width, right-aligned) */
+    grid-template-columns: 1fr var(--score-col-w) 1fr;
+    grid-template-rows: auto auto;
   }
-  /* Row 1: date+time runs full width with group badge on the right */
-  .fh-left {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0;
-    flex-wrap: nowrap;
-    width: 100%;
+  .card-group-badge {
+    grid-column: 1 / -1;
+    justify-self: flex-end;
+    margin-top: calc(-1 * var(--space-1));
   }
-  .fh-datetime {
-    font-weight: 700;
-    color: var(--color-text);    /* more prominent on mobile */
-    font-size: 0.72rem;
-    letter-spacing: 0.01em;
-  }
-  /* Pipe divider hidden on mobile — venue goes below */
-  .fh-divider { display: none; }
-
-  /* Row 1 right: group badge stays inline with date */
-  .card-fixture-header .fh-right {
-    /* No separate positioning needed — it's sibling of fh-left inside the flex column */
-    display: none;  /* hide from normal flow; re-added inline via fh-left */
-  }
-
-  /* Venue: full-width second row */
-  .fh-venue {
-    max-width: 100%;
-    white-space: normal;
-    font-size: 0.68rem;
-    color: var(--color-text-faint);
-    margin-top: var(--space-1);
-    display: flex;
-    align-items: flex-start;
-    line-height: 1.3;
-  }
-
-  /* ── Card body: vertical stack  home → score → away ─────────────────── */
-  .card-body {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto auto;
-    gap: 0;
-    padding: 0;
-  }
-
-  /* Home: top row */
-  .match-team.home {
-    order: 1;
-    flex-direction: row;
-    justify-content: flex-start;
-    font-size: var(--text-sm);
-    padding: var(--space-3) var(--space-3) var(--space-2);
-    border-bottom: 1px solid var(--color-divider);
-  }
-
-  /* Score + actions: middle row, horizontal */
-  .match-center {
-    order: 2;
-    flex-direction: row;
-    justify-content: center;
-    align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-2) var(--space-3);
-    background: var(--color-surface-2);
-    flex-wrap: wrap;
-    border-bottom: 1px solid var(--color-divider);
-  }
-
-  /* Away: bottom row */
-  .match-team.away {
-    order: 3;
-    flex-direction: row-reverse;
-    justify-content: flex-end;
-    text-align: right;
-    font-size: var(--text-sm);
-    padding: var(--space-2) var(--space-3) var(--space-3);
-  }
-
-  /* Score inputs slightly smaller on mobile */
-  .score-input, .pred-input {
-    width: 2.5rem; height: 2.5rem;
-    font-size: var(--text-base);
-  }
-
-  /* ── Broadcast strip: full-width, compact ─────────────────────────── */
-  .card-broadcast {
-    gap: var(--space-1);
-    padding: var(--space-2) var(--space-3);
-  }
-  .bc-badge { font-size: 0.62rem; padding: 0.15rem 0.45rem; }
-  .bc-label { font-size: 0.6rem; }
+  .card-meta { gap: var(--space-2); }
+  .card-meta-item { white-space: normal; }
 }
 
-/* ==========================================================================
-   CONTAINER QUERY — very narrow cards (< 360px wide)
-   Shrinks team name font and hides flag on extreme small screens
-   ========================================================================== */
-@container (max-width: 359px) {
-  .match-team { font-size: var(--text-xs); }
-  .match-team .team-flag { display: none; }
-  .score-input, .pred-input { width: 2.25rem; height: 2.25rem; font-size: var(--text-sm); }
+@media (max-width: 420px) {
+  .card-team .team-name-text { display: none; } /* flag only on very small screens */
+  .card-header { padding: var(--space-3); }
+  .card-meta, .card-broadcast-row { padding: var(--space-2) var(--space-3); }
 }

@@ -225,26 +225,57 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
     </div>`;
   }
 
-  // ─── Fixture Header HTML ──────────────────────────────────────────────────
-  function fixtureHeader(match, groupLabel) {
+  // ─── Match Card HTML ──────────────────────────────────────────────────────
+  // Shared card structure used by both Matches and Predictions views.
+  // Layout:
+  //   .card-header  — home team | score col | away team | group badge
+  //   .card-meta    — calendar icon + date·time  |  pin icon + venue, city
+  //   .card-actions — save/predict button + broadcast badges
+  function matchCardHTML(match, centerHTML, groupLabel) {
     const dateStr = match.date
       ? new Date(match.date + 'T12:00:00').toLocaleDateString('en-US',
           { weekday: 'short', month: 'short', day: 'numeric' })
       : null;
-    const time  = match.timeLocal ? `${match.timeLocal} ${match.tz || 'ET'}` : null;
+    const time  = match.timeLocal ? `${match.timeLocal}\u202f${match.tz || 'ET'}` : null;
     const venue = match.venue || null;
     const city  = match.city  || null;
 
-    const left = [
-      dateStr && time ? `<span class="fh-datetime"><svg class="fh-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M2 6h12M5 1v3M11 1v3"/></svg>${dateStr} &middot; ${time}</span>` : '',
-      venue ? `<span class="fh-venue"><svg class="fh-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 1.5C5.51 1.5 3.5 3.51 3.5 6c0 3.75 4.5 8.5 4.5 8.5S12.5 9.75 12.5 6C12.5 3.51 10.49 1.5 8 1.5z"/><circle cx="8" cy="6" r="1.5"/></svg>${venue}${ city ? `, ${city}` : ''}</span>` : '',
-    ].filter(Boolean).join('');
+    const metaParts = [];
+    if (dateStr || time) {
+      metaParts.push(`
+        <span class="card-meta-item">
+          <svg class="meta-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M2 6h12M5 1v3M11 1v3"/></svg>
+          ${ [dateStr, time].filter(Boolean).join(' &middot; ') }
+        </span>`);
+    }
+    if (venue) {
+      metaParts.push(`
+        <span class="card-meta-item">
+          <svg class="meta-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 1.5C5.51 1.5 3.5 3.51 3.5 6c0 3.75 4.5 8.5 4.5 8.5S12.5 9.75 12.5 6C12.5 3.51 10.49 1.5 8 1.5z"/><circle cx="8" cy="6" r="1.5"/></svg>
+          ${venue}${ city ? `, ${city}` : '' }
+        </span>`);
+    }
 
-    const right = groupLabel
-      ? `<span class="fh-group">${groupLabel}</span>`
-      : '';
+    const broadcast = broadcastBadges(match);
 
-    return `<div class="card-fixture-header">${left}<div class="fh-right">${right}</div></div>`;
+    return `
+      <div class="card-header">
+        <div class="card-team home-team">
+          <span class="team-flag">${match.home.flag}</span>
+          <span class="team-name-text">${match.home.name}</span>
+        </div>
+        <div class="card-score-col">
+          ${centerHTML}
+        </div>
+        <div class="card-team away-team">
+          <span class="team-name-text">${match.away.name}</span>
+          <span class="team-flag">${match.away.flag}</span>
+        </div>
+        ${ groupLabel ? `<span class="card-group-badge">${groupLabel}</span>` : '' }
+      </div>
+      ${ metaParts.length ? `<div class="card-meta">${metaParts.join('')}</div>` : '' }
+      ${ broadcast ? `<div class="card-broadcast-row">${broadcast.replace(/<div class="card-broadcast">|<\/div>/g,'')}</div>` : '' }
+    `;
   }
 
   // ─── Render Groups ────────────────────────────────────────────────────────
@@ -287,34 +318,27 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
     if (venueFilter !== 'all') filtered = filtered.filter(m => m.venue === venueFilter);
 
     filtered.forEach(match => {
+      const scoreCenter = `
+        <div class="score-inputs-wrap">
+          <input class="score-input" type="number" min="0" max="20"
+            value="${match.homeScore !== null ? match.homeScore : ''}"
+            placeholder="-" data-match="${match.id}" data-side="home">
+          <span class="score-sep">:</span>
+          <input class="score-input" type="number" min="0" max="20"
+            value="${match.awayScore !== null ? match.awayScore : ''}"
+            placeholder="-" data-match="${match.id}" data-side="away">
+        </div>
+        <button class="btn-save" data-save="${match.id}">Save Result</button>
+        <span class="result-saved" id="saved-${match.id}">Saved ✓</span>
+      `;
+
       const card = document.createElement('div');
       card.className = 'match-card';
-      card.innerHTML = `
-        ${fixtureHeader(match, match.group ? 'Group ' + match.group : null)}
-        <div class="card-body">
-          <div class="match-team home">
-            <span class="team-flag">${match.home.flag}</span>
-            <span class="team-name-text">${match.home.name}</span>
-          </div>
-          <div class="match-center">
-            <div class="match-score-inputs">
-              <input class="score-input" type="number" min="0" max="20"
-                value="${match.homeScore !== null ? match.homeScore : ''}"
-                placeholder="-" data-match="${match.id}" data-side="home">
-              <span class="score-sep">:</span>
-              <input class="score-input" type="number" min="0" max="20"
-                value="${match.awayScore !== null ? match.awayScore : ''}"
-                placeholder="-" data-match="${match.id}" data-side="away">
-            </div>
-            <button class="btn-save" data-save="${match.id}">Save Result</button>
-            <span class="result-saved" id="saved-${match.id}">Saved ✓</span>
-          </div>
-          <div class="match-team away">
-            <span class="team-name-text">${match.away.name}</span>
-            <span class="team-flag">${match.away.flag}</span>
-          </div>
-        </div>
-        ${broadcastBadges(match)}`;
+      card.innerHTML = matchCardHTML(
+        match,
+        scoreCenter,
+        match.group ? 'Group ' + match.group : null
+      );
       container.appendChild(card);
     });
 
@@ -354,37 +378,34 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
       const pred = userPredictions[key] || userPredictions[match.id] || null;
       const hasResult = match.homeScore !== null && match.awayScore !== null;
 
+      let centerHTML;
+      if (hasResult) {
+        centerHTML = `
+          <div class="score-final">${match.homeScore} : ${match.awayScore}</div>
+          <span class="card-result-badge">Final</span>
+          ${ pred ? `<div class="pred-was">Your pick: ${pred.homeScorePred}–${pred.awayScorePred}</div>` : '' }
+        `;
+      } else {
+        centerHTML = `
+          <div class="score-inputs-wrap">
+            <input class="pred-input" type="number" min="0" max="20"
+              value="${ pred ? pred.homeScorePred : '' }" placeholder="?" data-pred="${match.id}" data-side="home">
+            <span class="score-sep">:</span>
+            <input class="pred-input" type="number" min="0" max="20"
+              value="${ pred ? pred.awayScorePred : '' }" placeholder="?" data-pred="${match.id}" data-side="away">
+          </div>
+          <button class="btn-save pred-btn" data-pred-save="${match.id}" data-fsid="${match.firestoreId || ''}">Predict</button>
+          <span class="pred-saving" id="pred-saving-${match.id}" hidden>Saving…</span>
+        `;
+      }
+
       const card = document.createElement('div');
       card.className = 'match-card';
-      card.innerHTML = `
-        ${fixtureHeader(match, match.group ? 'Group ' + match.group : null)}
-        <div class="card-body">
-          <div class="match-team home">
-            <span class="team-flag">${match.home.flag}</span>
-            <span class="team-name-text">${match.home.name}</span>
-          </div>
-          <div class="match-center">
-            ${ hasResult
-              ? `<div class="pred-score-display">${match.homeScore} : ${match.awayScore}</div>
-                 <span class="match-group-badge result-badge">Final</span>
-                 ${ pred ? `<span class="pred-was">Your pick: ${pred.homeScorePred}–${pred.awayScorePred}</span>` : '' }`
-              : `<div class="pred-inputs">
-                   <input class="pred-input" type="number" min="0" max="20"
-                     value="${ pred ? pred.homeScorePred : '' }" placeholder="?" data-pred="${match.id}" data-side="home">
-                   <span class="score-sep">:</span>
-                   <input class="pred-input" type="number" min="0" max="20"
-                     value="${ pred ? pred.awayScorePred : '' }" placeholder="?" data-pred="${match.id}" data-side="away">
-                 </div>
-                 <button class="btn-save pred-btn" data-pred-save="${match.id}" data-fsid="${match.firestoreId || ''}">Predict</button>
-                 <span class="pred-saving" id="pred-saving-${match.id}" hidden>Saving…</span>`
-            }
-          </div>
-          <div class="match-team away">
-            <span class="team-name-text">${match.away.name}</span>
-            <span class="team-flag">${match.away.flag}</span>
-          </div>
-        </div>
-        ${broadcastBadges(match)}`;
+      card.innerHTML = matchCardHTML(
+        match,
+        centerHTML,
+        match.group ? 'Group ' + match.group : null
+      );
       container.appendChild(card);
     });
 
