@@ -1,21 +1,82 @@
 // 2026 FIFA World Cup Groups & Teams
-// 12 groups of 4 teams each
+// Official draw results - December 5, 2025
+// Source: FIFA / ESPN
 const WC_GROUPS = [
-  { id: 'A', teams: [{name:'USA', flag:'🇺🇸'},{name:'Mexico', flag:'🇲🇽'},{name:'Uruguay', flag:'🇺🇾'},{name:'Panama', flag:'🇵🇦'}] },
-  { id: 'B', teams: [{name:'Spain', flag:'🇪🇸'},{name:'Brazil', flag:'🇧🇷'},{name:'Japan', flag:'🇯🇵'},{name:'Morocco', flag:'🇲🇦'}] },
-  { id: 'C', teams: [{name:'England', flag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿'},{name:'Argentina', flag:'🇦🇷'},{name:'France', flag:'🇫🇷'},{name:'Australia', flag:'🇦🇺'}] },
-  { id: 'D', teams: [{name:'Germany', flag:'🇩🇪'},{name:'Portugal', flag:'🇵🇹'},{name:'Colombia', flag:'🇨🇴'},{name:'Senegal', flag:'🇸🇳'}] },
-  { id: 'E', teams: [{name:'Netherlands', flag:'🇳🇱'},{name:'Ecuador', flag:'🇪🇨'},{name:'Italy', flag:'🇮🇹'},{name:'South Korea', flag:'🇰🇷'}] },
-  { id: 'F', teams: [{name:'Belgium', flag:'🇧🇪'},{name:'Croatia', flag:'🇭🇷'},{name:'Serbia', flag:'🇷🇸'},{name:'Jamaica', flag:'🇯🇲'}] },
-  { id: 'G', teams: [{name:'Canada', flag:'🇨🇦'},{name:'Cameroon', flag:'🇨🇲'},{name:'Chile', flag:'🇨🇱'},{name:'Peru', flag:'🇵🇪'}] },
-  { id: 'H', teams: [{name:'Switzerland', flag:'🇨🇭'},{name:'Denmark', flag:'🇩🇰'},{name:'Turkey', flag:'🇹🇷'},{name:'Bolivia', flag:'🇧🇴'}] },
-  { id: 'I', teams: [{name:'Poland', flag:'🇵🇱'},{name:'Paraguay', flag:'🇵🇾'},{name:'Saudi Arabia', flag:'🇸🇦'},{name:'Honduras', flag:'🇭🇳'}] },
-  { id: 'J', teams: [{name:'Nigeria', flag:'🇳🇬'},{name:'Egypt', flag:'🇪🇬'},{name:'Ukraine', flag:'🇺🇦'},{name:'New Zealand', flag:'🇳🇿'}] },
-  { id: 'K', teams: [{name:'Iran', flag:'🇮🇷'},{name:'Venezuela', flag:'🇻🇪'},{name:'Algeria', flag:'🇩🇿'},{name:'Czech Republic', flag:'🇨🇿'}] },
-  { id: 'L', teams: [{name:'Portugal', flag:'🇵🇹'},{name:'Scotland', flag:'🏴󠁧󠁢󠁳󠁣󠁴󠁿'},{name:'Ghana', flag:'🇬🇭'},{name:'El Salvador', flag:'🇸🇻'}] },
+  { id: 'A', teams: [
+    {name:'Mexico',        flag:'🇲🇽'},
+    {name:'South Africa',  flag:'🇿🇦'},
+    {name:'South Korea',   flag:'🇰🇷'},
+    {name:'Czechia',       flag:'🇨🇿'}
+  ]},
+  { id: 'B', teams: [
+    {name:'Canada',        flag:'🇨🇦'},
+    {name:'Bosnia-Herzegovina', flag:'🇧🇦'},
+    {name:'Qatar',         flag:'🇶🇦'},
+    {name:'Switzerland',   flag:'🇨🇭'}
+  ]},
+  { id: 'C', teams: [
+    {name:'Brazil',        flag:'🇧🇷'},
+    {name:'Morocco',       flag:'🇲🇦'},
+    {name:'Haiti',         flag:'🇭🇹'},
+    {name:'Scotland',      flag:'🏴󠁧󠁢󠁳󠁣󠁴󠁿'}
+  ]},
+  { id: 'D', teams: [
+    {name:'USA',           flag:'🇺🇸'},
+    {name:'Paraguay',      flag:'🇵🇾'},
+    {name:'Australia',     flag:'🇦🇺'},
+    {name:'Türkiye',       flag:'🇹🇷'}
+  ]},
+  { id: 'E', teams: [
+    {name:'Germany',       flag:'🇩🇪'},
+    {name:'Curaçao',       flag:'🇨🇼'},
+    {name:'Ivory Coast',   flag:'🇨🇮'},
+    {name:'Ecuador',       flag:'🇪🇨'}
+  ]},
+  { id: 'F', teams: [
+    {name:'Netherlands',   flag:'🇳🇱'},
+    {name:'Japan',         flag:'🇯🇵'},
+    {name:'Sweden',        flag:'🇸🇪'},
+    {name:'Tunisia',       flag:'🇹🇳'}
+  ]},
+  { id: 'G', teams: [
+    {name:'Belgium',       flag:'🇧🇪'},
+    {name:'Egypt',         flag:'🇪🇬'},
+    {name:'Iran',          flag:'🇮🇷'},
+    {name:'New Zealand',   flag:'🇳🇿'}
+  ]},
+  { id: 'H', teams: [
+    {name:'Spain',         flag:'🇪🇸'},
+    {name:'Cape Verde',    flag:'🇨🇻'},
+    {name:'Saudi Arabia',  flag:'🇸🇦'},
+    {name:'Uruguay',       flag:'🇺🇾'}
+  ]},
+  { id: 'I', teams: [
+    {name:'France',        flag:'🇫🇷'},
+    {name:'Senegal',       flag:'🇸🇳'},
+    {name:'Iraq',          flag:'🇮🇶'},
+    {name:'Norway',        flag:'🇳🇴'}
+  ]},
+  { id: 'J', teams: [
+    {name:'Argentina',     flag:'🇦🇷'},
+    {name:'Algeria',       flag:'🇩🇿'},
+    {name:'Austria',       flag:'🇦🇹'},
+    {name:'Jordan',        flag:'🇯🇴'}
+  ]},
+  { id: 'K', teams: [
+    {name:'Portugal',      flag:'🇵🇹'},
+    {name:'Congo DR',      flag:'🇨🇩'},
+    {name:'Uzbekistan',    flag:'🇺🇿'},
+    {name:'Colombia',      flag:'🇨🇴'}
+  ]},
+  { id: 'L', teams: [
+    {name:'England',       flag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿'},
+    {name:'Croatia',       flag:'🇭🇷'},
+    {name:'Ghana',         flag:'🇬🇭'},
+    {name:'Panama',        flag:'🇵🇦'}
+  ]},
 ];
 
-// Generate group stage matches (each team plays 3 games)
+// Generate group stage matches (each team plays the other 3 in their group)
 function generateMatches() {
   const matches = [];
   let id = 1;
