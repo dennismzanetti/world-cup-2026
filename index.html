@@ -14,13 +14,41 @@
   <!-- Skip link -->
   <a href="#main" class="sr-only">Skip to content</a>
 
+  <!-- Auth Modal -->
+  <div class="auth-modal" id="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title" hidden>
+    <div class="auth-card">
+      <h2 id="auth-title" class="auth-heading">Sign In</h2>
+      <p class="auth-sub" id="auth-sub">Sign in to save your predictions.</p>
+      <form id="auth-form" novalidate>
+        <div class="form-group">
+          <label for="auth-name" id="name-label" style="display:none">Name</label>
+          <input type="text" id="auth-name" placeholder="Your name" autocomplete="name" style="display:none">
+        </div>
+        <div class="form-group">
+          <label for="auth-email">Email</label>
+          <input type="email" id="auth-email" placeholder="you@example.com" autocomplete="email" required>
+        </div>
+        <div class="form-group">
+          <label for="auth-password">Password</label>
+          <input type="password" id="auth-password" placeholder="Password" autocomplete="current-password" required minlength="6">
+        </div>
+        <p class="auth-error" id="auth-error" aria-live="polite"></p>
+        <button type="submit" class="btn btn-primary auth-submit" id="auth-submit">Sign In</button>
+      </form>
+      <p class="auth-toggle">
+        <button class="link-btn" id="auth-switch">Don\'t have an account? Sign up</button>
+      </p>
+      <button class="auth-close" id="auth-close" aria-label="Close sign in dialog">&times;</button>
+    </div>
+  </div>
+  <div class="auth-backdrop" id="auth-backdrop" hidden></div>
+
   <!-- Header -->
   <header class="site-header">
     <div class="container header-inner">
       <a href="#" class="logo" aria-label="World Cup 2026 Home">
         <svg width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
           <circle cx="18" cy="18" r="17" stroke="currentColor" stroke-width="2"/>
-          <!-- Soccer ball hex patches -->
           <polygon points="18,6 22,10 20,15 16,15 14,10" fill="currentColor" opacity="0.9"/>
           <polygon points="22,10 27,10 29,15 25,18 20,15" fill="currentColor" opacity="0.5"/>
           <polygon points="14,10 16,15 11,18 7,15 9,10" fill="currentColor" opacity="0.5"/>
@@ -37,11 +65,22 @@
         <button class="nav-btn" data-view="predictions">Predictions</button>
         <button class="nav-btn" data-view="standings">Standings</button>
       </nav>
-      <button class="theme-toggle" data-theme-toggle aria-label="Switch to light mode">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-      </button>
+      <div class="header-actions">
+        <button class="btn btn-sm" id="auth-btn" aria-label="Sign in">Sign In</button>
+        <button class="theme-toggle" data-theme-toggle aria-label="Switch to light mode">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+      </div>
     </div>
   </header>
+
+  <!-- User Bar (visible when signed in) -->
+  <div class="user-bar" id="user-bar" hidden>
+    <div class="container user-bar-inner">
+      <span id="user-greeting"></span>
+      <button class="link-btn" id="sign-out-btn">Sign out</button>
+    </div>
+  </div>
 
   <!-- Main Content -->
   <main id="main" class="main-content">
@@ -61,13 +100,17 @@
     <section class="view" id="view-matches">
       <div class="container">
         <div class="page-header">
-          <h1 class="page-title">Match Results</h1>
-          <p class="page-subtitle">Enter scores for completed matches</p>
+          <h1 class="page-title">Match Schedule &amp; Results</h1>
+          <p class="page-subtitle">Dates, venues, broadcast info, and live results</p>
         </div>
         <div class="matches-filter">
           <label for="group-filter">Filter by Group:</label>
           <select id="group-filter">
             <option value="all">All Groups</option>
+          </select>
+          <label for="venue-filter">Venue:</label>
+          <select id="venue-filter">
+            <option value="all">All Venues</option>
           </select>
         </div>
         <div class="matches-list" id="matches-list"></div>
@@ -79,7 +122,11 @@
       <div class="container">
         <div class="page-header">
           <h1 class="page-title">Your Predictions</h1>
-          <p class="page-subtitle">Predict match scores before they're played</p>
+          <p class="page-subtitle">Predict match scores before kickoff &mdash; sign in to save</p>
+        </div>
+        <div id="predictions-auth-prompt" class="auth-prompt" hidden>
+          <p>Sign in to save and track your predictions.</p>
+          <button class="btn btn-primary" id="predict-signin-btn">Sign In</button>
         </div>
         <div class="predictions-list" id="predictions-list"></div>
       </div>
@@ -106,7 +153,11 @@
     </div>
   </footer>
 
+  <!-- Firebase modules loaded as ES modules -->
+  <script type="module" src="./firebase.js"></script>
+  <script type="module" src="./auth.js"></script>
+  <script type="module" src="./db.js"></script>
   <script src="./assets/data.js"></script>
-  <script src="./assets/app.js"></script>
+  <script type="module" src="./assets/app.js"></script>
 </body>
 </html>

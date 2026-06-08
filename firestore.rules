@@ -1,0 +1,27 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // MATCHES — public read, no client writes (admin only via Admin SDK)
+    match /matches/{matchId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // USERS — each user can only read and write their own profile
+    match /users/{userId} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == userId;
+    }
+
+    // PREDICTIONS — signed-in users can read all predictions,
+    // but can only create/update/delete their own
+    match /predictions/{predictionId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+    }
+  }
+}
