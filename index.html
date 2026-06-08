@@ -135,8 +135,8 @@
           <h1 class="page-title">Your Predictions</h1>
           <p class="page-subtitle">Predict match scores before kickoff &mdash; sign in to save</p>
         </div>
-        <!-- Shown when signed out -->
-        <div id="predictions-auth-prompt" class="auth-prompt">
+        <!-- Shown when signed out; starts hidden until auth state is resolved -->
+        <div id="predictions-auth-prompt" class="auth-prompt" hidden>
           <p>Sign in to save and track your predictions across devices.</p>
           <button class="btn btn-primary" id="predict-signin-btn">Sign In to Predict</button>
         </div>
