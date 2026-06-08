@@ -149,18 +149,17 @@
 
   </main>
 
-  <!-- Footer -->
-  <footer class="site-footer">
-    <div class="container footer-inner">
-      <span>World Cup 2026 Tracker</span>
-      <span class="footer-muted">USA &bull; Canada &bull; Mexico &mdash; June&ndash;July 2026</span>
-    </div>
+  <!-- Build footer -->
+  <footer class="build-footer" id="build-footer" aria-label="Build information">
+    <span id="build-badge">Loading build&hellip;</span>
   </footer>
 
   <!-- Data (global WC_MATCHES / WC_GROUPS) must load before app module -->
   <script src="./assets/data.js"></script>
   <!-- Firebase + App as ES modules -->
   <script type="module" src="./assets/app.js"></script>
+  <!-- Build footer version script -->
+  <script src="./assets/version.js" defer></script>
 
 </body>
 </html>
