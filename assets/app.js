@@ -8,9 +8,9 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
 
   // ─── State ────────────────────────────────────────────────────────────────
   let currentUser = null;
-  let userPredictions = {};   // { [matchId]: { homeScorePred, awayScorePred } }
-  let firestoreMatches = [];  // populated from Firestore; falls back to WC_MATCHES
-  let authMode = 'signin';    // 'signin' | 'signup'
+  let userPredictions = {};
+  let firestoreMatches = [];
+  let authMode = 'signin';
 
   // ─── Theme ────────────────────────────────────────────────────────────────
   const themeToggle = document.querySelector('[data-theme-toggle]');
@@ -47,24 +47,24 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
   });
 
   // ─── Auth Modal ───────────────────────────────────────────────────────────
-  const authModal    = document.getElementById('auth-modal');
-  const authBackdrop = document.getElementById('auth-backdrop');
-  const authForm     = document.getElementById('auth-form');
-  const authTitle    = document.getElementById('auth-title');
-  const authSub      = document.getElementById('auth-sub');
-  const authSubmit   = document.getElementById('auth-submit');
-  const authSwitch   = document.getElementById('auth-switch');
-  const authClose    = document.getElementById('auth-close');
-  const authError    = document.getElementById('auth-error');
-  const authNameWrap = document.getElementById('auth-name');
-  const authNameInput= document.getElementById('auth-name-input'); // the actual <input>
-  const authNameLabel= document.getElementById('name-label');
-  const authBtn      = document.getElementById('auth-btn');
-  const userBar      = document.getElementById('user-bar');
-  const userGreeting = document.getElementById('user-greeting');
-  const signOutBtn   = document.getElementById('sign-out-btn');
-  const predictSignin= document.getElementById('predict-signin-btn');
-  const predictPrompt= document.getElementById('predictions-auth-prompt');
+  const authModal     = document.getElementById('auth-modal');
+  const authBackdrop  = document.getElementById('auth-backdrop');
+  const authForm      = document.getElementById('auth-form');
+  const authTitle     = document.getElementById('auth-title');
+  const authSub       = document.getElementById('auth-sub');
+  const authSubmit    = document.getElementById('auth-submit');
+  const authSwitch    = document.getElementById('auth-switch');
+  const authClose     = document.getElementById('auth-close');
+  const authError     = document.getElementById('auth-error');
+  const authNameWrap  = document.getElementById('auth-name');       // the <div> wrapper
+  const authNameInput = document.getElementById('auth-name-input'); // the <input> inside it
+  const authNameLabel = document.getElementById('name-label');
+  const authBtn       = document.getElementById('auth-btn');
+  const userBar       = document.getElementById('user-bar');
+  const userGreeting  = document.getElementById('user-greeting');
+  const signOutBtn    = document.getElementById('sign-out-btn');
+  const predictSignin = document.getElementById('predict-signin-btn');
+  const predictPrompt = document.getElementById('predictions-auth-prompt');
 
   function openAuthModal() {
     authModal.hidden = false;
@@ -80,30 +80,22 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
   }
   function setAuthMode(mode) {
     authMode = mode;
-    if (mode === 'signup') {
-      authTitle.textContent = 'Create Account';
-      authSub.textContent = 'Sign up to save and track your predictions.';
-      authSubmit.textContent = 'Sign Up';
-      authSwitch.textContent = 'Already have an account? Sign in';
-      if (authNameWrap)  { authNameWrap.style.display = 'block'; }
-      if (authNameLabel) { authNameLabel.style.display = 'block'; }
-    } else {
-      authTitle.textContent = 'Sign In';
-      authSub.textContent = 'Sign in to save your predictions.';
-      authSubmit.textContent = 'Sign In';
-      authSwitch.textContent = "Don't have an account? Sign up";
-      if (authNameWrap)  { authNameWrap.style.display = 'none'; }
-      if (authNameLabel) { authNameLabel.style.display = 'none'; }
-    }
+    const isSignup = mode === 'signup';
+    authTitle.textContent   = isSignup ? 'Create Account' : 'Sign In';
+    authSub.textContent     = isSignup ? 'Sign up to save and track your predictions.' : 'Sign in to save your predictions.';
+    authSubmit.textContent  = isSignup ? 'Sign Up' : 'Sign In';
+    authSwitch.textContent  = isSignup ? 'Already have an account? Sign in' : "Don't have an account? Sign up";
+    if (authNameWrap)  authNameWrap.style.display  = isSignup ? 'block' : 'none';
+    if (authNameLabel) authNameLabel.style.display = isSignup ? 'block' : 'none';
     authError.textContent = '';
   }
 
-  if (authBtn)      authBtn.addEventListener('click', () => { setAuthMode('signin'); openAuthModal(); });
+  if (authBtn)       authBtn.addEventListener('click', () => { setAuthMode('signin'); openAuthModal(); });
   if (predictSignin) predictSignin.addEventListener('click', () => { setAuthMode('signin'); openAuthModal(); });
-  if (authClose)    authClose.addEventListener('click', closeAuthModal);
-  if (authBackdrop) authBackdrop.addEventListener('click', closeAuthModal);
-  if (authSwitch)   authSwitch.addEventListener('click', () => setAuthMode(authMode === 'signin' ? 'signup' : 'signin'));
-  if (signOutBtn)   signOutBtn.addEventListener('click', () => logOut());
+  if (authClose)     authClose.addEventListener('click', closeAuthModal);
+  if (authBackdrop)  authBackdrop.addEventListener('click', closeAuthModal);
+  if (authSwitch)    authSwitch.addEventListener('click', () => setAuthMode(authMode === 'signin' ? 'signup' : 'signin'));
+  if (signOutBtn)    signOutBtn.addEventListener('click', () => logOut());
 
   if (authForm) {
     authForm.addEventListener('submit', async (e) => {
@@ -111,16 +103,11 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
       authError.textContent = '';
       const email    = document.getElementById('auth-email').value.trim();
       const password = document.getElementById('auth-password').value;
-      // FIX: read from the <input> element, not the wrapper <div>
-      const name     = authNameInput ? authNameInput.value.trim() : '';
+      const name     = authNameInput ? authNameInput.value.trim() : ''; // read <input>, not the <div>
       authSubmit.disabled = true;
       authSubmit.textContent = authMode === 'signup' ? 'Creating...' : 'Signing in...';
       try {
-        if (authMode === 'signup') {
-          await signUp(email, password, name);
-        } else {
-          await signIn(email, password);
-        }
+        authMode === 'signup' ? await signUp(email, password, name) : await signIn(email, password);
         closeAuthModal();
       } catch (err) {
         authError.textContent = friendlyAuthError(err.code);
@@ -148,10 +135,10 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
   watchAuth(async (user) => {
     currentUser = user;
     if (user) {
-      if (authBtn)      { authBtn.textContent = 'Account'; }
-      if (userBar)      { userBar.hidden = false; }
-      if (userGreeting) { userGreeting.textContent = 'Hi, ' + (user.displayName || user.email); }
-      if (predictPrompt){ predictPrompt.hidden = true; }
+      if (authBtn)      authBtn.textContent = 'Account';
+      if (userBar)      userBar.hidden = false;
+      if (userGreeting) userGreeting.textContent = 'Hi, ' + (user.displayName || user.email);
+      if (predictPrompt) predictPrompt.hidden = true;
       try {
         const preds = await getUserPredictions(user.uid);
         userPredictions = {};
@@ -160,9 +147,9 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
         console.warn('Could not load predictions:', err);
       }
     } else {
-      if (authBtn)      { authBtn.textContent = 'Sign In'; }
-      if (userBar)      { userBar.hidden = true; }
-      if (predictPrompt){ predictPrompt.hidden = false; }
+      if (authBtn)      authBtn.textContent = 'Sign In';
+      if (userBar)      userBar.hidden = true;
+      if (predictPrompt) predictPrompt.hidden = false;
       userPredictions = {};
     }
     renderAll();
@@ -174,20 +161,18 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
       firestoreMatches = await getMatches();
       if (firestoreMatches.length > 0) {
         firestoreMatches.forEach(fm => {
-          const local = WC_MATCHES.find(
-            m => m.home.name === fm.homeTeam && m.away.name === fm.awayTeam
-          );
+          const local = WC_MATCHES.find(m => m.home.name === fm.homeTeam && m.away.name === fm.awayTeam);
           if (local) {
             if (fm.homeScore !== null) local.homeScore = fm.homeScore;
             if (fm.awayScore !== null) local.awayScore = fm.awayScore;
-            if (fm.date)       local.date      = fm.date;
-            if (fm.timeLocal)  local.timeLocal = fm.timeLocal;
-            if (fm.timezone)   local.tz        = fm.timezone.replace('America/', '').split('/')[0];
-            if (fm.venue)      local.venue     = fm.venue;
-            if (fm.city)       local.city      = fm.city;
-            if (fm.tvEnglish)  local.tvEnglish = fm.tvEnglish;
-            if (fm.tvSpanish)  local.tvSpanish = fm.tvSpanish;
-            if (fm.streaming)  local.streaming = fm.streaming;
+            if (fm.date)      local.date      = fm.date;
+            if (fm.timeLocal) local.timeLocal = fm.timeLocal;
+            if (fm.timezone)  local.tz        = fm.timezone.replace('America/', '').split('/')[0];
+            if (fm.venue)     local.venue     = fm.venue;
+            if (fm.city)      local.city      = fm.city;
+            if (fm.tvEnglish) local.tvEnglish = fm.tvEnglish;
+            if (fm.tvSpanish) local.tvSpanish = fm.tvSpanish;
+            if (fm.streaming) local.streaming = fm.streaming;
             local.firestoreId = fm.id;
           }
         });
@@ -215,21 +200,26 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
     return { pts, played: w + d + l, w, d, l, gf, ga, gd: gf - ga };
   }
 
-  // ─── Broadcast Badges HTML ────────────────────────────────────────────────
-  function broadcastBadges(match) {
-    const tv  = (match.tvEnglish || []);
-    const esp = (match.tvSpanish || []);
-    const str = (match.streaming || []);
+  // ─── Broadcast Badges ─────────────────────────────────────────────────────
+  // Returns an HTML string of badge <span>s, or '' if none.
+  function broadcastBadgesHTML(match) {
+    const tv  = match.tvEnglish || [];
+    const esp = match.tvSpanish || [];
+    const str = match.streaming || [];
     if (!tv.length && !esp.length && !str.length) return '';
-    return `<div class="card-broadcast">
-      ${ tv.map(s  => `<span class="bc-badge bc-tv">${s}</span>`).join('') }
-      ${ esp.map(s => `<span class="bc-badge bc-esp">${s}</span>`).join('') }
-      ${ str.map(s => `<span class="bc-badge bc-stream">${s}</span>`).join('') }
-    </div>`;
+    return [
+      ...tv.map(s  => `<span class="bc-badge bc-tv">${s}</span>`),
+      ...esp.map(s => `<span class="bc-badge bc-esp">${s}</span>`),
+      ...str.map(s => `<span class="bc-badge bc-stream">${s}</span>`),
+    ].join('');
   }
 
   // ─── Match Card HTML ──────────────────────────────────────────────────────
-  function matchCardHTML(match, centerHTML, groupLabel) {
+  // Layout:
+  //   .card-header        — home team | .card-score-col (fixed w) | away team | group badge
+  //   .card-meta          — calendar icon + date · time  |  pin icon + venue, city
+  //   .card-broadcast-row — TV / streaming badges (omitted when empty)
+  function matchCardHTML(match, scoreColHTML, groupLabel) {
     const dateStr = match.date
       ? new Date(match.date + 'T12:00:00').toLocaleDateString('en-US',
           { weekday: 'short', month: 'short', day: 'numeric' })
@@ -238,23 +228,39 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
     const venue = match.venue || null;
     const city  = match.city  || null;
 
-    const metaParts = [];
+    // ── meta row ──
+    const metaItems = [];
     if (dateStr || time) {
-      metaParts.push(`
-        <span class="card-meta-item">
-          <svg class="meta-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M2 6h12M5 1v3M11 1v3"/></svg>
-          ${ [dateStr, time].filter(Boolean).join(' &middot; ') }
-        </span>`);
+      metaItems.push(`<span class="card-meta-item">
+        <svg class="meta-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+          <rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M2 6h12M5 1v3M11 1v3"/>
+        </svg>
+        ${[dateStr, time].filter(Boolean).join(' &middot; ')}
+      </span>`);
     }
     if (venue) {
-      metaParts.push(`
-        <span class="card-meta-item">
-          <svg class="meta-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 1.5C5.51 1.5 3.5 3.51 3.5 6c0 3.75 4.5 8.5 4.5 8.5S12.5 9.75 12.5 6C12.5 3.51 10.49 1.5 8 1.5z"/><circle cx="8" cy="6" r="1.5"/></svg>
-          ${venue}${ city ? `, ${city}` : '' }
-        </span>`);
+      metaItems.push(`<span class="card-meta-item">
+        <svg class="meta-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+          <path d="M8 1.5C5.51 1.5 3.5 3.51 3.5 6c0 3.75 4.5 8.5 4.5 8.5S12.5 9.75 12.5 6C12.5 3.51 10.49 1.5 8 1.5z"/>
+          <circle cx="8" cy="6" r="1.5"/>
+        </svg>
+        ${venue}${city ? `, ${city}` : ''}
+      </span>`);
     }
+    const metaRow = metaItems.length
+      ? `<div class="card-meta">${metaItems.join('')}</div>`
+      : '';
 
-    const broadcast = broadcastBadges(match);
+    // ── broadcast row ──
+    const badges = broadcastBadgesHTML(match);
+    const broadcastRow = badges
+      ? `<div class="card-broadcast-row">${badges}</div>`
+      : '';
+
+    // ── group badge ──
+    const groupBadge = groupLabel
+      ? `<span class="card-group-badge">${groupLabel}</span>`
+      : '';
 
     return `
       <div class="card-header">
@@ -262,17 +268,15 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
           <span class="team-flag">${match.home.flag}</span>
           <span class="team-name-text">${match.home.name}</span>
         </div>
-        <div class="card-score-col">
-          ${centerHTML}
-        </div>
+        <div class="card-score-col">${scoreColHTML}</div>
         <div class="card-team away-team">
           <span class="team-name-text">${match.away.name}</span>
           <span class="team-flag">${match.away.flag}</span>
         </div>
-        ${ groupLabel ? `<span class="card-group-badge">${groupLabel}</span>` : '' }
+        ${groupBadge}
       </div>
-      ${ metaParts.length ? `<div class="card-meta">${metaParts.join('')}</div>` : '' }
-      ${ broadcast ? `<div class="card-broadcast-row">${broadcast.replace(/<div class="card-broadcast">|<\/div>/g,'')}</div>` : '' }
+      ${metaRow}
+      ${broadcastRow}
     `;
   }
 
@@ -283,9 +287,9 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
     container.innerHTML = '';
     WC_GROUPS.forEach(group => {
       const groupMatches = WC_MATCHES.filter(m => m.group === group.id);
-      const teamsWithPts = group.teams.map(t => ({
-        ...t, ...calcPoints(groupMatches, t.name)
-      })).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+      const teamsWithPts = group.teams
+        .map(t => ({ ...t, ...calcPoints(groupMatches, t.name) }))
+        .sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
 
       const card = document.createElement('div');
       card.className = 'group-card';
@@ -316,7 +320,8 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
     if (venueFilter !== 'all') filtered = filtered.filter(m => m.venue === venueFilter);
 
     filtered.forEach(match => {
-      const scoreCenter = `
+      // Score column: inputs + save button + saved confirmation
+      const scoreColHTML = `
         <div class="score-inputs-wrap">
           <input class="score-input" type="number" min="0" max="20"
             value="${match.homeScore !== null ? match.homeScore : ''}"
@@ -327,14 +332,12 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
             placeholder="-" data-match="${match.id}" data-side="away">
         </div>
         <button class="btn-save" data-save="${match.id}">Save Result</button>
-        <span class="result-saved" id="saved-${match.id}">Saved ✓</span>
-      `;
+        <span class="result-saved" id="saved-${match.id}">Saved ✓</span>`;
 
       const card = document.createElement('div');
       card.className = 'match-card';
       card.innerHTML = matchCardHTML(
-        match,
-        scoreCenter,
+        match, scoreColHTML,
         match.group ? 'Group ' + match.group : null
       );
       container.appendChild(card);
@@ -342,8 +345,8 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
 
     container.querySelectorAll('.btn-save').forEach(btn => {
       btn.addEventListener('click', () => {
-        const id    = parseInt(btn.dataset.save);
-        const match = WC_MATCHES.find(m => m.id === id);
+        const id     = parseInt(btn.dataset.save);
+        const match  = WC_MATCHES.find(m => m.id === id);
         const hInput = container.querySelector(`input[data-match="${id}"][data-side="home"]`);
         const aInput = container.querySelector(`input[data-match="${id}"][data-side="away"]`);
         if (hInput.value !== '' && aInput.value !== '') {
@@ -376,32 +379,31 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
       const pred = userPredictions[key] || userPredictions[match.id] || null;
       const hasResult = match.homeScore !== null && match.awayScore !== null;
 
-      let centerHTML;
+      let scoreColHTML;
       if (hasResult) {
-        centerHTML = `
+        scoreColHTML = `
           <div class="score-final">${match.homeScore} : ${match.awayScore}</div>
           <span class="card-result-badge">Final</span>
-          ${ pred ? `<div class="pred-was">Your pick: ${pred.homeScorePred}–${pred.awayScorePred}</div>` : '' }
-        `;
+          ${pred ? `<div class="pred-was">Your pick: ${pred.homeScorePred}–${pred.awayScorePred}</div>` : ''}`;
       } else {
-        centerHTML = `
+        scoreColHTML = `
           <div class="score-inputs-wrap">
             <input class="pred-input" type="number" min="0" max="20"
-              value="${ pred ? pred.homeScorePred : '' }" placeholder="?" data-pred="${match.id}" data-side="home">
+              value="${pred ? pred.homeScorePred : ''}" placeholder="?"
+              data-pred="${match.id}" data-side="home">
             <span class="score-sep">:</span>
             <input class="pred-input" type="number" min="0" max="20"
-              value="${ pred ? pred.awayScorePred : '' }" placeholder="?" data-pred="${match.id}" data-side="away">
+              value="${pred ? pred.awayScorePred : ''}" placeholder="?"
+              data-pred="${match.id}" data-side="away">
           </div>
           <button class="btn-save pred-btn" data-pred-save="${match.id}" data-fsid="${match.firestoreId || ''}">Predict</button>
-          <span class="pred-saving" id="pred-saving-${match.id}" hidden>Saving…</span>
-        `;
+          <span class="pred-saving" id="pred-saving-${match.id}" hidden>Saving…</span>`;
       }
 
       const card = document.createElement('div');
       card.className = 'match-card';
       card.innerHTML = matchCardHTML(
-        match,
-        centerHTML,
+        match, scoreColHTML,
         match.group ? 'Group ' + match.group : null
       );
       container.appendChild(card);
@@ -425,11 +427,7 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
             homeScorePred: parseInt(hInput.value),
             awayScorePred: parseInt(aInput.value)
           });
-          userPredictions[matchId] = {
-            matchId,
-            homeScorePred: parseInt(hInput.value),
-            awayScorePred: parseInt(aInput.value)
-          };
+          userPredictions[matchId] = { matchId, homeScorePred: parseInt(hInput.value), awayScorePred: parseInt(aInput.value) };
           btn.textContent = 'Updated ✓';
           setTimeout(() => { btn.textContent = 'Predict'; btn.disabled = false; }, 1500);
         } catch (err) {
@@ -449,10 +447,10 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
     if (!container) return;
     container.innerHTML = '';
     WC_GROUPS.forEach(group => {
-      const groupMatches = WC_MATCHES.filter(m => m.group === group.id);
-      const teamsWithStats = group.teams.map(t => ({
-        ...t, ...calcPoints(groupMatches, t.name)
-      })).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+      const groupMatches  = WC_MATCHES.filter(m => m.group === group.id);
+      const teamsWithStats = group.teams
+        .map(t => ({ ...t, ...calcPoints(groupMatches, t.name) }))
+        .sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
 
       const card = document.createElement('div');
       card.className = 'standings-card';
@@ -460,18 +458,20 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
         <div class="standings-header">Group ${group.id}</div>
         <table class="standings-table">
           <thead>
-            <tr><th></th><th>Team</th>
+            <tr>
+              <th></th><th>Team</th>
               <th title="Played">P</th><th title="Won">W</th><th title="Drawn">D</th>
               <th title="Lost">L</th><th title="Goals For">GF</th>
               <th title="Goals Against">GA</th><th title="Goal Difference">GD</th>
-              <th title="Points">Pts</th></tr>
+              <th title="Points">Pts</th>
+            </tr>
           </thead>
           <tbody>
             ${teamsWithStats.map((t, i) => `
               <tr class="${i < 2 ? 'qualified' : ''}">
                 <td>${t.flag}</td><td>${t.name}</td>
-                <td>${t.played}</td><td>${t.w}</td><td>${t.d}</td>
-                <td>${t.l}</td><td>${t.gf}</td><td>${t.ga}</td>
+                <td>${t.played}</td><td>${t.w}</td><td>${t.d}</td><td>${t.l}</td>
+                <td>${t.gf}</td><td>${t.ga}</td>
                 <td>${t.gd > 0 ? '+' + t.gd : t.gd}</td>
                 <td class="pts">${t.pts}</td>
               </tr>`).join('')}
@@ -492,7 +492,6 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
       groupFilterEl.appendChild(opt);
     });
   }
-
   if (venueFilterEl) {
     const venues = [...new Set(WC_MATCHES.map(m => m.venue).filter(Boolean))];
     venues.forEach(v => {
@@ -505,7 +504,7 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
   function getFilters() {
     return {
       group: groupFilterEl ? groupFilterEl.value : 'all',
-      venue: venueFilterEl ? venueFilterEl.value : 'all'
+      venue: venueFilterEl ? venueFilterEl.value : 'all',
     };
   }
 
