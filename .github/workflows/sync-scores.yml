@@ -3,9 +3,6 @@
 # and writes them to Firestore so the web app updates in real time.
 #
 # Schedule: every 5 minutes (GitHub Actions minimum cron interval).
-# For sub-5-minute polling during match windows, run this locally or
-# deploy sync/live-scores.js to a worker service (Render, Railway, etc.)
-# with a 60-second setInterval loop.
 #
 # Required GitHub Secrets:
 #   FOOTBALL_DATA_API_KEY           — from football-data.org (free tier)
@@ -16,43 +13,35 @@ name: Sync Live Scores
 
 on:
   schedule:
-    # Every 5 minutes — GH Actions minimum; actual execution may be delayed
-    # by a few minutes under load. Good enough for score updates.
     - cron: '*/5 * * * *'
   workflow_dispatch:
-    # Allow manual trigger from the Actions tab at any time
 
 jobs:
   sync:
     name: Fetch & write live scores
     runs-on: ubuntu-latest
 
-    # Only run during the tournament window (11 Jun – 20 Jul 2026 UTC)
-    # This avoids unnecessary API calls outside the World Cup.
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (
-        contains(fromJSON('["2026-06-11","2026-06-12","2026-06-13","2026-06-14",
-          "2026-06-15","2026-06-16","2026-06-17","2026-06-18","2026-06-19",
-          "2026-06-20","2026-06-21","2026-06-22","2026-06-23","2026-06-24",
-          "2026-06-25","2026-06-26","2026-06-27","2026-06-28","2026-06-29",
-          "2026-06-30","2026-07-01","2026-07-02","2026-07-03","2026-07-04",
-          "2026-07-05","2026-07-06","2026-07-07","2026-07-08","2026-07-09",
-          "2026-07-10","2026-07-11","2026-07-12","2026-07-13","2026-07-14",
-          "2026-07-15","2026-07-16","2026-07-17","2026-07-18","2026-07-19",
-          "2026-07-20"]'),
-        steps.date.outputs.today)
-      )
-
     steps:
-      - name: Get today's date
-        id: date
-        run: echo "today=$(date -u +%Y-%m-%d)" >> $GITHUB_OUTPUT
+      - name: Check tournament window
+        id: window
+        run: |
+          TODAY=$(date -u +%Y-%m-%d)
+          START="2026-06-11"
+          END="2026-07-20"
+          if [[ "$TODAY" < "$START" || "$TODAY" > "$END" ]]; then
+            echo "in_window=false" >> $GITHUB_OUTPUT
+            echo "Today ($TODAY) is outside the tournament window — skipping sync."
+          else
+            echo "in_window=true" >> $GITHUB_OUTPUT
+            echo "Today ($TODAY) is within the tournament window — proceeding."
+          fi
 
       - name: Checkout repository
+        if: steps.window.outputs.in_window == 'true' || github.event_name == 'workflow_dispatch'
         uses: actions/checkout@v4
 
       - name: Set up Node.js
+        if: steps.window.outputs.in_window == 'true' || github.event_name == 'workflow_dispatch'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -60,10 +49,12 @@ jobs:
           cache-dependency-path: sync/package.json
 
       - name: Install sync dependencies
+        if: steps.window.outputs.in_window == 'true' || github.event_name == 'workflow_dispatch'
         working-directory: sync
         run: npm install
 
       - name: Run live-scores sync
+        if: steps.window.outputs.in_window == 'true' || github.event_name == 'workflow_dispatch'
         working-directory: sync
         run: node live-scores.js
         env:
