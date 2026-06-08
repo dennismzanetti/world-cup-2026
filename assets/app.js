@@ -8,7 +8,7 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
 
   // ─── State ────────────────────────────────────────────────────────────────
   let currentUser = null;
-  let authResolved = false;   // true after first watchAuth callback fires
+  let authResolved = false;
   let userPredictions = {};
   let firestoreMatches = [];
   let authMode = 'signin';
@@ -149,7 +149,6 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
       if (authBtn)       authBtn.textContent = 'Account';
       if (userBar)       userBar.hidden = false;
       if (userGreeting)  userGreeting.textContent = 'Hi, ' + (user.displayName || user.email);
-      // Always hide the prompt the moment a signed-in user is confirmed
       if (predictPrompt) predictPrompt.hidden = true;
       try {
         const preds = await getUserPredictions(user.uid);
@@ -161,7 +160,6 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
     } else {
       if (authBtn)       authBtn.textContent = 'Sign In';
       if (userBar)       userBar.hidden = true;
-      // Only show the prompt when auth is resolved AND user is definitely signed out
       if (predictPrompt) predictPrompt.hidden = false;
       userPredictions = {};
     }
@@ -193,6 +191,7 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
     } catch (err) {
       console.warn('Firestore unavailable, using local data:', err);
     }
+    populateDateFilter();
     renderAll();
   }
 
@@ -314,15 +313,61 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
     });
   }
 
+  // ─── Date Filter Population ───────────────────────────────────────────────
+  function populateDateFilter() {
+    const el = document.getElementById('date-filter');
+    if (!el) return;
+    // collect unique sorted dates
+    const dates = [...new Set(
+      WC_MATCHES.map(m => m.date).filter(Boolean)
+    )].sort();
+    // clear existing options beyond the first "All Dates"
+    while (el.options.length > 1) el.remove(1);
+    dates.forEach(d => {
+      const label = new Date(d + 'T12:00:00').toLocaleDateString('en-US',
+        { weekday: 'short', month: 'short', day: 'numeric' });
+      const opt = document.createElement('option');
+      opt.value = d;
+      opt.textContent = label;
+      el.appendChild(opt);
+    });
+  }
+
   // ─── Render Matches ───────────────────────────────────────────────────────
-  function renderMatches(groupFilter = 'all', venueFilter = 'all') {
+  function renderMatches(groupFilter = 'all', venueFilter = 'all', dateFilter = 'all') {
     const container = document.getElementById('matches-list');
     if (!container) return;
     container.innerHTML = '';
-    let filtered = groupFilter === 'all' ? WC_MATCHES : WC_MATCHES.filter(m => m.group === groupFilter);
-    if (venueFilter !== 'all') filtered = filtered.filter(m => m.venue === venueFilter);
 
+    let filtered = WC_MATCHES.slice();
+    if (groupFilter !== 'all') filtered = filtered.filter(m => m.group === groupFilter);
+    if (venueFilter !== 'all') filtered = filtered.filter(m => m.venue === venueFilter);
+    if (dateFilter  !== 'all') filtered = filtered.filter(m => m.date  === dateFilter);
+
+    // Sort by date then kickoff time
+    filtered.sort((a, b) => {
+      const da = (a.date || '') + (a.timeLocal || '');
+      const db = (b.date || '') + (b.timeLocal || '');
+      return da.localeCompare(db);
+    });
+
+    if (filtered.length === 0) {
+      container.innerHTML = '<p class="empty-filter-msg">No matches found for the selected filters.</p>';
+      return;
+    }
+
+    // Group by date for visual date dividers
+    let lastDate = null;
     filtered.forEach(match => {
+      if (match.date && match.date !== lastDate) {
+        lastDate = match.date;
+        const divider = document.createElement('div');
+        divider.className = 'date-divider';
+        divider.textContent = new Date(match.date + 'T12:00:00').toLocaleDateString('en-US',
+          { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+        container.appendChild(divider);
+      }
+
       const scoreColHTML = `
         <div class="score-inputs-wrap">
           <input class="score-input" type="number" min="0" max="20"
@@ -366,8 +411,6 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
     const container = document.getElementById('predictions-list');
     if (!container) return;
 
-    // While Firebase auth hasn't resolved yet, show nothing (avoids flash of
-    // the sign-in prompt for users who are already authenticated).
     if (!authResolved) {
       container.innerHTML = '';
       if (predictPrompt) predictPrompt.hidden = true;
@@ -380,7 +423,6 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
       return;
     }
 
-    // User is signed in — always hide the prompt
     if (predictPrompt) predictPrompt.hidden = true;
     container.innerHTML = '';
 
@@ -488,6 +530,8 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
   // ─── Filters ──────────────────────────────────────────────────────────────
   const groupFilterEl = document.getElementById('group-filter');
   const venueFilterEl = document.getElementById('venue-filter');
+  const dateFilterEl  = document.getElementById('date-filter');
+
   if (groupFilterEl) {
     WC_GROUPS.forEach(g => {
       const opt = document.createElement('option');
@@ -503,21 +547,33 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
       venueFilterEl.appendChild(opt);
     });
   }
+
+  // Date filter populated after data (including Firestore) is merged
+  populateDateFilter();
+
   function getFilters() {
     return {
       group: groupFilterEl ? groupFilterEl.value : 'all',
       venue: venueFilterEl ? venueFilterEl.value : 'all',
+      date:  dateFilterEl  ? dateFilterEl.value  : 'all',
     };
   }
-  if (groupFilterEl) groupFilterEl.addEventListener('change', () => { const f = getFilters(); renderMatches(f.group, f.venue); });
-  if (venueFilterEl) venueFilterEl.addEventListener('change', () => { const f = getFilters(); renderMatches(f.group, f.venue); });
+
+  function onFilterChange() {
+    const f = getFilters();
+    renderMatches(f.group, f.venue, f.date);
+  }
+
+  if (groupFilterEl) groupFilterEl.addEventListener('change', onFilterChange);
+  if (venueFilterEl) venueFilterEl.addEventListener('change', onFilterChange);
+  if (dateFilterEl)  dateFilterEl.addEventListener('change',  onFilterChange);
 
   // ─── Render All ───────────────────────────────────────────────────────────
   function renderAll() {
     const activeView = document.querySelector('.nav-btn.active')?.dataset.view;
     const f = getFilters();
     if (activeView === 'groups')      renderGroups();
-    if (activeView === 'matches')     renderMatches(f.group, f.venue);
+    if (activeView === 'matches')     renderMatches(f.group, f.venue, f.date);
     if (activeView === 'predictions') renderPredictions();
     if (activeView === 'standings')   renderStandings();
   }
