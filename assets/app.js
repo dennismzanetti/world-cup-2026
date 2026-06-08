@@ -1,19 +1,19 @@
 // World Cup 2026 App — Firebase-connected
 import { auth } from './firebase.js';
 import { signUp, signIn, logOut, watchAuth } from './auth.js';
-import { getMatches, savePrediction, getUserPredictions } from './db.js';
+import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } from './db.js';
 
 (function () {
   'use strict';
 
-  // ─── State ────────────────────────────────────────────────────────────────
+  // ─── State ───────────────────────────────────────────────────────────────────
   let currentUser = null;
   let authResolved = false;
   let userPredictions = {};
-  let firestoreMatches = [];
   let authMode = 'signin';
+  let unsubscribeMatches = null; // Firestore live listener handle
 
-  // ─── Theme ────────────────────────────────────────────────────────────────
+  // ─── Theme ───────────────────────────────────────────────────────────────────
   const themeToggle = document.querySelector('[data-theme-toggle]');
   const html = document.documentElement;
   function setTheme(t) {
@@ -34,7 +34,7 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
     });
   }
 
-  // ─── Navigation ───────────────────────────────────────────────────────────
+  // ─── Navigation ──────────────────────────────────────────────────────────────
   const navBtns = document.querySelectorAll('.nav-btn');
   const views   = document.querySelectorAll('.view');
   navBtns.forEach(btn => {
@@ -47,7 +47,7 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
     });
   });
 
-  // ─── Auth Modal ───────────────────────────────────────────────────────────
+  // ─── Auth Modal ──────────────────────────────────────────────────────────────
   const authModal     = document.getElementById('auth-modal');
   const authBackdrop  = document.getElementById('auth-backdrop');
   const authForm      = document.getElementById('auth-form');
@@ -122,25 +122,25 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
 
   function friendlyAuthError(code) {
     const map = {
-      'auth/user-not-found':          'No account found with that email.',
-      'auth/wrong-password':          'Incorrect password.',
-      'auth/email-already-in-use':    'An account already exists for that email.',
-      'auth/invalid-email':           'Please enter a valid email address.',
-      'auth/weak-password':           'Password must be at least 6 characters.',
-      'auth/too-many-requests':       'Too many attempts. Please wait and try again.',
-      'auth/invalid-credential':      'Invalid email or password.',
-      'auth/operation-not-allowed':   'Email sign-in is not enabled. Contact the app admin.',
-      'auth/network-request-failed':  'Network error — check your connection and try again.',
-      'auth/missing-password':        'Please enter a password.',
-      'auth/missing-email':           'Please enter your email address.',
-      'auth/popup-blocked':           'A popup was blocked by your browser.',
-      'auth/user-disabled':           'This account has been disabled.',
-      'auth/requires-recent-login':   'Please sign out and sign in again to continue.',
+      'auth/user-not-found':         'No account found with that email.',
+      'auth/wrong-password':         'Incorrect password.',
+      'auth/email-already-in-use':   'An account already exists for that email.',
+      'auth/invalid-email':          'Please enter a valid email address.',
+      'auth/weak-password':          'Password must be at least 6 characters.',
+      'auth/too-many-requests':      'Too many attempts. Please wait and try again.',
+      'auth/invalid-credential':     'Invalid email or password.',
+      'auth/operation-not-allowed':  'Email sign-in is not enabled. Contact the app admin.',
+      'auth/network-request-failed': 'Network error — check your connection and try again.',
+      'auth/missing-password':       'Please enter a password.',
+      'auth/missing-email':          'Please enter your email address.',
+      'auth/popup-blocked':          'A popup was blocked by your browser.',
+      'auth/user-disabled':          'This account has been disabled.',
+      'auth/requires-recent-login':  'Please sign out and sign in again to continue.',
     };
     return map[code] || `Something went wrong (${code || 'unknown'}). Please try again.`;
   }
 
-  // ─── Auth State Observer ──────────────────────────────────────────────────
+  // ─── Auth State Observer ─────────────────────────────────────────────────────
   watchAuth(async (user) => {
     currentUser = user;
     authResolved = true;
@@ -165,43 +165,46 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
     renderAll();
   });
 
-  // ─── Load Matches from Firestore ──────────────────────────────────────────
-  async function loadFirestoreMatches() {
-    try {
-      firestoreMatches = await getMatches();
-      if (firestoreMatches.length > 0) {
-        firestoreMatches.forEach(fm => {
-          const local = WC_MATCHES.find(m => m.home.name === fm.homeTeam && m.away.name === fm.awayTeam);
-          if (local) {
-            if (fm.homeScore !== null) local.homeScore = fm.homeScore;
-            if (fm.awayScore !== null) local.awayScore = fm.awayScore;
-            if (fm.date)      local.date      = fm.date;
-            if (fm.timeLocal) local.timeLocal = fm.timeLocal;
-            if (fm.timezone)  local.tz        = fm.timezone.replace('America/', '').split('/')[0];
-            if (fm.venue)     local.venue     = fm.venue;
-            if (fm.city)      local.city      = fm.city;
-            if (fm.tvEnglish) local.tvEnglish = fm.tvEnglish;
-            if (fm.tvSpanish) local.tvSpanish = fm.tvSpanish;
-            if (fm.streaming) local.streaming = fm.streaming;
-            local.firestoreId = fm.id;
-          }
-        });
-      }
-    } catch (err) {
-      console.warn('Firestore unavailable, using local data:', err);
-    }
-    populateDateFilter();
-    renderAll();
+  // ─── Live Firestore Match Listener ───────────────────────────────────────────
+  // watchMatches() uses onSnapshot — Firestore pushes every score/status change
+  // instantly to all connected browsers. No polling required.
+  function startMatchListener() {
+    if (unsubscribeMatches) unsubscribeMatches(); // detach any previous listener
+    unsubscribeMatches = watchMatches((liveMatches) => {
+      // Merge Firestore data into local WC_MATCHES array
+      liveMatches.forEach(fm => {
+        const local = WC_MATCHES.find(
+          m => m.home.name === fm.homeTeam && m.away.name === fm.awayTeam
+        );
+        if (local) {
+          if (fm.homeScore !== undefined && fm.homeScore !== null) local.homeScore = fm.homeScore;
+          if (fm.awayScore !== undefined && fm.awayScore !== null) local.awayScore = fm.awayScore;
+          if (fm.status)    local.status    = fm.status;   // 'scheduled'|'live'|'ht'|'finished'
+          if (fm.minute)    local.minute    = fm.minute;   // e.g. 67 (shown during live)
+          if (fm.date)      local.date      = fm.date;
+          if (fm.timeLocal) local.timeLocal = fm.timeLocal;
+          if (fm.timezone)  local.tz        = fm.timezone.replace('America/', '').split('/')[0];
+          if (fm.venue)     local.venue     = fm.venue;
+          if (fm.city)      local.city      = fm.city;
+          if (fm.tvEnglish) local.tvEnglish = fm.tvEnglish;
+          if (fm.tvSpanish) local.tvSpanish = fm.tvSpanish;
+          if (fm.streaming) local.streaming = fm.streaming;
+          local.firestoreId = fm.id;
+        }
+      });
+      populateDateFilter();
+      renderAll();
+    });
   }
 
-  // ─── Shared sort helper ─────────────────────────────────────────────────
+  // ─── Shared sort helper ───────────────────────────────────────────────────────
   function sortByDateTime(a, b) {
     const ka = (a.date || '9999-99-99') + 'T' + (a.timeLocal || '99:99');
     const kb = (b.date || '9999-99-99') + 'T' + (b.timeLocal || '99:99');
     return ka.localeCompare(kb);
   }
 
-  // ─── Date divider helper ───────────────────────────────────────────────
+  // ─── Date divider helper ─────────────────────────────────────────────────────
   function insertDateDividers(container, matches) {
     let lastDate = null;
     matches.forEach(match => {
@@ -218,7 +221,20 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
     });
   }
 
-  // ─── Points Calculation ───────────────────────────────────────────────────
+  // ─── Status badge helper ─────────────────────────────────────────────────────
+  // Returns an HTML string for the match status badge shown in the score column.
+  function statusBadgeHTML(match) {
+    const s = (match.status || 'scheduled').toLowerCase();
+    if (s === 'live') {
+      const min = match.minute ? `${match.minute}'` : 'LIVE';
+      return `<span class="status-badge status-live"><span class="live-dot"></span>${min}</span>`;
+    }
+    if (s === 'ht')       return `<span class="status-badge status-ht">HT</span>`;
+    if (s === 'finished') return `<span class="status-badge status-ft">FT</span>`;
+    return ''; // scheduled — show nothing extra
+  }
+
+  // ─── Points Calculation ───────────────────────────────────────────────────────
   function calcPoints(matches, teamName) {
     let pts = 0, w = 0, d = 0, l = 0, gf = 0, ga = 0;
     matches.forEach(m => {
@@ -235,7 +251,7 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
     return { pts, played: w + d + l, w, d, l, gf, ga, gd: gf - ga };
   }
 
-  // ─── Broadcast Badges ─────────────────────────────────────────────────────
+  // ─── Broadcast Badges ─────────────────────────────────────────────────────────
   function broadcastBadgesHTML(match) {
     const tv  = match.tvEnglish || [];
     const esp = match.tvSpanish || [];
@@ -248,7 +264,7 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
     ].join('');
   }
 
-  // ─── Match Card HTML ──────────────────────────────────────────────────────
+  // ─── Match Card HTML (shared) ─────────────────────────────────────────────────
   function matchCardHTML(match, scoreColHTML, stripLabel) {
     const dateStr = match.date
       ? new Date(match.date + 'T12:00:00').toLocaleDateString('en-US',
@@ -307,28 +323,50 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
     return header + teamsRow + metaRow + broadcastRow;
   }
 
-  // ─── Build a single match card element (Matches view) ─────────────────
+  // ─── Build match card (Matches view) ─────────────────────────────────────────
+  // Score column logic:
+  //   scheduled  → manual score inputs + Save button (admin use)
+  //   live / ht  → live score display + status badge (read-only)
+  //   finished   → final score + FT badge (read-only)
   function buildMatchCard(match) {
-    const scoreColHTML = `
-      <div class="score-inputs-wrap">
-        <input class="score-input" type="number" min="0" max="20"
-          value="${match.homeScore !== null ? match.homeScore : ''}"
-          placeholder="-" data-match="${match.id}" data-side="home">
-        <span class="score-sep">:</span>
-        <input class="score-input" type="number" min="0" max="20"
-          value="${match.awayScore !== null ? match.awayScore : ''}"
-          placeholder="-" data-match="${match.id}" data-side="away">
-      </div>
-      <button class="btn-save" data-save="${match.id}">Save Result</button>
-      <span class="result-saved" id="saved-${match.id}">Saved ✓</span>`;
+    const status = (match.status || 'scheduled').toLowerCase();
+    const isLive     = status === 'live' || status === 'ht';
+    const isFinished = status === 'finished';
+    const hasScore   = match.homeScore !== null && match.homeScore !== undefined
+                    && match.awayScore !== null && match.awayScore !== undefined;
+
+    let scoreColHTML;
+
+    if (isLive || isFinished) {
+      // Read-only score display for live / finished matches
+      const scoreDisplay = hasScore
+        ? `<div class="score-final ${isLive ? 'score-live' : ''}">${match.homeScore} : ${match.awayScore}</div>`
+        : `<div class="score-final score-pending">- : -</div>`;
+      scoreColHTML = scoreDisplay + statusBadgeHTML(match);
+    } else {
+      // Editable score inputs for scheduled matches (admin)
+      scoreColHTML = `
+        <div class="score-inputs-wrap">
+          <input class="score-input" type="number" min="0" max="20"
+            value="${hasScore ? match.homeScore : ''}" placeholder="-"
+            data-match="${match.id}" data-side="home">
+          <span class="score-sep">:</span>
+          <input class="score-input" type="number" min="0" max="20"
+            value="${hasScore ? match.awayScore : ''}" placeholder="-"
+            data-match="${match.id}" data-side="away">
+        </div>
+        <button class="btn-save" data-save="${match.id}">Save Result</button>
+        <span class="result-saved" id="saved-${match.id}">Saved ✓</span>`;
+    }
+
     const stripLabel = match.group ? 'Group ' + match.group : (match.stage || 'Match');
     const card = document.createElement('div');
-    card.className = 'match-card';
+    card.className = 'match-card' + (isLive ? ' match-card-live' : '');
     card.innerHTML = matchCardHTML(match, scoreColHTML, stripLabel);
     return card;
   }
 
-  // ─── Render Groups ────────────────────────────────────────────────────────
+  // ─── Render Groups ────────────────────────────────────────────────────────────
   function renderGroups() {
     const container = document.getElementById('groups-grid');
     if (!container) return;
@@ -357,7 +395,7 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
     });
   }
 
-  // ─── Date Filter Population ───────────────────────────────────────────────
+  // ─── Date Filter Population ───────────────────────────────────────────────────
   function populateDateFilter() {
     const el = document.getElementById('date-filter');
     if (!el) return;
@@ -367,13 +405,12 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
       const label = new Date(d + 'T12:00:00').toLocaleDateString('en-US',
         { weekday: 'short', month: 'short', day: 'numeric' });
       const opt = document.createElement('option');
-      opt.value = d;
-      opt.textContent = label;
+      opt.value = d; opt.textContent = label;
       el.appendChild(opt);
     });
   }
 
-  // ─── Render Matches ───────────────────────────────────────────────────────
+  // ─── Render Matches ───────────────────────────────────────────────────────────
   function renderMatches(groupFilter = 'all', venueFilter = 'all', dateFilter = 'all') {
     const container = document.getElementById('matches-list');
     if (!container) return;
@@ -384,7 +421,13 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
     if (venueFilter !== 'all') filtered = filtered.filter(m => m.venue === venueFilter);
     if (dateFilter  !== 'all') filtered = filtered.filter(m => m.date  === dateFilter);
 
-    filtered.sort(sortByDateTime);
+    // Live matches float to the top within each day, then chronological
+    filtered.sort((a, b) => {
+      const liveA = (a.status === 'live' || a.status === 'ht') ? 0 : 1;
+      const liveB = (b.status === 'live' || b.status === 'ht') ? 0 : 1;
+      if (liveA !== liveB) return liveA - liveB;
+      return sortByDateTime(a, b);
+    });
 
     if (filtered.length === 0) {
       container.innerHTML = '<p class="empty-filter-msg">No matches found for the selected filters.</p>';
@@ -393,26 +436,35 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
 
     insertDateDividers(container, filtered);
 
-    // Attach save-result listeners
+    // Attach save-result listeners (only present on scheduled cards)
     container.querySelectorAll('.btn-save').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const id     = parseInt(btn.dataset.save);
         const match  = WC_MATCHES.find(m => m.id === id);
         const hInput = container.querySelector(`input[data-match="${id}"][data-side="home"]`);
         const aInput = container.querySelector(`input[data-match="${id}"][data-side="away"]`);
-        if (hInput.value !== '' && aInput.value !== '') {
-          match.homeScore = parseInt(hInput.value);
-          match.awayScore = parseInt(aInput.value);
-          const saved = document.getElementById('saved-' + id);
-          if (saved) { saved.style.display = 'inline'; setTimeout(() => { saved.style.display = 'none'; }, 2000); }
-          renderGroups();
-          renderStandings();
+        if (!match || hInput.value === '' || aInput.value === '') return;
+        match.homeScore = parseInt(hInput.value);
+        match.awayScore = parseInt(aInput.value);
+        // Persist to Firestore if we have a firestoreId
+        if (match.firestoreId) {
+          try {
+            await updateMatchResult(match.firestoreId, {
+              homeScore: match.homeScore,
+              awayScore: match.awayScore,
+              status: 'finished'
+            });
+          } catch (err) { console.warn('Could not persist result:', err); }
         }
+        const saved = document.getElementById('saved-' + id);
+        if (saved) { saved.style.display = 'inline'; setTimeout(() => { saved.style.display = 'none'; }, 2000); }
+        renderGroups();
+        renderStandings();
       });
     });
   }
 
-  // ─── Render Predictions ───────────────────────────────────────────────────
+  // ─── Render Predictions ───────────────────────────────────────────────────────
   function renderPredictions() {
     const container = document.getElementById('predictions-list');
     if (!container) return;
@@ -430,12 +482,10 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
     if (predictPrompt) predictPrompt.hidden = true;
     container.innerHTML = '';
 
-    // Sort all matches by date + kickoff time
     const sorted = WC_MATCHES.slice().sort(sortByDateTime);
 
     let lastDate = null;
     sorted.forEach(match => {
-      // Date divider
       if (match.date && match.date !== lastDate) {
         lastDate = match.date;
         const divider = document.createElement('div');
@@ -447,15 +497,26 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
 
       const key  = match.firestoreId || (match.home.name + '|' + match.away.name);
       const pred = userPredictions[key] || userPredictions[match.id] || null;
-      const hasResult = match.homeScore !== null && match.awayScore !== null;
+      const status     = (match.status || 'scheduled').toLowerCase();
+      const isLive     = status === 'live' || status === 'ht';
+      const isFinished = status === 'finished';
+      const hasResult  = (match.homeScore !== null && match.homeScore !== undefined
+                       && match.awayScore !== null && match.awayScore !== undefined);
 
       let scoreColHTML;
-      if (hasResult) {
+      if (isFinished || (isLive && hasResult)) {
+        // Show actual score + status badge; lock predictions
         scoreColHTML = `
-          <div class="score-final">${match.homeScore} : ${match.awayScore}</div>
-          <span class="card-result-badge">Final</span>
+          <div class="score-final ${isLive ? 'score-live' : ''}">${match.homeScore} : ${match.awayScore}</div>
+          ${statusBadgeHTML(match)}
+          ${pred ? `<div class="pred-was">Your pick: ${pred.homeScorePred}–${pred.awayScorePred}</div>` : '<div class="pred-was">No prediction</div>'}`;
+      } else if (isLive) {
+        scoreColHTML = `
+          <div class="score-final score-pending">- : -</div>
+          ${statusBadgeHTML(match)}
           ${pred ? `<div class="pred-was">Your pick: ${pred.homeScorePred}–${pred.awayScorePred}</div>` : ''}`;
       } else {
+        // Scheduled — allow prediction entry
         scoreColHTML = `
           <div class="score-inputs-wrap">
             <input class="pred-input" type="number" min="0" max="20"
@@ -472,7 +533,7 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
 
       const stripLabel = match.group ? 'Group ' + match.group : (match.stage || 'Match');
       const card = document.createElement('div');
-      card.className = 'match-card';
+      card.className = 'match-card' + (isLive ? ' match-card-live' : '');
       card.innerHTML = matchCardHTML(match, scoreColHTML, stripLabel);
       container.appendChild(card);
     });
@@ -507,7 +568,7 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
     });
   }
 
-  // ─── Render Standings ─────────────────────────────────────────────────────
+  // ─── Render Standings ─────────────────────────────────────────────────────────
   function renderStandings() {
     const container = document.getElementById('standings-grid');
     if (!container) return;
@@ -545,7 +606,7 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
     });
   }
 
-  // ─── Filters ──────────────────────────────────────────────────────────────
+  // ─── Filters ──────────────────────────────────────────────────────────────────
   const groupFilterEl = document.getElementById('group-filter');
   const venueFilterEl = document.getElementById('venue-filter');
   const dateFilterEl  = document.getElementById('date-filter');
@@ -585,7 +646,7 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
   if (venueFilterEl) venueFilterEl.addEventListener('change', onFilterChange);
   if (dateFilterEl)  dateFilterEl.addEventListener('change',  onFilterChange);
 
-  // ─── Render All ───────────────────────────────────────────────────────────
+  // ─── Render All ───────────────────────────────────────────────────────────────
   function renderAll() {
     const activeView = document.querySelector('.nav-btn.active')?.dataset.view;
     const f = getFilters();
@@ -595,8 +656,10 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
     if (activeView === 'standings')   renderStandings();
   }
 
-  // ─── Boot ────────────────────────────────────────────────────────────────
+  // ─── Boot ─────────────────────────────────────────────────────────────────────
+  // Start the real-time Firestore listener immediately — scores update push to
+  // all connected browsers the instant the database changes.
   renderGroups();
-  loadFirestoreMatches();
+  startMatchListener();
 
 })();
