@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>World Cup 2026 Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./assets/style.css">
+</head>
+<body>
+
+  <!-- Skip link -->
+  <a href="#main" class="sr-only">Skip to content</a>
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="#" class="logo" aria-label="World Cup 2026 Home">
+        <svg width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="18" cy="18" r="17" stroke="currentColor" stroke-width="2"/>
+          <!-- Soccer ball hex patches -->
+          <polygon points="18,6 22,10 20,15 16,15 14,10" fill="currentColor" opacity="0.9"/>
+          <polygon points="22,10 27,10 29,15 25,18 20,15" fill="currentColor" opacity="0.5"/>
+          <polygon points="14,10 16,15 11,18 7,15 9,10" fill="currentColor" opacity="0.5"/>
+          <polygon points="25,18 29,15 30,21 26,24 22,22" fill="currentColor" opacity="0.7"/>
+          <polygon points="11,18 16,15 14,22 10,24 6,21" fill="currentColor" opacity="0.7"/>
+          <polygon points="20,15 25,18 22,22 14,22 11,18 16,15" fill="none" stroke="currentColor" stroke-width="1" opacity="0.4"/>
+          <polygon points="14,22 22,22 21,28 18,30 15,28" fill="currentColor" opacity="0.6"/>
+        </svg>
+        <span class="logo-text">WC<span class="logo-year">2026</span></span>
+      </a>
+      <nav class="main-nav" aria-label="Main navigation">
+        <button class="nav-btn active" data-view="groups">Groups</button>
+        <button class="nav-btn" data-view="matches">Matches</button>
+        <button class="nav-btn" data-view="predictions">Predictions</button>
+        <button class="nav-btn" data-view="standings">Standings</button>
+      </nav>
+      <button class="theme-toggle" data-theme-toggle aria-label="Switch to light mode">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main id="main" class="main-content">
+
+    <!-- GROUPS VIEW -->
+    <section class="view active" id="view-groups">
+      <div class="container">
+        <div class="page-header">
+          <h1 class="page-title">Group Stage</h1>
+          <p class="page-subtitle">2026 FIFA World Cup &mdash; 48 teams, 12 groups</p>
+        </div>
+        <div class="groups-grid" id="groups-grid"></div>
+      </div>
+    </section>
+
+    <!-- MATCHES VIEW -->
+    <section class="view" id="view-matches">
+      <div class="container">
+        <div class="page-header">
+          <h1 class="page-title">Match Results</h1>
+          <p class="page-subtitle">Enter scores for completed matches</p>
+        </div>
+        <div class="matches-filter">
+          <label for="group-filter">Filter by Group:</label>
+          <select id="group-filter">
+            <option value="all">All Groups</option>
+          </select>
+        </div>
+        <div class="matches-list" id="matches-list"></div>
+      </div>
+    </section>
+
+    <!-- PREDICTIONS VIEW -->
+    <section class="view" id="view-predictions">
+      <div class="container">
+        <div class="page-header">
+          <h1 class="page-title">Your Predictions</h1>
+          <p class="page-subtitle">Predict match scores before they're played</p>
+        </div>
+        <div class="predictions-list" id="predictions-list"></div>
+      </div>
+    </section>
+
+    <!-- STANDINGS VIEW -->
+    <section class="view" id="view-standings">
+      <div class="container">
+        <div class="page-header">
+          <h1 class="page-title">Standings</h1>
+          <p class="page-subtitle">Group standings based on entered results</p>
+        </div>
+        <div class="standings-grid" id="standings-grid"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <span>World Cup 2026 Tracker</span>
+      <span class="footer-muted">USA &bull; Canada &bull; Mexico &mdash; June&ndash;July 2026</span>
+    </div>
+  </footer>
+
+  <script src="./assets/data.js"></script>
+  <script src="./assets/app.js"></script>
+</body>
+</html>
