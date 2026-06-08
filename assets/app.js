@@ -222,7 +222,10 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
   }
 
   // ─── Match Card HTML ──────────────────────────────────────────────────────
-  function matchCardHTML(match, scoreColHTML, groupLabel) {
+  // Shared by both Matches and Predictions views.
+  // stripLabel  — e.g. 'Group A'  or  'Round of 16'
+  // scoreColHTML — the action area in the centre (inputs, final score, etc.)
+  function matchCardHTML(match, scoreColHTML, stripLabel) {
     const dateStr = match.date
       ? new Date(match.date + 'T12:00:00').toLocaleDateString('en-US',
           { weekday: 'short', month: 'short', day: 'numeric' })
@@ -231,32 +234,15 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
     const venue = match.venue || null;
     const city  = match.city  || null;
 
-    const metaItems = [];
-    if (dateStr || time) {
-      metaItems.push(`<span class="card-meta-item">
-        <svg class="meta-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
-          <rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M2 6h12M5 1v3M11 1v3"/>
-        </svg>
-        ${[dateStr, time].filter(Boolean).join(' &middot; ')}
-      </span>`);
-    }
-    if (venue) {
-      metaItems.push(`<span class="card-meta-item">
-        <svg class="meta-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
-          <path d="M8 1.5C5.51 1.5 3.5 3.51 3.5 6c0 3.75 4.5 8.5 4.5 8.5S12.5 9.75 12.5 6C12.5 3.51 10.49 1.5 8 1.5z"/>
-          <circle cx="8" cy="6" r="1.5"/>
-        </svg>
-        ${venue}${city ? `, ${city}` : ''}
-      </span>`);
-    }
-    const metaRow = metaItems.length ? `<div class="card-meta">${metaItems.join('')}</div>` : '';
+    // Row 1: navy strip with group/stage label
+    const strip = `
+      <div class="card-strip">
+        <span class="card-strip-label">${stripLabel || 'Match'}</span>
+      </div>`;
 
-    const badges = broadcastBadgesHTML(match);
-    const broadcastRow = badges ? `<div class="card-broadcast-row">${badges}</div>` : '';
-    const groupBadge = groupLabel ? `<span class="card-group-badge">${groupLabel}</span>` : '';
-
-    return `
-      <div class="card-header">
+    // Row 2: teams + score
+    const teamsRow = `
+      <div class="card-teams">
         <div class="card-team home-team">
           <span class="team-flag">${match.home.flag}</span>
           <span class="team-name-text">${match.home.name}</span>
@@ -266,11 +252,36 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
           <span class="team-name-text">${match.away.name}</span>
           <span class="team-flag">${match.away.flag}</span>
         </div>
-        ${groupBadge}
-      </div>
-      ${metaRow}
-      ${broadcastRow}
-    `;
+      </div>`;
+
+    // Row 3: date/time + venue
+    const metaItems = [];
+    if (dateStr || time) {
+      metaItems.push(`<span class="card-meta-item">
+        <svg class="meta-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+          <rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M2 6h12M5 1v3M11 1v3"/>
+        </svg>
+        ${[dateStr, time].filter(Boolean).join(' &middot; ')}
+      </span>`);
+    }
+    if (venue || city) {
+      metaItems.push(`<span class="card-meta-item">
+        <svg class="meta-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+          <path d="M8 1.5C5.51 1.5 3.5 3.51 3.5 6c0 3.75 4.5 8.5 4.5 8.5S12.5 9.75 12.5 6C12.5 3.51 10.49 1.5 8 1.5z"/>
+          <circle cx="8" cy="6" r="1.5"/>
+        </svg>
+        ${[venue, city].filter(Boolean).join(', ')}
+      </span>`);
+    }
+    const metaRow = metaItems.length
+      ? `<div class="card-meta">${metaItems.join('')}</div>`
+      : '';
+
+    // Row 4: broadcast badges
+    const badges = broadcastBadgesHTML(match);
+    const broadcastRow = badges ? `<div class="card-broadcast-row">${badges}</div>` : '';
+
+    return strip + teamsRow + metaRow + broadcastRow;
   }
 
   // ─── Render Groups ────────────────────────────────────────────────────────
@@ -324,9 +335,10 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
         <button class="btn-save" data-save="${match.id}">Save Result</button>
         <span class="result-saved" id="saved-${match.id}">Saved ✓</span>`;
 
+      const stripLabel = match.group ? 'Group ' + match.group : (match.stage || 'Match');
       const card = document.createElement('div');
       card.className = 'match-card';
-      card.innerHTML = matchCardHTML(match, scoreColHTML, match.group ? 'Group ' + match.group : null);
+      card.innerHTML = matchCardHTML(match, scoreColHTML, stripLabel);
       container.appendChild(card);
     });
 
@@ -386,9 +398,10 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
           <span class="pred-saving" id="pred-saving-${match.id}" hidden>Saving…</span>`;
       }
 
+      const stripLabel = match.group ? 'Group ' + match.group : (match.stage || 'Match');
       const card = document.createElement('div');
       card.className = 'match-card';
-      card.innerHTML = matchCardHTML(match, scoreColHTML, match.group ? 'Group ' + match.group : null);
+      card.innerHTML = matchCardHTML(match, scoreColHTML, stripLabel);
       container.appendChild(card);
     });
 

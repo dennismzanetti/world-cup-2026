@@ -17,7 +17,6 @@
   --space-16: 4rem;
 
   --footer-h: 2rem;
-  /* Fixed width for the score column — keeps it identical on every card */
   --score-col-w: 9rem;
 
   --color-bg:             #f5f6f8;
@@ -41,7 +40,6 @@
   --color-error:          #c0392b;
   --color-error-highlight: #fde8e6;
 
-  /* Broadcast badge colors */
   --color-tv-bg:     #e8f0fe;
   --color-tv-text:   #1a3a6b;
   --color-esp-bg:    #fff3e0;
@@ -85,7 +83,6 @@
   --color-error:          #e05a4e;
   --color-error-highlight: #2e0c0a;
 
-  /* Broadcast badge colors — dark mode */
   --color-tv-bg:     #1a2540;
   --color-tv-text:   #7aacf0;
   --color-esp-bg:    #2e1f00;
@@ -245,10 +242,12 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
 .matches-filter select { padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); border: 1px solid var(--color-border); background: var(--color-surface); font-size: var(--text-sm); }
 
 /* ============================================================
-   MATCH CARD — new 3-row layout
-   Row 1 (.card-header):  home team | score col (fixed w) | away team | group badge
-   Row 2 (.card-meta):    date/time  ·  venue, city
-   Row 3 (.card-broadcast-row): TV / streaming badges
+   MATCH CARD — 4-row layout (identical for Matches & Predictions)
+
+   Row 1 (.card-strip):        Group label  |  stage/date context  (navy bar)
+   Row 2 (.card-teams):        home team flag+name | score col | away flag+name
+   Row 3 (.card-meta):         📅 date · time   📍 venue, city
+   Row 4 (.card-broadcast-row): TV / streaming badges
    ============================================================ */
 
 .match-card {
@@ -260,11 +259,37 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
   margin-bottom: var(--space-3);
 }
 
-/* ── Row 1: header ── */
-.card-header {
+/* ── Row 1: group/stage strip ── */
+.card-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-1) var(--space-4);
+  background: var(--color-accent);
+  color: #fff;
+  gap: var(--space-3);
+  min-height: 1.75rem;
+}
+.card-strip-label {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+.card-strip-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+/* ── Row 2: teams + score ── */
+.card-teams {
   display: grid;
-  /* home | score-col (fixed) | away | badge (auto) */
-  grid-template-columns: 1fr var(--score-col-w) 1fr auto;
+  grid-template-columns: 1fr var(--score-col-w) 1fr;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-4) var(--space-5);
@@ -280,13 +305,17 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
   min-width: 0;
 }
 .card-team .team-flag { font-size: 1.4rem; flex-shrink: 0; }
-.card-team .team-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Full name always visible — wrap on small screens instead of hiding */
+.card-team .team-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
-/* Home left-aligned, away right-aligned */
 .home-team { justify-content: flex-start; }
 .away-team { justify-content: flex-end; flex-direction: row-reverse; }
 
-/* Score column — fixed width, centred, never changes size */
+/* Score column — fixed width, centred */
 .card-score-col {
   width: var(--score-col-w);
   display: flex;
@@ -312,7 +341,6 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
   border-radius: var(--radius-md);
   background: var(--color-surface-2);
   color: var(--color-text);
-  /* remove browser number spinners */
   -moz-appearance: textfield;
   appearance: textfield;
 }
@@ -329,7 +357,6 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
   user-select: none;
 }
 
-/* Final score display (predictions view) */
 .score-final {
   font-family: var(--font-display);
   font-size: var(--text-xl);
@@ -363,22 +390,6 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
 .pred-saving { font-size: var(--text-xs); color: var(--color-text-muted); }
 .pred-was { font-size: var(--text-xs); color: var(--color-text-faint); font-style: italic; }
 
-/* Group badge — top-right corner of the header row */
-.card-group-badge {
-  display: inline-flex;
-  align-items: center;
-  font-size: var(--text-xs);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  background: var(--color-primary-highlight);
-  color: var(--color-primary);
-  border-radius: var(--radius-full);
-  padding: 0.2rem 0.55rem;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
 .card-result-badge {
   display: inline-flex;
   align-items: center;
@@ -393,7 +404,7 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
   white-space: nowrap;
 }
 
-/* ── Row 2: meta (date · time  |  venue, city) ── */
+/* ── Row 3: meta (date · time | venue, city) ── */
 .card-meta {
   display: flex;
   align-items: center;
@@ -420,7 +431,7 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
   opacity: 0.6;
 }
 
-/* ── Row 3: broadcast badges ── */
+/* ── Row 4: broadcast badges ── */
 .card-broadcast-row {
   display: flex;
   flex-wrap: wrap;
@@ -484,26 +495,16 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
 }
 
 @media (max-width: 600px) {
-  --score-col-w: 8rem;
-
-  .card-header {
-    /* On small screens: stack into two rows
-       Row A: home  |  score  |  away
-       Row B: group badge (full width, right-aligned) */
-    grid-template-columns: 1fr var(--score-col-w) 1fr;
-    grid-template-rows: auto auto;
-  }
-  .card-group-badge {
-    grid-column: 1 / -1;
-    justify-self: flex-end;
-    margin-top: calc(-1 * var(--space-1));
-  }
+  :root { --score-col-w: 8rem; }
+  .card-teams { gap: var(--space-2); padding: var(--space-3) var(--space-3); }
   .card-meta { gap: var(--space-2); }
   .card-meta-item { white-space: normal; }
+  .card-broadcast-row { padding: var(--space-2) var(--space-3); }
 }
 
 @media (max-width: 420px) {
-  .card-team .team-name-text { display: none; } /* flag only on very small screens */
-  .card-header { padding: var(--space-3); }
-  .card-meta, .card-broadcast-row { padding: var(--space-2) var(--space-3); }
+  :root { --score-col-w: 7rem; }
+  /* Abbreviate long names on very small screens using font-size, not hiding */
+  .card-team .team-name-text { font-size: var(--text-xs); }
+  .score-input, .pred-input { width: 2.25rem; height: 2.25rem; font-size: var(--text-base); }
 }
