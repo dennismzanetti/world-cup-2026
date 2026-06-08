@@ -144,7 +144,6 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
   watchAuth(async (user) => {
     currentUser = user;
     authResolved = true;
-
     if (user) {
       if (authBtn)       authBtn.textContent = 'Account';
       if (userBar)       userBar.hidden = false;
@@ -193,6 +192,30 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
     }
     populateDateFilter();
     renderAll();
+  }
+
+  // ─── Shared sort helper ─────────────────────────────────────────────────
+  function sortByDateTime(a, b) {
+    const ka = (a.date || '9999-99-99') + 'T' + (a.timeLocal || '99:99');
+    const kb = (b.date || '9999-99-99') + 'T' + (b.timeLocal || '99:99');
+    return ka.localeCompare(kb);
+  }
+
+  // ─── Date divider helper ───────────────────────────────────────────────
+  function insertDateDividers(container, matches) {
+    let lastDate = null;
+    matches.forEach(match => {
+      if (match.date && match.date !== lastDate) {
+        lastDate = match.date;
+        const divider = document.createElement('div');
+        divider.className = 'date-divider';
+        divider.textContent = new Date(match.date + 'T12:00:00').toLocaleDateString('en-US',
+          { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+        container.appendChild(divider);
+      }
+      const card = buildMatchCard(match);
+      container.appendChild(card);
+    });
   }
 
   // ─── Points Calculation ───────────────────────────────────────────────────
@@ -284,6 +307,27 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
     return header + teamsRow + metaRow + broadcastRow;
   }
 
+  // ─── Build a single match card element (Matches view) ─────────────────
+  function buildMatchCard(match) {
+    const scoreColHTML = `
+      <div class="score-inputs-wrap">
+        <input class="score-input" type="number" min="0" max="20"
+          value="${match.homeScore !== null ? match.homeScore : ''}"
+          placeholder="-" data-match="${match.id}" data-side="home">
+        <span class="score-sep">:</span>
+        <input class="score-input" type="number" min="0" max="20"
+          value="${match.awayScore !== null ? match.awayScore : ''}"
+          placeholder="-" data-match="${match.id}" data-side="away">
+      </div>
+      <button class="btn-save" data-save="${match.id}">Save Result</button>
+      <span class="result-saved" id="saved-${match.id}">Saved ✓</span>`;
+    const stripLabel = match.group ? 'Group ' + match.group : (match.stage || 'Match');
+    const card = document.createElement('div');
+    card.className = 'match-card';
+    card.innerHTML = matchCardHTML(match, scoreColHTML, stripLabel);
+    return card;
+  }
+
   // ─── Render Groups ────────────────────────────────────────────────────────
   function renderGroups() {
     const container = document.getElementById('groups-grid');
@@ -317,11 +361,7 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
   function populateDateFilter() {
     const el = document.getElementById('date-filter');
     if (!el) return;
-    // collect unique sorted dates
-    const dates = [...new Set(
-      WC_MATCHES.map(m => m.date).filter(Boolean)
-    )].sort();
-    // clear existing options beyond the first "All Dates"
+    const dates = [...new Set(WC_MATCHES.map(m => m.date).filter(Boolean))].sort();
     while (el.options.length > 1) el.remove(1);
     dates.forEach(d => {
       const label = new Date(d + 'T12:00:00').toLocaleDateString('en-US',
@@ -344,50 +384,16 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
     if (venueFilter !== 'all') filtered = filtered.filter(m => m.venue === venueFilter);
     if (dateFilter  !== 'all') filtered = filtered.filter(m => m.date  === dateFilter);
 
-    // Sort by date then kickoff time
-    filtered.sort((a, b) => {
-      const da = (a.date || '') + (a.timeLocal || '');
-      const db = (b.date || '') + (b.timeLocal || '');
-      return da.localeCompare(db);
-    });
+    filtered.sort(sortByDateTime);
 
     if (filtered.length === 0) {
       container.innerHTML = '<p class="empty-filter-msg">No matches found for the selected filters.</p>';
       return;
     }
 
-    // Group by date for visual date dividers
-    let lastDate = null;
-    filtered.forEach(match => {
-      if (match.date && match.date !== lastDate) {
-        lastDate = match.date;
-        const divider = document.createElement('div');
-        divider.className = 'date-divider';
-        divider.textContent = new Date(match.date + 'T12:00:00').toLocaleDateString('en-US',
-          { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-        container.appendChild(divider);
-      }
+    insertDateDividers(container, filtered);
 
-      const scoreColHTML = `
-        <div class="score-inputs-wrap">
-          <input class="score-input" type="number" min="0" max="20"
-            value="${match.homeScore !== null ? match.homeScore : ''}"
-            placeholder="-" data-match="${match.id}" data-side="home">
-          <span class="score-sep">:</span>
-          <input class="score-input" type="number" min="0" max="20"
-            value="${match.awayScore !== null ? match.awayScore : ''}"
-            placeholder="-" data-match="${match.id}" data-side="away">
-        </div>
-        <button class="btn-save" data-save="${match.id}">Save Result</button>
-        <span class="result-saved" id="saved-${match.id}">Saved ✓</span>`;
-
-      const stripLabel = match.group ? 'Group ' + match.group : (match.stage || 'Match');
-      const card = document.createElement('div');
-      card.className = 'match-card';
-      card.innerHTML = matchCardHTML(match, scoreColHTML, stripLabel);
-      container.appendChild(card);
-    });
-
+    // Attach save-result listeners
     container.querySelectorAll('.btn-save').forEach(btn => {
       btn.addEventListener('click', () => {
         const id     = parseInt(btn.dataset.save);
@@ -416,17 +422,29 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
       if (predictPrompt) predictPrompt.hidden = true;
       return;
     }
-
     if (!currentUser) {
       container.innerHTML = '';
       if (predictPrompt) predictPrompt.hidden = false;
       return;
     }
-
     if (predictPrompt) predictPrompt.hidden = true;
     container.innerHTML = '';
 
-    WC_MATCHES.forEach(match => {
+    // Sort all matches by date + kickoff time
+    const sorted = WC_MATCHES.slice().sort(sortByDateTime);
+
+    let lastDate = null;
+    sorted.forEach(match => {
+      // Date divider
+      if (match.date && match.date !== lastDate) {
+        lastDate = match.date;
+        const divider = document.createElement('div');
+        divider.className = 'date-divider';
+        divider.textContent = new Date(match.date + 'T12:00:00').toLocaleDateString('en-US',
+          { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+        container.appendChild(divider);
+      }
+
       const key  = match.firestoreId || (match.home.name + '|' + match.away.name);
       const pred = userPredictions[key] || userPredictions[match.id] || null;
       const hasResult = match.homeScore !== null && match.awayScore !== null;
@@ -548,7 +566,6 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
     });
   }
 
-  // Date filter populated after data (including Firestore) is merged
   populateDateFilter();
 
   function getFilters() {
@@ -578,7 +595,7 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
     if (activeView === 'standings')   renderStandings();
   }
 
-  // ─── Boot ─────────────────────────────────────────────────────────────────
+  // ─── Boot ────────────────────────────────────────────────────────────────
   renderGroups();
   loadFirestoreMatches();
 
