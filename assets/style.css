@@ -303,6 +303,28 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
 .matches-filter { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-6); font-size: var(--text-sm); color: var(--color-text-muted); }
 .matches-filter select { padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); border: 1px solid var(--color-border); background: var(--color-surface); font-size: var(--text-sm); }
 
+/* ---- DATE DIVIDER ---- */
+.date-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  margin-top: var(--space-4);
+  margin-bottom: var(--space-2);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.date-divider:first-child { margin-top: 0; }
+.date-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-divider);
+}
+
 /* ============================================================
    MATCH CARD — 4-row layout (identical for Matches & Predictions)
 
@@ -542,68 +564,28 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
 .standings-header { padding: var(--space-3) var(--space-4); background: var(--color-accent); color: #fff; font-family: var(--font-display); font-size: var(--text-lg); letter-spacing: 0.05em; }
 .standings-table { width: 100%; border-collapse: collapse; }
 .standings-table th, .standings-table td { padding: var(--space-2) var(--space-3); font-size: var(--text-sm); text-align: left; border-bottom: 1px solid var(--color-divider); }
-.standings-table th { color: var(--color-text-muted); font-weight: 600; font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.05em; }
-.standings-table tr:last-child td { border-bottom: none; }
+.standings-table th { background: var(--color-surface-2); font-weight: 600; color: var(--color-text-muted); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.06em; }
+.standings-table td:not(:first-child):not(:nth-child(2)) { text-align: center; font-variant-numeric: tabular-nums; }
+.standings-table th:not(:first-child):not(:nth-child(2)) { text-align: center; }
+.standings-table tr.qualified td { color: var(--color-text); }
+.standings-table tr.qualified td:first-child::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--color-success); margin-right: var(--space-1); vertical-align: middle; }
 .standings-table td.pts { font-weight: 700; color: var(--color-primary); }
-.standings-table tr.qualified { background: color-mix(in oklch, var(--color-success) 8%, transparent); }
-.standings-table tr.qualified td:first-child { border-left: 3px solid var(--color-success); padding-left: calc(var(--space-3) - 3px); }
+.standings-table tr:last-child td { border-bottom: none; }
 
-/* ---- BUILD FOOTER ---- */
-.build-footer {
-  position: fixed;
-  bottom: 0; left: 0; right: 0;
-  height: var(--footer-h);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 var(--space-4);
-  background: var(--color-surface);
-  border-top: 1px solid var(--color-divider);
-  z-index: 50;
-}
-#build-badge {
-  font-size: var(--text-xs);
-  color: var(--color-text-faint);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-.build-sha { color: var(--color-primary); font-weight: 600; text-decoration: none; }
-.build-sha:hover { text-decoration: underline; color: var(--color-primary-hover); }
+/* ---- FOOTER ---- */
+.site-footer { position: fixed; bottom: 0; left: 0; right: 0; height: var(--footer-h); background: var(--color-surface); border-top: 1px solid var(--color-border); display: flex; align-items: center; justify-content: center; font-size: var(--text-xs); color: var(--color-text-faint); z-index: 50; }
+
+/* ---- EMPTY / LOADING ---- */
+.empty-filter-msg { text-align: center; color: var(--color-text-muted); padding: var(--space-12) var(--space-4); font-size: var(--text-sm); }
 
 /* ---- RESPONSIVE ---- */
-
-/* On mobile: shrink top row horizontal padding so buttons don't crowd logo */
-@media (max-width: 480px) {
-  .container { padding-inline: var(--space-3); }
-  /* Logo: hide SVG ball, show text only to save space */
-  .logo svg { display: none; }
-  .logo { font-size: var(--text-lg); }
-  /* Nav: remove container padding so tabs truly fill screen width */
-  .nav-inner {
-    padding-inline: 0;
-    max-width: 100%;
-  }
-  /* Slightly smaller nav tab text */
-  .nav-btn { font-size: 0.75rem; }
-}
-
 @media (max-width: 600px) {
-  :root { --score-col-w: 8rem; }
-  .card-teams { gap: var(--space-2); padding: var(--space-3) var(--space-3); }
-  .card-meta { gap: var(--space-2); }
-  .card-meta-item { white-space: normal; }
-  .card-broadcast-row { padding: var(--space-2) var(--space-3); }
-  .card-header { gap: var(--space-2); }
-  .card-header-home,
-  .card-header-away { max-width: 11ch; }
-}
-
-@media (max-width: 420px) {
-  :root { --score-col-w: 7rem; }
-  .card-team .team-flag { font-size: 1.6rem; }
+  .card-teams { grid-template-columns: 1fr 7rem 1fr; gap: var(--space-2); padding: var(--space-3) var(--space-3); }
   .score-input, .pred-input { width: 2.25rem; height: 2.25rem; font-size: var(--text-base); }
-  .card-header-home,
-  .card-header-away { max-width: 9ch; font-size: var(--text-xs); }
+  .card-header { padding: var(--space-2) var(--space-3); }
+  .card-meta { padding: var(--space-2) var(--space-3); gap: var(--space-3); }
+  .card-broadcast-row { padding: var(--space-2) var(--space-3); }
+  .page-title { font-size: var(--text-xl); }
+  .matches-filter { gap: var(--space-2); }
+  .standings-table th, .standings-table td { padding: var(--space-1) var(--space-2); }
 }
