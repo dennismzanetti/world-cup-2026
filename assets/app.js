@@ -1,7 +1,7 @@
 // World Cup 2026 App — Firebase-connected
-import { auth } from '../firebase.js';
-import { signUp, signIn, logOut, watchAuth } from '../auth.js';
-import { getMatches, savePrediction, getUserPredictions } from '../db.js';
+import { auth } from './firebase.js';
+import { signUp, signIn, logOut, watchAuth } from './auth.js';
+import { getMatches, savePrediction, getUserPredictions } from './db.js';
 
 (function () {
   'use strict';
@@ -56,8 +56,8 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
   const authSwitch    = document.getElementById('auth-switch');
   const authClose     = document.getElementById('auth-close');
   const authError     = document.getElementById('auth-error');
-  const authNameWrap  = document.getElementById('auth-name');       // the <div> wrapper
-  const authNameInput = document.getElementById('auth-name-input'); // the <input> inside it
+  const authNameWrap  = document.getElementById('auth-name');
+  const authNameInput = document.getElementById('auth-name-input');
   const authNameLabel = document.getElementById('name-label');
   const authBtn       = document.getElementById('auth-btn');
   const userBar       = document.getElementById('user-bar');
@@ -81,10 +81,10 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
   function setAuthMode(mode) {
     authMode = mode;
     const isSignup = mode === 'signup';
-    authTitle.textContent   = isSignup ? 'Create Account' : 'Sign In';
-    authSub.textContent     = isSignup ? 'Sign up to save and track your predictions.' : 'Sign in to save your predictions.';
-    authSubmit.textContent  = isSignup ? 'Sign Up' : 'Sign In';
-    authSwitch.textContent  = isSignup ? 'Already have an account? Sign in' : "Don't have an account? Sign up";
+    authTitle.textContent  = isSignup ? 'Create Account' : 'Sign In';
+    authSub.textContent    = isSignup ? 'Sign up to save and track your predictions.' : 'Sign in to save your predictions.';
+    authSubmit.textContent = isSignup ? 'Sign Up' : 'Sign In';
+    authSwitch.textContent = isSignup ? 'Already have an account? Sign in' : "Don't have an account? Sign up";
     if (authNameWrap)  authNameWrap.style.display  = isSignup ? 'block' : 'none';
     if (authNameLabel) authNameLabel.style.display = isSignup ? 'block' : 'none';
     authError.textContent = '';
@@ -103,7 +103,7 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
       authError.textContent = '';
       const email    = document.getElementById('auth-email').value.trim();
       const password = document.getElementById('auth-password').value;
-      const name     = authNameInput ? authNameInput.value.trim() : ''; // read <input>, not the <div>
+      const name     = authNameInput ? authNameInput.value.trim() : '';
       authSubmit.disabled = true;
       authSubmit.textContent = authMode === 'signup' ? 'Creating...' : 'Signing in...';
       try {
@@ -135,9 +135,9 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
   watchAuth(async (user) => {
     currentUser = user;
     if (user) {
-      if (authBtn)      authBtn.textContent = 'Account';
-      if (userBar)      userBar.hidden = false;
-      if (userGreeting) userGreeting.textContent = 'Hi, ' + (user.displayName || user.email);
+      if (authBtn)       authBtn.textContent = 'Account';
+      if (userBar)       userBar.hidden = false;
+      if (userGreeting)  userGreeting.textContent = 'Hi, ' + (user.displayName || user.email);
       if (predictPrompt) predictPrompt.hidden = true;
       try {
         const preds = await getUserPredictions(user.uid);
@@ -147,8 +147,8 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
         console.warn('Could not load predictions:', err);
       }
     } else {
-      if (authBtn)      authBtn.textContent = 'Sign In';
-      if (userBar)      userBar.hidden = true;
+      if (authBtn)       authBtn.textContent = 'Sign In';
+      if (userBar)       userBar.hidden = true;
       if (predictPrompt) predictPrompt.hidden = false;
       userPredictions = {};
     }
@@ -201,7 +201,6 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
   }
 
   // ─── Broadcast Badges ─────────────────────────────────────────────────────
-  // Returns an HTML string of badge <span>s, or '' if none.
   function broadcastBadgesHTML(match) {
     const tv  = match.tvEnglish || [];
     const esp = match.tvSpanish || [];
@@ -215,10 +214,6 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
   }
 
   // ─── Match Card HTML ──────────────────────────────────────────────────────
-  // Layout:
-  //   .card-header        — home team | .card-score-col (fixed w) | away team | group badge
-  //   .card-meta          — calendar icon + date · time  |  pin icon + venue, city
-  //   .card-broadcast-row — TV / streaming badges (omitted when empty)
   function matchCardHTML(match, scoreColHTML, groupLabel) {
     const dateStr = match.date
       ? new Date(match.date + 'T12:00:00').toLocaleDateString('en-US',
@@ -228,7 +223,6 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
     const venue = match.venue || null;
     const city  = match.city  || null;
 
-    // ── meta row ──
     const metaItems = [];
     if (dateStr || time) {
       metaItems.push(`<span class="card-meta-item">
@@ -247,20 +241,11 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
         ${venue}${city ? `, ${city}` : ''}
       </span>`);
     }
-    const metaRow = metaItems.length
-      ? `<div class="card-meta">${metaItems.join('')}</div>`
-      : '';
+    const metaRow = metaItems.length ? `<div class="card-meta">${metaItems.join('')}</div>` : '';
 
-    // ── broadcast row ──
     const badges = broadcastBadgesHTML(match);
-    const broadcastRow = badges
-      ? `<div class="card-broadcast-row">${badges}</div>`
-      : '';
-
-    // ── group badge ──
-    const groupBadge = groupLabel
-      ? `<span class="card-group-badge">${groupLabel}</span>`
-      : '';
+    const broadcastRow = badges ? `<div class="card-broadcast-row">${badges}</div>` : '';
+    const groupBadge = groupLabel ? `<span class="card-group-badge">${groupLabel}</span>` : '';
 
     return `
       <div class="card-header">
@@ -290,7 +275,6 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
       const teamsWithPts = group.teams
         .map(t => ({ ...t, ...calcPoints(groupMatches, t.name) }))
         .sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
-
       const card = document.createElement('div');
       card.className = 'group-card';
       card.innerHTML = `
@@ -315,12 +299,10 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
     const container = document.getElementById('matches-list');
     if (!container) return;
     container.innerHTML = '';
-
     let filtered = groupFilter === 'all' ? WC_MATCHES : WC_MATCHES.filter(m => m.group === groupFilter);
     if (venueFilter !== 'all') filtered = filtered.filter(m => m.venue === venueFilter);
 
     filtered.forEach(match => {
-      // Score column: inputs + save button + saved confirmation
       const scoreColHTML = `
         <div class="score-inputs-wrap">
           <input class="score-input" type="number" min="0" max="20"
@@ -336,10 +318,7 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
 
       const card = document.createElement('div');
       card.className = 'match-card';
-      card.innerHTML = matchCardHTML(
-        match, scoreColHTML,
-        match.group ? 'Group ' + match.group : null
-      );
+      card.innerHTML = matchCardHTML(match, scoreColHTML, match.group ? 'Group ' + match.group : null);
       container.appendChild(card);
     });
 
@@ -365,7 +344,6 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
   function renderPredictions() {
     const container = document.getElementById('predictions-list');
     if (!container) return;
-
     if (!currentUser) {
       container.innerHTML = '';
       if (predictPrompt) predictPrompt.hidden = false;
@@ -402,10 +380,7 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
 
       const card = document.createElement('div');
       card.className = 'match-card';
-      card.innerHTML = matchCardHTML(
-        match, scoreColHTML,
-        match.group ? 'Group ' + match.group : null
-      );
+      card.innerHTML = matchCardHTML(match, scoreColHTML, match.group ? 'Group ' + match.group : null);
       container.appendChild(card);
     });
 
@@ -416,11 +391,9 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
         const hInput = container.querySelector(`input[data-pred="${id}"][data-side="home"]`);
         const aInput = container.querySelector(`input[data-pred="${id}"][data-side="away"]`);
         if (!hInput || !aInput || hInput.value === '' || aInput.value === '') return;
-
         const saving = document.getElementById('pred-saving-' + id);
         btn.disabled = true;
         if (saving) saving.hidden = false;
-
         try {
           const matchId = fsId || String(id);
           await savePrediction(currentUser.uid, matchId, {
@@ -447,19 +420,17 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
     if (!container) return;
     container.innerHTML = '';
     WC_GROUPS.forEach(group => {
-      const groupMatches  = WC_MATCHES.filter(m => m.group === group.id);
+      const groupMatches   = WC_MATCHES.filter(m => m.group === group.id);
       const teamsWithStats = group.teams
         .map(t => ({ ...t, ...calcPoints(groupMatches, t.name) }))
         .sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
-
       const card = document.createElement('div');
       card.className = 'standings-card';
       card.innerHTML = `
         <div class="standings-header">Group ${group.id}</div>
         <table class="standings-table">
           <thead>
-            <tr>
-              <th></th><th>Team</th>
+            <tr><th></th><th>Team</th>
               <th title="Played">P</th><th title="Won">W</th><th title="Drawn">D</th>
               <th title="Lost">L</th><th title="Goals For">GF</th>
               <th title="Goals Against">GA</th><th title="Goal Difference">GD</th>
@@ -484,7 +455,6 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
   // ─── Filters ──────────────────────────────────────────────────────────────
   const groupFilterEl = document.getElementById('group-filter');
   const venueFilterEl = document.getElementById('venue-filter');
-
   if (groupFilterEl) {
     WC_GROUPS.forEach(g => {
       const opt = document.createElement('option');
@@ -500,14 +470,12 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
       venueFilterEl.appendChild(opt);
     });
   }
-
   function getFilters() {
     return {
       group: groupFilterEl ? groupFilterEl.value : 'all',
       venue: venueFilterEl ? venueFilterEl.value : 'all',
     };
   }
-
   if (groupFilterEl) groupFilterEl.addEventListener('change', () => { const f = getFilters(); renderMatches(f.group, f.venue); });
   if (venueFilterEl) venueFilterEl.addEventListener('change', () => { const f = getFilters(); renderMatches(f.group, f.venue); });
 
