@@ -57,6 +57,7 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
   const authClose    = document.getElementById('auth-close');
   const authError    = document.getElementById('auth-error');
   const authNameWrap = document.getElementById('auth-name');
+  const authNameInput= document.getElementById('auth-name-input'); // the actual <input>
   const authNameLabel= document.getElementById('name-label');
   const authBtn      = document.getElementById('auth-btn');
   const userBar      = document.getElementById('user-bar');
@@ -71,6 +72,7 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
     authError.textContent = '';
     document.getElementById('auth-email').value = '';
     document.getElementById('auth-password').value = '';
+    if (authNameInput) authNameInput.value = '';
   }
   function closeAuthModal() {
     authModal.hidden = true;
@@ -109,7 +111,8 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
       authError.textContent = '';
       const email    = document.getElementById('auth-email').value.trim();
       const password = document.getElementById('auth-password').value;
-      const name     = authNameWrap ? authNameWrap.value.trim() : '';
+      // FIX: read from the <input> element, not the wrapper <div>
+      const name     = authNameInput ? authNameInput.value.trim() : '';
       authSubmit.disabled = true;
       authSubmit.textContent = authMode === 'signup' ? 'Creating...' : 'Signing in...';
       try {
@@ -226,11 +229,6 @@ import { getMatches, savePrediction, getUserPredictions } from '../db.js';
   }
 
   // ─── Match Card HTML ──────────────────────────────────────────────────────
-  // Shared card structure used by both Matches and Predictions views.
-  // Layout:
-  //   .card-header  — home team | score col | away team | group badge
-  //   .card-meta    — calendar icon + date·time  |  pin icon + venue, city
-  //   .card-actions — save/predict button + broadcast badges
   function matchCardHTML(match, centerHTML, groupLabel) {
     const dateStr = match.date
       ? new Date(match.date + 'T12:00:00').toLocaleDateString('en-US',
