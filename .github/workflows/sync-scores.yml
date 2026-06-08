@@ -16,6 +16,9 @@ on:
     - cron: '*/5 * * * *'
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   sync:
     name: Fetch & write live scores
@@ -44,7 +47,7 @@ jobs:
         if: steps.window.outputs.in_window == 'true' || github.event_name == 'workflow_dispatch'
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: sync/package.json
 
