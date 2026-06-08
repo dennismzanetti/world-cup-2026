@@ -1,0 +1,16 @@
+{
+  "name": "wc2026-live-scores-sync",
+  "version": "1.0.0",
+  "description": "Server-side sync script: polls football-data.org and writes live scores to Firestore",
+  "type": "module",
+  "scripts": {
+    "sync": "node live-scores.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "node-fetch": "^3.3.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
