@@ -110,6 +110,7 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
         authMode === 'signup' ? await signUp(email, password, name) : await signIn(email, password);
         closeAuthModal();
       } catch (err) {
+        console.error('[Auth error]', err.code, err.message);
         authError.textContent = friendlyAuthError(err.code);
       } finally {
         authSubmit.disabled = false;
@@ -120,15 +121,22 @@ import { getMatches, savePrediction, getUserPredictions } from './db.js';
 
   function friendlyAuthError(code) {
     const map = {
-      'auth/user-not-found':       'No account found with that email.',
-      'auth/wrong-password':       'Incorrect password.',
-      'auth/email-already-in-use': 'An account already exists for that email.',
-      'auth/invalid-email':        'Please enter a valid email address.',
-      'auth/weak-password':        'Password must be at least 6 characters.',
-      'auth/too-many-requests':    'Too many attempts. Please wait and try again.',
-      'auth/invalid-credential':   'Invalid email or password.',
+      'auth/user-not-found':          'No account found with that email.',
+      'auth/wrong-password':          'Incorrect password.',
+      'auth/email-already-in-use':    'An account already exists for that email.',
+      'auth/invalid-email':           'Please enter a valid email address.',
+      'auth/weak-password':           'Password must be at least 6 characters.',
+      'auth/too-many-requests':       'Too many attempts. Please wait and try again.',
+      'auth/invalid-credential':      'Invalid email or password.',
+      'auth/operation-not-allowed':   'Email sign-in is not enabled. Contact the app admin.',
+      'auth/network-request-failed':  'Network error — check your connection and try again.',
+      'auth/missing-password':        'Please enter a password.',
+      'auth/missing-email':           'Please enter your email address.',
+      'auth/popup-blocked':           'A popup was blocked by your browser.',
+      'auth/user-disabled':           'This account has been disabled.',
+      'auth/requires-recent-login':   'Please sign out and sign in again to continue.',
     };
-    return map[code] || 'Something went wrong. Please try again.';
+    return map[code] || `Something went wrong (${code || 'unknown'}). Please try again.`;
   }
 
   // ─── Auth State Observer ──────────────────────────────────────────────────
