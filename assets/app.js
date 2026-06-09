@@ -11,7 +11,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   let authResolved = false;
   let userPredictions = {};
   let authMode = 'signin';
-  let unsubscribeMatches = null; // Firestore live listener handle
+  let unsubscribeMatches = null;
 
   // ─── Theme ───────────────────────────────────────────────────────────────────
   const themeToggle = document.querySelector('[data-theme-toggle]');
@@ -91,7 +91,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     authError.textContent = '';
   }
 
-  // Auth button: only opens modal when signed out; hidden when signed in
   if (authBtn)       authBtn.addEventListener('click', () => { setAuthMode('signin'); openAuthModal(); });
   if (predictSignin) predictSignin.addEventListener('click', () => { setAuthMode('signin'); openAuthModal(); });
   if (authClose)     authClose.addEventListener('click', closeAuthModal);
@@ -142,15 +141,16 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   }
 
   // ─── Auth State Observer ─────────────────────────────────────────────────────
+  // IMPORTANT: never touch predictPrompt here — only renderPredictions() controls it.
+  // This prevents the flash caused by Firebase's two-fire pattern on page load
+  // (first fires null, then fires the real user ~300ms later).
   watchAuth(async (user) => {
     currentUser = user;
     authResolved = true;
     if (user) {
-      // Hide the Sign In button entirely when signed in
-      if (authBtn)       authBtn.hidden = true;
-      if (userBar)       userBar.hidden = false;
-      if (userGreeting)  userGreeting.textContent = 'Hi, ' + (user.displayName || user.email);
-      if (predictPrompt) predictPrompt.hidden = true;
+      if (authBtn)      authBtn.hidden = true;
+      if (userBar)      userBar.hidden = false;
+      if (userGreeting) userGreeting.textContent = 'Hi, ' + (user.displayName || user.email);
       try {
         const preds = await getUserPredictions(user.uid);
         userPredictions = {};
@@ -159,11 +159,8 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
         console.warn('Could not load predictions:', err);
       }
     } else {
-      // Show the Sign In button when signed out
-      if (authBtn)       { authBtn.hidden = false; authBtn.textContent = 'Sign In'; }
-      if (userBar)       userBar.hidden = true;
-      // Only reveal the auth prompt once we know for sure no session exists
-      if (predictPrompt) predictPrompt.hidden = false;
+      if (authBtn)  { authBtn.hidden = false; authBtn.textContent = 'Sign In'; }
+      if (userBar)  userBar.hidden = true;
       userPredictions = {};
     }
     renderAll();
@@ -269,7 +266,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       ? new Date(match.date + 'T12:00:00').toLocaleDateString('en-US',
           { weekday: 'short', month: 'short', day: 'numeric' })
       : null;
-    const time  = match.timeLocal ? `${match.timeLocal}\u202f${match.tz || 'ET'}` : null;
+    const time  = match.timeLocal ? `${match.timeLocal} ${match.tz || 'ET'}` : null;
     const venue = match.venue || null;
     const city  = match.city  || null;
 
@@ -331,7 +328,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
                     && match.awayScore !== null && match.awayScore !== undefined;
 
     let scoreColHTML;
-
     if (isLive || isFinished) {
       const scoreDisplay = hasScore
         ? `<div class="score-final ${isLive ? 'score-live' : ''}">${match.homeScore} : ${match.awayScore}</div>`
@@ -339,7 +335,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       scoreColHTML = scoreDisplay + statusBadgeHTML(match);
     } else {
       const kickoff = match.timeLocal
-        ? `<div class="score-kickoff">${match.timeLocal}\u202f${match.tz || 'ET'}</div>`
+        ? `<div class="score-kickoff">${match.timeLocal} ${match.tz || 'ET'}</div>`
         : `<div class="score-kickoff score-pending">TBD</div>`;
       scoreColHTML = kickoff;
     }
@@ -417,14 +413,11 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       container.innerHTML = '<p class="empty-filter-msg">No matches found for the selected filters.</p>';
       return;
     }
-
     insertDateDividers(container, filtered);
   }
 
   // ─── Canonical match key ─────────────────────────────────────────────────────
-  function matchKey(match) {
-    return match.id;
-  }
+  function matchKey(match) { return match.id; }
 
   // ─── Save with timeout ───────────────────────────────────────────────────────
   function withTimeout(promise, ms, label) {
@@ -435,21 +428,28 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   }
 
   // ─── Render Predictions ───────────────────────────────────────────────────────
+  // Single source of truth for predictPrompt visibility.
+  // Uses auth.currentUser as a synchronous check to avoid the Firebase
+  // two-fire pattern (null → user) causing a visible flash of the sign-in prompt.
   function renderPredictions() {
     const container = document.getElementById('predictions-list');
     if (!container) return;
 
-    // Auth not yet resolved — keep prompt hidden, show nothing
-    if (!authResolved) {
-      container.innerHTML = '';
+    // Use auth.currentUser synchronously — this is populated by Firebase as soon
+    // as the cached token is validated, before onAuthStateChanged fires.
+    const resolvedUser = currentUser || auth.currentUser;
+
+    // Auth not yet settled — hide prompt, render nothing, wait for watchAuth
+    if (!authResolved && !resolvedUser) {
       if (predictPrompt) predictPrompt.hidden = true;
+      container.innerHTML = '';
       return;
     }
 
-    // Resolved but no user — show sign-in prompt
-    if (!currentUser) {
-      container.innerHTML = '';
+    // No user — show sign-in prompt
+    if (!resolvedUser) {
       if (predictPrompt) predictPrompt.hidden = false;
+      container.innerHTML = '';
       return;
     }
 
@@ -458,7 +458,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     container.innerHTML = '';
 
     const sorted = WC_MATCHES.slice().sort(sortByDateTime);
-
     let lastDate = null;
     sorted.forEach(match => {
       if (match.date && match.date !== lastDate) {
@@ -475,8 +474,8 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       const status = (match.status || 'scheduled').toLowerCase();
       const isLive     = status === 'live' || status === 'ht';
       const isFinished = status === 'finished';
-      const hasResult  = (match.homeScore !== null && match.homeScore !== undefined
-                       && match.awayScore !== null && match.awayScore !== undefined);
+      const hasResult  = match.homeScore !== null && match.homeScore !== undefined
+                      && match.awayScore !== null && match.awayScore !== undefined;
 
       let scoreColHTML;
       if (isFinished || (isLive && hasResult)) {
@@ -521,7 +520,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
         const errorEl  = document.getElementById('pred-error-' + matchId);
 
         if (!hInput || !aInput || hInput.value === '' || aInput.value === '') return;
-
         const homeScorePred = parseInt(hInput.value);
         const awayScorePred = parseInt(aInput.value);
 
@@ -530,22 +528,16 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
         if (saving)  saving.hidden = true;
         if (errorEl) { errorEl.hidden = true; errorEl.textContent = ''; }
 
-        console.log('[Predict] saving matchId=%s uid=%s scores=%d-%d',
-          matchId, currentUser.uid, homeScorePred, awayScorePred);
-
         try {
           await withTimeout(
-            savePrediction(currentUser.uid, matchId, { homeScorePred, awayScorePred }),
-            8000,
-            `savePrediction(${matchId})`
+            savePrediction(resolvedUser.uid, matchId, { homeScorePred, awayScorePred }),
+            8000, `savePrediction(${matchId})`
           );
-          console.log('[Predict] saved OK — matchId=%s', matchId);
           userPredictions[matchId] = { matchId, homeScorePred, awayScorePred };
           btn.textContent = 'Saved \u2713';
           setTimeout(() => { btn.textContent = 'Predict'; btn.disabled = false; }, 1500);
         } catch (err) {
-          console.error('[Predict] save failed — matchId=%s code=%s message=%s',
-            matchId, err.code, err.message, err);
+          console.error('[Predict] save failed', matchId, err);
           const msg = err.code === 'permission-denied'
             ? 'Permission denied — are you signed in?'
             : err.message || 'Save failed — retry';
@@ -626,14 +618,9 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     };
   }
 
-  function onFilterChange() {
-    const f = getFilters();
-    renderMatches(f.group, f.venue, f.date);
-  }
-
-  if (groupFilterEl) groupFilterEl.addEventListener('change', onFilterChange);
-  if (venueFilterEl) venueFilterEl.addEventListener('change', onFilterChange);
-  if (dateFilterEl)  dateFilterEl.addEventListener('change',  onFilterChange);
+  if (groupFilterEl) groupFilterEl.addEventListener('change', () => renderMatches(...Object.values(getFilters())));
+  if (venueFilterEl) venueFilterEl.addEventListener('change', () => renderMatches(...Object.values(getFilters())));
+  if (dateFilterEl)  dateFilterEl.addEventListener('change',  () => renderMatches(...Object.values(getFilters())));
 
   // ─── Render All ───────────────────────────────────────────────────────────────
   function renderAll() {
