@@ -207,6 +207,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
         }
       });
       populateDateFilter();
+      populatePredDateFilter();
       renderAll();
     });
   }
@@ -393,7 +394,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     });
   }
 
-  // ─── Date Filter Population ───────────────────────────────────────────────────
+  // ─── Date Filter Population (Matches) ────────────────────────────────────────
   function populateDateFilter() {
     const el = document.getElementById('date-filter');
     if (!el) return;
@@ -444,6 +445,84 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     return Promise.race([promise, timeout]);
   }
 
+  // ─── Prediction Filters ───────────────────────────────────────────────────────
+  // Declared early (before watchAuth/renderAll) to avoid the initialization-order
+  // bug where const declarations after the auth observer were null at boot time.
+  const predDateFilterEl  = document.getElementById('pred-date-filter');
+  const predGroupFilterEl = document.getElementById('pred-group-filter');
+  const predTeamFilterEl  = document.getElementById('pred-team-filter');
+  const predFiltersBar    = document.getElementById('pred-filters');
+
+  // Populate group + knockout stage options eagerly on boot
+  if (predGroupFilterEl) {
+    WC_GROUPS.forEach(g => {
+      const opt = document.createElement('option');
+      opt.value = g.id;
+      opt.textContent = 'Group ' + g.id;
+      predGroupFilterEl.appendChild(opt);
+    });
+    ['Round of 32', 'Round of 16', 'Quarterfinals', 'Semifinals', 'Third Place', 'Final'].forEach(stage => {
+      const opt = document.createElement('option');
+      opt.value = stage;
+      opt.textContent = stage;
+      predGroupFilterEl.appendChild(opt);
+    });
+  }
+
+  function populatePredDateFilter() {
+    if (!predDateFilterEl) return;
+    const currentValue = predDateFilterEl.value;
+    const dates = [...new Set(WC_MATCHES.map(m => m.date).filter(Boolean))].sort();
+    while (predDateFilterEl.options.length > 1) predDateFilterEl.remove(1);
+    dates.forEach(d => {
+      const label = new Date(d + 'T12:00:00').toLocaleDateString('en-US',
+        { weekday: 'short', month: 'short', day: 'numeric' });
+      const opt = document.createElement('option');
+      opt.value = d; opt.textContent = label;
+      predDateFilterEl.appendChild(opt);
+    });
+    // Restore selection if it still exists after repopulation
+    if ([...predDateFilterEl.options].some(o => o.value === currentValue)) {
+      predDateFilterEl.value = currentValue;
+    }
+  }
+
+  function getPredFilters() {
+    return {
+      group: predGroupFilterEl?.value || 'all',
+      date:  predDateFilterEl?.value  || 'all',
+      team:  predTeamFilterEl?.value?.trim().toLowerCase() || '',
+    };
+  }
+
+  function getFilteredPredictionMatches() {
+    const { group, date, team } = getPredFilters();
+    return WC_MATCHES.slice()
+      .sort(sortByDateTime)
+      .filter(match => {
+        const matchGroup = match.group || match.stage || '';
+        if (group !== 'all' && matchGroup !== group) return false;
+        if (date  !== 'all' && (match.date || '') !== date) return false;
+        if (team) {
+          const home = (match.home?.name || '').toLowerCase();
+          const away = (match.away?.name || '').toLowerCase();
+          if (!home.includes(team) && !away.includes(team)) return false;
+        }
+        return true;
+      });
+  }
+
+  function onPredFilterChange() {
+    renderPredictions();
+  }
+
+  if (predDateFilterEl)  predDateFilterEl.addEventListener('change', onPredFilterChange);
+  if (predGroupFilterEl) predGroupFilterEl.addEventListener('change', onPredFilterChange);
+  if (predTeamFilterEl)  predTeamFilterEl.addEventListener('input',  onPredFilterChange);
+
+  // Populate date filter options on boot
+  populatePredDateFilter();
+
   // ─── Render Predictions ───────────────────────────────────────────────────────
   // predictPrompt is only ever shown after authResolved=true AND currentUser=null.
   // The firstAuthFire guard in watchAuth ensures we never render with the false
@@ -454,25 +533,34 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 
     // Auth not yet resolved — keep everything hidden, wait for watchAuth
     if (!authResolved) {
-      if (predictPrompt) predictPrompt.hidden = true;
+      if (predictPrompt)  predictPrompt.hidden = true;
+      if (predFiltersBar) predFiltersBar.hidden = true;
       container.innerHTML = '';
       return;
     }
 
-    // Resolved: no user — show sign-in prompt
+    // Resolved: no user — show sign-in prompt, hide filters
     if (!currentUser) {
-      if (predictPrompt) predictPrompt.hidden = false;
+      if (predictPrompt)  predictPrompt.hidden = false;
+      if (predFiltersBar) predFiltersBar.hidden = true;
       container.innerHTML = '';
       return;
     }
 
-    // Signed in — hide prompt, render prediction cards
-    if (predictPrompt) predictPrompt.hidden = true;
+    // Signed in — hide prompt, show filters, render filtered prediction cards
+    if (predictPrompt)  predictPrompt.hidden = true;
+    if (predFiltersBar) predFiltersBar.hidden = false;
+
+    const filtered = getFilteredPredictionMatches();
     container.innerHTML = '';
 
-    const sorted = WC_MATCHES.slice().sort(sortByDateTime);
+    if (filtered.length === 0) {
+      container.innerHTML = '<p class="empty-filter-msg">No matches found for the selected prediction filters.</p>';
+      return;
+    }
+
     let lastDate = null;
-    sorted.forEach(match => {
+    filtered.forEach(match => {
       if (match.date && match.date !== lastDate) {
         lastDate = match.date;
         const divider = document.createElement('div');
@@ -600,7 +688,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     });
   }
 
-  // ─── Filters ──────────────────────────────────────────────────────────────────
+  // ─── Matches Filters ─────────────────────────────────────────────────────────
   const groupFilterEl = document.getElementById('group-filter');
   const venueFilterEl = document.getElementById('venue-filter');
   const dateFilterEl  = document.getElementById('date-filter');

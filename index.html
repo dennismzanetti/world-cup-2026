@@ -142,6 +142,25 @@
           <p>Sign in to save and track your predictions across devices.</p>
           <button class="btn btn-primary" id="predict-signin-btn">Sign In to Predict</button>
         </div>
+        <!-- Prediction filters (only visible when signed in) -->
+        <div class="matches-filter" id="pred-filters" hidden>
+          <label for="pred-date-filter">Date:</label>
+          <select id="pred-date-filter">
+            <option value="all">All Dates</option>
+          </select>
+          <label for="pred-group-filter">Group:</label>
+          <select id="pred-group-filter">
+            <option value="all">All Groups</option>
+          </select>
+          <label for="pred-team-filter">Team:</label>
+          <input
+            id="pred-team-filter"
+            type="search"
+            placeholder="Search team"
+            autocomplete="off"
+            class="filter-search-input"
+          />
+        </div>
         <div class="predictions-list" id="predictions-list"></div>
       </div>
     </section>
