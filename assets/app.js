@@ -64,8 +64,9 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   const userBar       = document.getElementById('user-bar');
   const userGreeting  = document.getElementById('user-greeting');
   const signOutBtn    = document.getElementById('sign-out-btn');
-  const predictSignin = document.getElementById('predict-signin-btn');
-  const predictPrompt = document.getElementById('predictions-auth-prompt');
+  const predictSignin   = document.getElementById('predict-signin-btn');
+  const predictPrompt   = document.getElementById('predictions-auth-prompt');
+  const predictSubtitle = document.getElementById('predictions-subtitle');
 
   function openAuthModal() {
     authModal.hidden = false;
@@ -140,15 +141,23 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     return map[code] || `Something went wrong (${code || 'unknown'}). Please try again.`;
   }
 
+  // ─── Update predictions section UI for auth state ────────────────────────────
+  function updatePredictionsAuthUI(user) {
+    if (predictPrompt)   predictPrompt.hidden   = !!user;
+    if (predictSubtitle) predictSubtitle.textContent = user
+      ? 'Predict match scores before kickoff — your picks are saved automatically.'
+      : 'Predict match scores before kickoff — sign in to save.';
+  }
+
   // ─── Auth State Observer ─────────────────────────────────────────────────────
   watchAuth(async (user) => {
     currentUser = user;
     authResolved = true;
     if (user) {
-      if (authBtn)       authBtn.textContent = 'Account';
-      if (userBar)       userBar.hidden = false;
-      if (userGreeting)  userGreeting.textContent = 'Hi, ' + (user.displayName || user.email);
-      if (predictPrompt) predictPrompt.hidden = true;
+      if (authBtn)      authBtn.textContent = 'Account';
+      if (userBar)      userBar.hidden = false;
+      if (userGreeting) userGreeting.textContent = 'Hi, ' + (user.displayName || user.email);
+      updatePredictionsAuthUI(user);
       try {
         const preds = await getUserPredictions(user.uid);
         userPredictions = {};
@@ -157,9 +166,9 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
         console.warn('Could not load predictions:', err);
       }
     } else {
-      if (authBtn)       authBtn.textContent = 'Sign In';
-      if (userBar)       userBar.hidden = true;
-      if (predictPrompt) predictPrompt.hidden = false;
+      if (authBtn)  authBtn.textContent = 'Sign In';
+      if (userBar)  userBar.hidden = true;
+      updatePredictionsAuthUI(null);
       userPredictions = {};
     }
     renderAll();
