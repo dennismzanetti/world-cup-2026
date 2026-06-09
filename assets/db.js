@@ -13,8 +13,9 @@ import {
 import { db } from "./firebase.js";
 import { auth } from "./firebase.js";
 
-const PROJECT = "worldcup2026-cfbc2";
-const FS_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
+const PROJECT  = "worldcup2026-cfbc2";
+const DB_ROOT  = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)`;
+const FS_BASE  = `${DB_ROOT}/documents`;
 
 // ─── REST helpers ──────────────────────────────────────────────────────────────
 
@@ -24,7 +25,6 @@ async function getIdToken() {
   return user.getIdToken();
 }
 
-// Convert a JS value to Firestore REST field value
 function toFsValue(v) {
   if (typeof v === 'string')  return { stringValue: v };
   if (typeof v === 'number')  return { integerValue: String(v) };
@@ -33,7 +33,6 @@ function toFsValue(v) {
   return { stringValue: String(v) };
 }
 
-// Convert Firestore REST field value back to JS
 function fromFsValue(fv) {
   if ('stringValue'  in fv) return fv.stringValue;
   if ('integerValue' in fv) return parseInt(fv.integerValue);
@@ -47,12 +46,11 @@ function docToObj(fsDoc) {
   const fields = fsDoc.fields || {};
   const obj = {};
   for (const [k, v] of Object.entries(fields)) obj[k] = fromFsValue(v);
-  // extract id from name: "projects/.../documents/collection/DOC_ID"
   obj.id = fsDoc.name.split('/').pop();
   return obj;
 }
 
-// ─── MATCHES (SDK — read-only, WebChannel is fine for reads) ───────────────────────
+// ─── MATCHES (SDK — read-only) ───────────────────────────────────────────────────
 
 export async function getMatches() {
   const q = query(collection(db, "matches"), orderBy("date"), orderBy("timeLocal"));
@@ -79,28 +77,24 @@ export function watchMatches(callback) {
   });
 }
 
-// ─── PREDICTIONS (REST — bypasses WebChannel for writes) ────────────────────────
+// ─── PREDICTIONS (REST — bypasses WebChannel) ────────────────────────────────
 
 export async function savePrediction(userId, matchId, { homeScorePred, awayScorePred }) {
-  const token   = await getIdToken();
-  const docId   = `${userId}_${matchId}`;
-  const url     = `${FS_BASE}/predictions/${encodeURIComponent(docId)}`;
-  const body    = {
-    fields: {
-      userId:         toFsValue(userId),
-      matchId:        toFsValue(matchId),
-      homeScorePred:  toFsValue(homeScorePred),
-      awayScorePred:  toFsValue(awayScorePred),
-      updatedAt:      toFsValue(new Date().toISOString())
-    }
-  };
-  const res = await fetch(url, {
+  const token = await getIdToken();
+  const docId = `${userId}_${matchId}`;
+  const url   = `${FS_BASE}/predictions/${encodeURIComponent(docId)}`;
+  const res   = await fetch(url, {
     method:  'PATCH',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type':  'application/json'
-    },
-    body: JSON.stringify(body)
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      fields: {
+        userId:        toFsValue(userId),
+        matchId:       toFsValue(matchId),
+        homeScorePred: toFsValue(homeScorePred),
+        awayScorePred: toFsValue(awayScorePred),
+        updatedAt:     toFsValue(new Date().toISOString())
+      }
+    })
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -110,29 +104,24 @@ export async function savePrediction(userId, matchId, { homeScorePred, awayScore
 }
 
 export async function getUserPredictions(userId) {
-  const token = await getIdToken();
-  const url   = `${FS_BASE}/predictions?pageSize=500`;
-  // Use REST runQuery to filter by userId
-  const queryUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents:runQuery`;
-  const body = {
-    structuredQuery: {
-      from: [{ collectionId: 'predictions' }],
-      where: {
-        fieldFilter: {
-          field: { fieldPath: 'userId' },
-          op: 'EQUAL',
-          value: { stringValue: userId }
+  const token    = await getIdToken();
+  // :runQuery must be on the database root, NOT on /documents
+  const queryUrl = `${DB_ROOT}:runQuery`;
+  const res      = await fetch(queryUrl, {
+    method:  'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      structuredQuery: {
+        from:  [{ collectionId: 'predictions' }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: 'userId' },
+            op:    'EQUAL',
+            value: { stringValue: userId }
+          }
         }
       }
-    }
-  };
-  const res = await fetch(queryUrl, {
-    method:  'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type':  'application/json'
-    },
-    body: JSON.stringify(body)
+    })
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -145,46 +134,37 @@ export async function getUserPredictions(userId) {
 }
 
 export async function getPrediction(userId, matchId) {
-  const token  = await getIdToken();
-  const docId  = `${userId}_${matchId}`;
-  const url    = `${FS_BASE}/predictions/${encodeURIComponent(docId)}`;
-  const res    = await fetch(url, {
-    headers: { 'Authorization': `Bearer ${token}` }
-  });
+  const token = await getIdToken();
+  const docId = `${userId}_${matchId}`;
+  const url   = `${FS_BASE}/predictions/${encodeURIComponent(docId)}`;
+  const res   = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
   if (res.status === 404) return null;
   if (!res.ok) return null;
   return docToObj(await res.json());
 }
 
 export async function deletePrediction(userId, matchId) {
-  const token  = await getIdToken();
-  const docId  = `${userId}_${matchId}`;
-  const url    = `${FS_BASE}/predictions/${encodeURIComponent(docId)}`;
-  await fetch(url, {
-    method:  'DELETE',
-    headers: { 'Authorization': `Bearer ${token}` }
-  });
+  const token = await getIdToken();
+  const docId = `${userId}_${matchId}`;
+  const url   = `${FS_BASE}/predictions/${encodeURIComponent(docId)}`;
+  await fetch(url, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
 }
 
-// ─── USERS ────────────────────────────────────────────────────────────────────
+// ─── USERS ───────────────────────────────────────────────────────────────────
 
 export async function saveUserProfile(uid, { email, displayName }) {
-  const token  = await getIdToken();
-  const url    = `${FS_BASE}/users/${encodeURIComponent(uid)}`;
-  const body   = {
-    fields: {
-      email:       toFsValue(email),
-      displayName: toFsValue(displayName),
-      updatedAt:   toFsValue(new Date().toISOString())
-    }
-  };
-  const res = await fetch(url, {
+  const token = await getIdToken();
+  const url   = `${FS_BASE}/users/${encodeURIComponent(uid)}`;
+  const res   = await fetch(url, {
     method:  'PATCH',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type':  'application/json'
-    },
-    body: JSON.stringify(body)
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      fields: {
+        email:       toFsValue(email),
+        displayName: toFsValue(displayName),
+        updatedAt:   toFsValue(new Date().toISOString())
+      }
+    })
   });
   if (!res.ok) console.warn('saveUserProfile failed', res.status);
 }
@@ -192,9 +172,7 @@ export async function saveUserProfile(uid, { email, displayName }) {
 export async function getUserProfile(uid) {
   const token = await getIdToken();
   const url   = `${FS_BASE}/users/${encodeURIComponent(uid)}`;
-  const res   = await fetch(url, {
-    headers: { 'Authorization': `Bearer ${token}` }
-  });
+  const res   = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
   if (!res.ok) return null;
   return docToObj(await res.json());
 }
