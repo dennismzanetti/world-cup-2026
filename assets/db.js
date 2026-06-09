@@ -7,8 +7,7 @@ import {
   updateDoc,
   query,
   where,
-  orderBy,
-  onSnapshot
+  orderBy
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { db } from "./firebase.js";
 import { auth } from "./firebase.js";
@@ -20,10 +19,11 @@ const RQ_URL   = `${FS_BASE}:runQuery`;
 
 // ─── REST helpers ──────────────────────────────────────────────────────────────
 
-async function getIdToken() {
+// forceRefresh=true avoids stale tokens right after onAuthStateChanged fires
+async function getIdToken(forceRefresh = false) {
   const user = auth.currentUser;
   if (!user) throw new Error('Not authenticated');
-  return user.getIdToken();
+  return user.getIdToken(forceRefresh);
 }
 
 function toFsValue(v) {
@@ -77,11 +77,29 @@ export async function updateMatchResult(matchId, { homeScore, awayScore, status 
   });
 }
 
-export function watchMatches(callback) {
-  const q = query(collection(db, "matches"), orderBy("date"), orderBy("timeLocal"));
-  return onSnapshot(q, snapshot => {
-    callback(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-  });
+// ─── MATCHES (REST polling — replaces onSnapshot to avoid ad-blocker blocks) ──
+
+export function watchMatches(callback, intervalMs = 30000) {
+  const MATCHES_URL = `${FS_BASE}?pageSize=200&orderBy=date,timeLocal`;
+
+  async function fetchMatches() {
+    try {
+      const res = await fetch(MATCHES_URL);
+      if (!res.ok) { console.warn('[watchMatches] fetch failed', res.status); return; }
+      const data = await res.json();
+      const docs = (data.documents || []).map(docToObj);
+      callback(docs);
+    } catch (err) {
+      console.warn('[watchMatches] error', err);
+    }
+  }
+
+  // Fire immediately, then poll
+  fetchMatches();
+  const timerId = setInterval(fetchMatches, intervalMs);
+
+  // Return an unsubscribe function matching the onSnapshot API
+  return () => clearInterval(timerId);
 }
 
 // ─── PREDICTIONS (REST — bypasses WebChannel) ────────────────────────────────
@@ -110,8 +128,8 @@ export async function savePrediction(userId, matchId, { homeScorePred, awayScore
 }
 
 export async function getUserPredictions(userId) {
-  const token = await getIdToken();
-  // POST to /documents:runQuery (not the database root)
+  // forceRefresh=true ensures the token is valid right after onAuthStateChanged
+  const token = await getIdToken(true);
   const res   = await fetch(RQ_URL, {
     method:  'POST',
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
