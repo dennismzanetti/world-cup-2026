@@ -52,8 +52,6 @@ function predDocUrl(userId, matchId) {
   return `${FS_BASE}/predictions/${encodeURIComponent(userId)}_${encodeURIComponent(matchId)}`;
 }
 
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-
 // ─── MATCHES ───────────────────────────────────────────────────────────────────
 
 export async function getMatches() {
@@ -75,7 +73,6 @@ export async function updateMatchResult(matchId, { homeScore, awayScore, status 
 }
 
 // Uses SDK getDocs polling — no WebChannel, no CORS issues, ad-blocker safe.
-// Matches are public so no auth token needed; getDocs handles auth internally.
 export function watchMatches(callback, intervalMs = 30000) {
   const q = query(collection(db, "matches"), orderBy("date"), orderBy("timeLocal"));
 
@@ -118,42 +115,35 @@ export async function savePrediction(userId, matchId, { homeScorePred, awayScore
   return res.json();
 }
 
-// Retries once with a fresh token after a short delay if Firestore returns 404,
-// which can happen when the token is not yet valid right after onAuthStateChanged.
 export async function getUserPredictions(userId) {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    if (attempt > 0) await sleep(500 * attempt); // 500ms, then 1000ms
-    const token = await getIdToken(true);
-    const res   = await fetch(RQ_URL, {
-      method:  'POST',
-      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        structuredQuery: {
-          from:  [{ collectionId: 'predictions' }],
-          where: {
-            fieldFilter: {
-              field: { fieldPath: 'userId' },
-              op:    'EQUAL',
-              value: { stringValue: userId }
-            }
+  const token = await getIdToken(true);
+  const res   = await fetch(RQ_URL, {
+    method:  'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      structuredQuery: {
+        from:  [{ collectionId: 'predictions' }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: 'userId' },
+            op:    'EQUAL',
+            value: { stringValue: userId }
           }
         }
-      })
-    });
-    if (res.status === 404 && attempt < 2) {
-      console.warn(`[getUserPredictions] 404 on attempt ${attempt + 1}, retrying...`);
-      continue;
-    }
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(`Firestore REST query error ${res.status}: ${err?.error?.message || res.statusText}`);
-    }
-    const results = await res.json();
-    return results
-      .filter(r => r.document)
-      .map(r => docToObj(r.document));
+      }
+    })
+  });
+  // 404 means the predictions collection doesn't exist yet (no one has predicted).
+  // Treat it as an empty result — it will auto-create on the first savePrediction call.
+  if (res.status === 404) return [];
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Firestore REST query error ${res.status}: ${err?.error?.message || res.statusText}`);
   }
-  return [];
+  const results = await res.json();
+  return results
+    .filter(r => r.document)
+    .map(r => docToObj(r.document));
 }
 
 export async function getPrediction(userId, matchId) {
