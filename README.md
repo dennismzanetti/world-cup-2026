@@ -25,5 +25,4 @@ A web app to predict and track the results of the 2026 FIFA World Cup.
 - [ ] Knockout bracket
 - [ ] Prediction scoring / leaderboard
 - [ ] Live scores integration
-- [ ] LocalStorage persistence
-- [ ] User accounts
+- [x] User accounts
