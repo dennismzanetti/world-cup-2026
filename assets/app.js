@@ -172,7 +172,8 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   function startMatchListener() {
     if (unsubscribeMatches) unsubscribeMatches(); // detach any previous listener
     unsubscribeMatches = watchMatches((liveMatches) => {
-      // Merge Firestore data into local WC_MATCHES array
+      // Merge Firestore data into local WC_MATCHES array (scores, status, etc.)
+      // match.id is now a stable deterministic slug — no firestoreId needed.
       liveMatches.forEach(fm => {
         const local = WC_MATCHES.find(
           m => m.home.name === fm.homeTeam && m.away.name === fm.awayTeam
@@ -180,8 +181,8 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
         if (local) {
           if (fm.homeScore !== undefined && fm.homeScore !== null) local.homeScore = fm.homeScore;
           if (fm.awayScore !== undefined && fm.awayScore !== null) local.awayScore = fm.awayScore;
-          if (fm.status)    local.status    = fm.status;   // 'scheduled'|'live'|'ht'|'finished'
-          if (fm.minute)    local.minute    = fm.minute;   // e.g. 67 (shown during live)
+          if (fm.status)    local.status    = fm.status;
+          if (fm.minute)    local.minute    = fm.minute;
           if (fm.date)      local.date      = fm.date;
           if (fm.timeLocal) local.timeLocal = fm.timeLocal;
           if (fm.timezone)  local.tz        = fm.timezone.replace('America/', '').split('/')[0];
@@ -190,7 +191,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
           if (fm.tvEnglish) local.tvEnglish = fm.tvEnglish;
           if (fm.tvSpanish) local.tvSpanish = fm.tvSpanish;
           if (fm.streaming) local.streaming = fm.streaming;
-          local.firestoreId = fm.id;
         }
       });
       populateDateFilter();
@@ -223,7 +223,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   }
 
   // ─── Status badge helper ─────────────────────────────────────────────────────
-  // Returns an HTML string for the match status badge shown in the score column.
   function statusBadgeHTML(match) {
     const s = (match.status || 'scheduled').toLowerCase();
     if (s === 'live') {
@@ -232,7 +231,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     }
     if (s === 'ht')       return `<span class="status-badge status-ht">HT</span>`;
     if (s === 'finished') return `<span class="status-badge status-ft">FT</span>`;
-    return ''; // scheduled — show nothing extra
+    return '';
   }
 
   // ─── Points Calculation ───────────────────────────────────────────────────────
@@ -325,10 +324,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   }
 
   // ─── Build match card (Matches view) ─────────────────────────────────────────
-  // Score column logic:
-  //   scheduled  → read-only kickoff time (scores come from live-scores sync script)
-  //   live / ht  → live score display + status badge
-  //   finished   → final score + FT badge
   function buildMatchCard(match) {
     const status = (match.status || 'scheduled').toLowerCase();
     const isLive     = status === 'live' || status === 'ht';
@@ -339,13 +334,11 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     let scoreColHTML;
 
     if (isLive || isFinished) {
-      // Read-only score display for live / finished matches
       const scoreDisplay = hasScore
         ? `<div class="score-final ${isLive ? 'score-live' : ''}">${match.homeScore} : ${match.awayScore}</div>`
         : `<div class="score-final score-pending">- : -</div>`;
       scoreColHTML = scoreDisplay + statusBadgeHTML(match);
     } else {
-      // Scheduled — show kickoff time only; scores are set by the live-scores sync script
       const kickoff = match.timeLocal
         ? `<div class="score-kickoff">${match.timeLocal}\u202f${match.tz || 'ET'}</div>`
         : `<div class="score-kickoff score-pending">TBD</div>`;
@@ -414,7 +407,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     if (venueFilter !== 'all') filtered = filtered.filter(m => m.venue === venueFilter);
     if (dateFilter  !== 'all') filtered = filtered.filter(m => m.date  === dateFilter);
 
-    // Live matches float to the top within each day, then chronological
     filtered.sort((a, b) => {
       const liveA = (a.status === 'live' || a.status === 'ht') ? 0 : 1;
       const liveB = (b.status === 'live' || b.status === 'ht') ? 0 : 1;
@@ -431,11 +423,10 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   }
 
   // ─── Canonical match key ─────────────────────────────────────────────────────
-  // Returns the Firestore document ID once the live-match listener has set it;
-  // falls back to the JS array index as a string until then. The same function
-  // is used for BOTH saving and loading predictions so the keys always match.
+  // match.id is now a stable deterministic slug generated in data.js
+  // (e.g. "2026-06-11-mexico-south-africa"). No Firestore dependency.
   function matchKey(match) {
-    return match.firestoreId || String(match.id);
+    return match.id;
   }
 
   // ─── Render Predictions ───────────────────────────────────────────────────────
@@ -469,10 +460,9 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
         container.appendChild(divider);
       }
 
-      // FIX: use matchKey() consistently for both lookup and saving so keys always match
-      const key  = matchKey(match);
-      const pred = userPredictions[key] || null;
-      const status     = (match.status || 'scheduled').toLowerCase();
+      const key    = matchKey(match);
+      const pred   = userPredictions[key] || null;
+      const status = (match.status || 'scheduled').toLowerCase();
       const isLive     = status === 'live' || status === 'ht';
       const isFinished = status === 'finished';
       const hasResult  = (match.homeScore !== null && match.homeScore !== undefined
@@ -480,7 +470,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 
       let scoreColHTML;
       if (isFinished || (isLive && hasResult)) {
-        // Show actual score + status badge; lock predictions
         scoreColHTML = `
           <div class="score-final ${isLive ? 'score-live' : ''}">${match.homeScore} : ${match.awayScore}</div>
           ${statusBadgeHTML(match)}
@@ -491,28 +480,19 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
           ${statusBadgeHTML(match)}
           ${pred ? `<div class="pred-was">Your pick: ${pred.homeScorePred}\u2013${pred.awayScorePred}</div>` : ''}`;
       } else {
-        // Scheduled — allow prediction entry.
-        // FIX: disable the Predict button until firestoreId is available so the
-        // save always uses the Firestore doc ID (the same key getUserPredictions
-        // returns), never a bare numeric string that won't match on reload.
-        const hasFirestoreId = !!match.firestoreId;
+        // Scheduled — prediction entry always available (no Firestore dependency)
         scoreColHTML = `
           <div class="score-inputs-wrap">
             <input class="pred-input" type="number" min="0" max="20"
               value="${pred ? pred.homeScorePred : ''}" placeholder="?"
-              data-pred="${match.id}" data-side="home">
+              data-pred="${key}" data-side="home">
             <span class="score-sep">:</span>
             <input class="pred-input" type="number" min="0" max="20"
               value="${pred ? pred.awayScorePred : ''}" placeholder="?"
-              data-pred="${match.id}" data-side="away">
+              data-pred="${key}" data-side="away">
           </div>
-          <button class="btn-save pred-btn"
-            data-pred-save="${match.id}"
-            data-fsid="${match.firestoreId || ''}"
-            ${hasFirestoreId ? '' : 'disabled title="Loading match data…"'}>
-            ${hasFirestoreId ? 'Predict' : 'Loading…'}
-          </button>
-          <span class="pred-saving" id="pred-saving-${match.id}" hidden>Saving\u2026</span>`;
+          <button class="btn-save pred-btn" data-pred-save="${key}">Predict</button>
+          <span class="pred-saving" id="pred-saving-${key}" hidden>Saving\u2026</span>`;
       }
 
       const stripLabel = match.group ? 'Group ' + match.group : (match.stage || 'Match');
@@ -524,24 +504,17 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 
     container.querySelectorAll('[data-pred-save]').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const id     = parseInt(btn.dataset.predSave);
-        const fsId   = btn.dataset.fsid;
-        const hInput = container.querySelector(`input[data-pred="${id}"][data-side="home"]`);
-        const aInput = container.querySelector(`input[data-pred="${id}"][data-side="away"]`);
+        const matchId = btn.dataset.predSave;
+        const hInput  = container.querySelector(`input[data-pred="${matchId}"][data-side="home"]`);
+        const aInput  = container.querySelector(`input[data-pred="${matchId}"][data-side="away"]`);
         if (!hInput || !aInput || hInput.value === '' || aInput.value === '') return;
-        const saving = document.getElementById('pred-saving-' + id);
+        const saving = document.getElementById('pred-saving-' + matchId);
         btn.disabled = true;
         if (saving) saving.hidden = false;
         try {
-          // FIX: use the same matchKey formula as the display lookup.
-          // fsId is set from match.firestoreId (guaranteed non-empty because the
-          // button is disabled until firestoreId arrives), so this always matches
-          // the key stored in userPredictions by getUserPredictions().
-          const matchId = fsId || String(id);
           const homeScorePred = parseInt(hInput.value);
           const awayScorePred = parseInt(aInput.value);
           await savePrediction(currentUser.uid, matchId, { homeScorePred, awayScorePred });
-          // FIX: store under matchId so the lookup in renderPredictions() hits immediately
           userPredictions[matchId] = { matchId, homeScorePred, awayScorePred };
           btn.textContent = 'Updated \u2713';
           setTimeout(() => { btn.textContent = 'Predict'; btn.disabled = false; }, 1500);
@@ -645,8 +618,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   }
 
   // ─── Boot ─────────────────────────────────────────────────────────────────────
-  // Start the real-time Firestore listener immediately — scores update push to
-  // all connected browsers the instant the database changes.
   renderGroups();
   startMatchListener();
 

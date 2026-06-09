@@ -183,21 +183,33 @@ const WC_FIXTURE_META = {
   'Croatia|Ghana':             { date:'2026-06-27', timeLocal:'17:00', tz:'ET', venue:'Lincoln Financial Field',    city:'Philadelphia, PA',               ...BC.fs1 },
 };
 
+// Generates a stable, URL-safe match ID from date + team names.
+// e.g. "2026-06-11-mexico-south-africa"
+// This is the canonical prediction key — no Firestore dependency.
+function makeMatchId(date, homeName, awayName) {
+  function slug(s) {
+    return s.toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+  }
+  const d = date || 'tbd';
+  return `${d}-${slug(homeName)}-${slug(awayName)}`;
+}
+
 // Generate group stage matches (each team plays the other 3 in their group)
 function generateMatches() {
   const matches = [];
-  let id = 1;
   WC_GROUPS.forEach(group => {
     const teams = group.teams;
     for (let i = 0; i < teams.length; i++) {
       for (let j = i + 1; j < teams.length; j++) {
-        const key = teams[i].name + '|' + teams[j].name;
+        const key  = teams[i].name + '|' + teams[j].name;
         const meta = WC_FIXTURE_META[key] || {};
         matches.push({
-          id: id++,
-          group: group.id,
-          home: teams[i],
-          away: teams[j],
+          id:        makeMatchId(meta.date || null, teams[i].name, teams[j].name),
+          group:     group.id,
+          home:      teams[i],
+          away:      teams[j],
           date:      meta.date      || null,
           timeLocal: meta.timeLocal || null,
           tz:        meta.tz        || 'ET',
