@@ -9,6 +9,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   // ─── State ───────────────────────────────────────────────────────────────────
   let currentUser = null;
   let authResolved = false;
+  let firstAuthFire = true;   // Firebase always fires null first on page load
   let userPredictions = {};
   let authMode = 'signin';
   let unsubscribeMatches = null;
@@ -141,12 +142,28 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   }
 
   // ─── Auth State Observer ─────────────────────────────────────────────────────
-  // IMPORTANT: never touch predictPrompt here — only renderPredictions() controls it.
-  // This prevents the flash caused by Firebase's two-fire pattern on page load
-  // (first fires null, then fires the real user ~300ms later).
+  // Firebase always fires onAuthStateChanged twice on page load when a session
+  // exists: first with user=null (before IndexedDB token is restored), then with
+  // the real user. We skip the first null fire entirely so the sign-in prompt
+  // never flashes for an already-authenticated user.
+  //
+  // Safe because:
+  //  - If the user is truly signed out, the second fire also comes with null,
+  //    so we still render the prompt correctly on that second fire.
+  //  - If the user is signed in, the second fire comes with the real user object.
+  //  - firstAuthFire is reset to false after the first call, so subsequent
+  //    sign-in / sign-out events (which are single fires) are never skipped.
   watchAuth(async (user) => {
+    // Skip the very first null fire — it's always a false negative on page load
+    if (firstAuthFire && user === null) {
+      firstAuthFire = false;
+      return;
+    }
+    firstAuthFire = false;
+
     currentUser = user;
     authResolved = true;
+
     if (user) {
       if (authBtn)      authBtn.hidden = true;
       if (userBar)      userBar.hidden = false;
@@ -266,7 +283,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       ? new Date(match.date + 'T12:00:00').toLocaleDateString('en-US',
           { weekday: 'short', month: 'short', day: 'numeric' })
       : null;
-    const time  = match.timeLocal ? `${match.timeLocal} ${match.tz || 'ET'}` : null;
+    const time  = match.timeLocal ? `${match.timeLocal} ${match.tz || 'ET'}` : null;
     const venue = match.venue || null;
     const city  = match.city  || null;
 
@@ -335,7 +352,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       scoreColHTML = scoreDisplay + statusBadgeHTML(match);
     } else {
       const kickoff = match.timeLocal
-        ? `<div class="score-kickoff">${match.timeLocal} ${match.tz || 'ET'}</div>`
+        ? `<div class="score-kickoff">${match.timeLocal} ${match.tz || 'ET'}</div>`
         : `<div class="score-kickoff score-pending">TBD</div>`;
       scoreColHTML = kickoff;
     }
@@ -428,26 +445,22 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   }
 
   // ─── Render Predictions ───────────────────────────────────────────────────────
-  // Single source of truth for predictPrompt visibility.
-  // Uses auth.currentUser as a synchronous check to avoid the Firebase
-  // two-fire pattern (null → user) causing a visible flash of the sign-in prompt.
+  // predictPrompt is only ever shown after authResolved=true AND currentUser=null.
+  // The firstAuthFire guard in watchAuth ensures we never render with the false
+  // null that Firebase emits before restoring a cached session.
   function renderPredictions() {
     const container = document.getElementById('predictions-list');
     if (!container) return;
 
-    // Use auth.currentUser synchronously — this is populated by Firebase as soon
-    // as the cached token is validated, before onAuthStateChanged fires.
-    const resolvedUser = currentUser || auth.currentUser;
-
-    // Auth not yet settled — hide prompt, render nothing, wait for watchAuth
-    if (!authResolved && !resolvedUser) {
+    // Auth not yet resolved — keep everything hidden, wait for watchAuth
+    if (!authResolved) {
       if (predictPrompt) predictPrompt.hidden = true;
       container.innerHTML = '';
       return;
     }
 
-    // No user — show sign-in prompt
-    if (!resolvedUser) {
+    // Resolved: no user — show sign-in prompt
+    if (!currentUser) {
       if (predictPrompt) predictPrompt.hidden = false;
       container.innerHTML = '';
       return;
@@ -530,7 +543,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 
         try {
           await withTimeout(
-            savePrediction(resolvedUser.uid, matchId, { homeScorePred, awayScorePred }),
+            savePrediction(currentUser.uid, matchId, { homeScorePred, awayScorePred }),
             8000, `savePrediction(${matchId})`
           );
           userPredictions[matchId] = { matchId, homeScorePred, awayScorePred };
