@@ -14,8 +14,9 @@ import { db } from "./firebase.js";
 import { auth } from "./firebase.js";
 
 const PROJECT  = "worldcup2026-cfbc2";
-const DB_ROOT  = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)`;
-const FS_BASE  = `${DB_ROOT}/documents`;
+const FS_BASE  = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
+// :runQuery must be appended to /documents, NOT to the database root
+const RQ_URL   = `${FS_BASE}:runQuery`;
 
 // ─── REST helpers ──────────────────────────────────────────────────────────────
 
@@ -109,10 +110,9 @@ export async function savePrediction(userId, matchId, { homeScorePred, awayScore
 }
 
 export async function getUserPredictions(userId) {
-  const token    = await getIdToken();
-  // :runQuery must be on the database root, NOT on /documents
-  const queryUrl = `${DB_ROOT}:runQuery`;
-  const res      = await fetch(queryUrl, {
+  const token = await getIdToken();
+  // POST to /documents:runQuery (not the database root)
+  const res   = await fetch(RQ_URL, {
     method:  'POST',
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
