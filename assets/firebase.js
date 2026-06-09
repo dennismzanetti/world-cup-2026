@@ -1,6 +1,6 @@
 // firebase.js — initializes Firebase app, exports auth and db
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getAuth, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -14,6 +14,14 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+
+// Use sessionStorage-backed persistence instead of IndexedDB (the default).
+// IndexedDB is blocked in sandboxed iframes (GitHub Pages preview proxy),
+// which causes Firebase to always fire onAuthStateChanged with null on page
+// load, making every signed-in user appear signed out.
+// sessionStorage works in sandboxed iframes and persists for the tab lifetime.
+setPersistence(auth, browserSessionPersistence).catch(err =>
+  console.warn('[Firebase] Could not set session persistence:', err)
+);
