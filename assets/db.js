@@ -18,10 +18,25 @@ const RQ_URL   = `${FS_BASE}:runQuery`;
 
 // ─── REST helpers ──────────────────────────────────────────────────────────────
 
+// getIdToken with a hard 5 s timeout so a stalled Auth SDK never blocks saves.
 async function getIdToken(forceRefresh = false) {
   const user = auth.currentUser;
   if (!user) throw new Error('Not authenticated');
-  return user.getIdToken(forceRefresh);
+  const tokenPromise = user.getIdToken(forceRefresh);
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('getIdToken timed out after 5000ms')), 5000)
+  );
+  return Promise.race([tokenPromise, timeout]);
+}
+
+// On a token timeout, force-refresh once then retry.
+async function getIdTokenWithRetry() {
+  try {
+    return await getIdToken(false);
+  } catch (e) {
+    console.warn('[db] getIdToken failed, retrying with forceRefresh:', e.message);
+    return getIdToken(true);
+  }
 }
 
 function toFsValue(v) {
@@ -94,7 +109,7 @@ export function watchMatches(callback, intervalMs = 30000) {
 // ─── PREDICTIONS (REST) ─────────────────────────────────────────────────────
 
 export async function savePrediction(userId, matchId, { homeScorePred, awayScorePred }) {
-  const token = await getIdToken();
+  const token = await getIdTokenWithRetry();
   const url   = predDocUrl(userId, matchId);
   const res   = await fetch(url, {
     method:  'PATCH',
@@ -117,7 +132,7 @@ export async function savePrediction(userId, matchId, { homeScorePred, awayScore
 }
 
 export async function getUserPredictions(userId) {
-  const token = await getIdToken(true);
+  const token = await getIdTokenWithRetry();
   const res   = await fetch(RQ_URL, {
     method:  'POST',
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -134,8 +149,6 @@ export async function getUserPredictions(userId) {
       }
     })
   });
-  // 404 means the predictions collection doesn't exist yet — return empty, it
-  // will be auto-created on the first savePrediction call.
   if (res.status === 404) return [];
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -148,7 +161,7 @@ export async function getUserPredictions(userId) {
 }
 
 export async function getPrediction(userId, matchId) {
-  const token = await getIdToken();
+  const token = await getIdTokenWithRetry();
   const url   = predDocUrl(userId, matchId);
   const res   = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
   if (res.status === 404) return null;
@@ -157,15 +170,35 @@ export async function getPrediction(userId, matchId) {
 }
 
 export async function deletePrediction(userId, matchId) {
-  const token = await getIdToken();
+  const token = await getIdTokenWithRetry();
   const url   = predDocUrl(userId, matchId);
   await fetch(url, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+}
+
+export async function getAllPredictions() {
+  const token = await getIdTokenWithRetry();
+  const res   = await fetch(RQ_URL, {
+    method:  'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      structuredQuery: { from: [{ collectionId: 'predictions' }] }
+    })
+  });
+  if (res.status === 404) return [];
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Firestore REST query error ${res.status}: ${err?.error?.message || res.statusText}`);
+  }
+  const results = await res.json();
+  return results
+    .filter(r => r.document)
+    .map(r => docToObj(r.document));
 }
 
 // ─── USERS ───────────────────────────────────────────────────────────────────
 
 export async function saveUserProfile(uid, { email, displayName }) {
-  const token = await getIdToken();
+  const token = await getIdTokenWithRetry();
   const url   = `${FS_BASE}/users/${encodeURIComponent(uid)}`;
   const res   = await fetch(url, {
     method:  'PATCH',
@@ -182,7 +215,7 @@ export async function saveUserProfile(uid, { email, displayName }) {
 }
 
 export async function getUserProfile(uid) {
-  const token = await getIdToken();
+  const token = await getIdTokenWithRetry();
   const url   = `${FS_BASE}/users/${encodeURIComponent(uid)}`;
   const res   = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
   if (!res.ok) return null;
