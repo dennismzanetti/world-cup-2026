@@ -11,7 +11,6 @@ import {
   query,
   where,
   orderBy,
-  serverTimestamp,
   onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { db } from "./firebase.js";
@@ -34,7 +33,7 @@ export async function updateMatchResult(matchId, { homeScore, awayScore, status 
     homeScore,
     awayScore,
     status,
-    updatedAt: serverTimestamp()
+    updatedAt: new Date().toISOString()
   });
 }
 
@@ -49,13 +48,15 @@ export function watchMatches(callback) {
 
 export async function savePrediction(userId, matchId, { homeScorePred, awayScorePred }) {
   const ref = doc(db, "predictions", `${userId}_${matchId}`);
+  // No merge:true, no serverTimestamp() — both can cause silent hangs
+  // when offline persistence queues the write before the server acks it.
   return setDoc(ref, {
     userId,
     matchId,
     homeScorePred,
     awayScorePred,
-    updatedAt: serverTimestamp()
-  }, { merge: true });
+    updatedAt: new Date().toISOString()
+  });
 }
 
 export async function getUserPredictions(userId) {
@@ -79,7 +80,7 @@ export async function saveUserProfile(uid, { email, displayName }) {
   return setDoc(doc(db, "users", uid), {
     email,
     displayName,
-    updatedAt: serverTimestamp()
+    updatedAt: new Date().toISOString()
   }, { merge: true });
 }
 
