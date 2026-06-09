@@ -6,7 +6,6 @@ import {
   getDocs,
   updateDoc,
   query,
-  where,
   orderBy
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { db } from "./firebase.js";
@@ -14,12 +13,10 @@ import { auth } from "./firebase.js";
 
 const PROJECT  = "worldcup2026-cfbc2";
 const FS_BASE  = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
-// :runQuery must be appended to /documents, NOT to the database root
 const RQ_URL   = `${FS_BASE}:runQuery`;
 
 // ─── REST helpers ──────────────────────────────────────────────────────────────
 
-// forceRefresh=true avoids stale tokens right after onAuthStateChanged fires
 async function getIdToken(forceRefresh = false) {
   const user = auth.currentUser;
   if (!user) throw new Error('Not authenticated');
@@ -51,13 +48,13 @@ function docToObj(fsDoc) {
   return obj;
 }
 
-// Build a prediction doc URL encoding each segment independently so the
-// resulting path always matches the raw doc name returned by Firestore.
 function predDocUrl(userId, matchId) {
   return `${FS_BASE}/predictions/${encodeURIComponent(userId)}_${encodeURIComponent(matchId)}`;
 }
 
-// ─── MATCHES (SDK — read-only) ───────────────────────────────────────────────────
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ─── MATCHES ───────────────────────────────────────────────────────────────────
 
 export async function getMatches() {
   const q = query(collection(db, "matches"), orderBy("date"), orderBy("timeLocal"));
@@ -77,32 +74,26 @@ export async function updateMatchResult(matchId, { homeScore, awayScore, status 
   });
 }
 
-// ─── MATCHES (REST polling — replaces onSnapshot to avoid ad-blocker blocks) ──
-
+// Uses SDK getDocs polling — no WebChannel, no CORS issues, ad-blocker safe.
+// Matches are public so no auth token needed; getDocs handles auth internally.
 export function watchMatches(callback, intervalMs = 30000) {
-  const MATCHES_URL = `${FS_BASE}?pageSize=200&orderBy=date,timeLocal`;
+  const q = query(collection(db, "matches"), orderBy("date"), orderBy("timeLocal"));
 
   async function fetchMatches() {
     try {
-      const res = await fetch(MATCHES_URL);
-      if (!res.ok) { console.warn('[watchMatches] fetch failed', res.status); return; }
-      const data = await res.json();
-      const docs = (data.documents || []).map(docToObj);
-      callback(docs);
+      const snapshot = await getDocs(q);
+      callback(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (err) {
-      console.warn('[watchMatches] error', err);
+      console.warn('[watchMatches] poll error', err);
     }
   }
 
-  // Fire immediately, then poll
   fetchMatches();
   const timerId = setInterval(fetchMatches, intervalMs);
-
-  // Return an unsubscribe function matching the onSnapshot API
   return () => clearInterval(timerId);
 }
 
-// ─── PREDICTIONS (REST — bypasses WebChannel) ────────────────────────────────
+// ─── PREDICTIONS (REST) ─────────────────────────────────────────────────────
 
 export async function savePrediction(userId, matchId, { homeScorePred, awayScorePred }) {
   const token = await getIdToken();
@@ -127,33 +118,42 @@ export async function savePrediction(userId, matchId, { homeScorePred, awayScore
   return res.json();
 }
 
+// Retries once with a fresh token after a short delay if Firestore returns 404,
+// which can happen when the token is not yet valid right after onAuthStateChanged.
 export async function getUserPredictions(userId) {
-  // forceRefresh=true ensures the token is valid right after onAuthStateChanged
-  const token = await getIdToken(true);
-  const res   = await fetch(RQ_URL, {
-    method:  'POST',
-    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      structuredQuery: {
-        from:  [{ collectionId: 'predictions' }],
-        where: {
-          fieldFilter: {
-            field: { fieldPath: 'userId' },
-            op:    'EQUAL',
-            value: { stringValue: userId }
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await sleep(500 * attempt); // 500ms, then 1000ms
+    const token = await getIdToken(true);
+    const res   = await fetch(RQ_URL, {
+      method:  'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        structuredQuery: {
+          from:  [{ collectionId: 'predictions' }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: 'userId' },
+              op:    'EQUAL',
+              value: { stringValue: userId }
+            }
           }
         }
-      }
-    })
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(`Firestore REST query error ${res.status}: ${err?.error?.message || res.statusText}`);
+      })
+    });
+    if (res.status === 404 && attempt < 2) {
+      console.warn(`[getUserPredictions] 404 on attempt ${attempt + 1}, retrying...`);
+      continue;
+    }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(`Firestore REST query error ${res.status}: ${err?.error?.message || res.statusText}`);
+    }
+    const results = await res.json();
+    return results
+      .filter(r => r.document)
+      .map(r => docToObj(r.document));
   }
-  const results = await res.json();
-  return results
-    .filter(r => r.document)
-    .map(r => docToObj(r.document));
+  return [];
 }
 
 export async function getPrediction(userId, matchId) {
