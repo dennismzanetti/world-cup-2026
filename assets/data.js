@@ -203,13 +203,22 @@ function generateMatches() {
     const teams = group.teams;
     for (let i = 0; i < teams.length; i++) {
       for (let j = i + 1; j < teams.length; j++) {
-        const key  = teams[i].name + '|' + teams[j].name;
-        const meta = WC_FIXTURE_META[key] || {};
+        // Try both key orderings — fixture meta may list either team as home
+        const keyFwd = teams[i].name + '|' + teams[j].name;
+        const keyRev = teams[j].name + '|' + teams[i].name;
+        const metaFwd = WC_FIXTURE_META[keyFwd];
+        const metaRev = WC_FIXTURE_META[keyRev];
+        const meta = metaFwd || metaRev || {};
+
+        // If the reversed key matched, swap home/away to reflect actual fixture
+        const homeTeam = metaRev && !metaFwd ? teams[j] : teams[i];
+        const awayTeam = metaRev && !metaFwd ? teams[i] : teams[j];
+
         matches.push({
-          id:        makeMatchId(meta.date || null, teams[i].name, teams[j].name),
+          id:        makeMatchId(meta.date || null, homeTeam.name, awayTeam.name),
           group:     group.id,
-          home:      teams[i],
-          away:      teams[j],
+          home:      homeTeam,
+          away:      awayTeam,
           date:      meta.date      || null,
           timeLocal: meta.timeLocal || null,
           tz:        meta.tz        || 'ET',
