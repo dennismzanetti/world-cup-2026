@@ -166,14 +166,9 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   });
 
   // ─── Live Firestore Match Listener ───────────────────────────────────────────
-  // watchMatches() uses onSnapshot — Firestore pushes every score/status change
-  // instantly to all connected browsers. Scores are written exclusively by the
-  // server-side live-scores sync script (sync/live-scores.js). No polling required.
   function startMatchListener() {
-    if (unsubscribeMatches) unsubscribeMatches(); // detach any previous listener
+    if (unsubscribeMatches) unsubscribeMatches();
     unsubscribeMatches = watchMatches((liveMatches) => {
-      // Merge Firestore data into local WC_MATCHES array (scores, status, etc.)
-      // match.id is now a stable deterministic slug — no firestoreId needed.
       liveMatches.forEach(fm => {
         const local = WC_MATCHES.find(
           m => m.home.name === fm.homeTeam && m.away.name === fm.awayTeam
@@ -423,10 +418,16 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   }
 
   // ─── Canonical match key ─────────────────────────────────────────────────────
-  // match.id is now a stable deterministic slug generated in data.js
-  // (e.g. "2026-06-11-mexico-south-africa"). No Firestore dependency.
   function matchKey(match) {
     return match.id;
+  }
+
+  // ─── Save with timeout ───────────────────────────────────────────────────────
+  function withTimeout(promise, ms, label) {
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`Timed out after ${ms}ms — ${label}`)), ms)
+    );
+    return Promise.race([promise, timeout]);
   }
 
   // ─── Render Predictions ───────────────────────────────────────────────────────
@@ -480,7 +481,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
           ${statusBadgeHTML(match)}
           ${pred ? `<div class="pred-was">Your pick: ${pred.homeScorePred}\u2013${pred.awayScorePred}</div>` : ''}`;
       } else {
-        // Scheduled — prediction entry always available (no Firestore dependency)
         scoreColHTML = `
           <div class="score-inputs-wrap">
             <input class="pred-input" type="number" min="0" max="20"
@@ -492,7 +492,8 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
               data-pred="${key}" data-side="away">
           </div>
           <button class="btn-save pred-btn" data-pred-save="${key}">Predict</button>
-          <span class="pred-saving" id="pred-saving-${key}" hidden>Saving\u2026</span>`;
+          <span class="pred-saving" id="pred-saving-${key}" hidden>Saving\u2026</span>
+          <span class="pred-error" id="pred-error-${key}" hidden></span>`;
       }
 
       const stripLabel = match.group ? 'Group ' + match.group : (match.stage || 'Match');
@@ -504,26 +505,44 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 
     container.querySelectorAll('[data-pred-save]').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const matchId = btn.dataset.predSave;
-        const hInput  = container.querySelector(`input[data-pred="${matchId}"][data-side="home"]`);
-        const aInput  = container.querySelector(`input[data-pred="${matchId}"][data-side="away"]`);
+        const matchId  = btn.dataset.predSave;
+        const hInput   = container.querySelector(`input[data-pred="${matchId}"][data-side="home"]`);
+        const aInput   = container.querySelector(`input[data-pred="${matchId}"][data-side="away"]`);
+        const saving   = document.getElementById('pred-saving-' + matchId);
+        const errorEl  = document.getElementById('pred-error-' + matchId);
+
         if (!hInput || !aInput || hInput.value === '' || aInput.value === '') return;
-        const saving = document.getElementById('pred-saving-' + matchId);
+
+        const homeScorePred = parseInt(hInput.value);
+        const awayScorePred = parseInt(aInput.value);
+
         btn.disabled = true;
-        if (saving) saving.hidden = false;
+        btn.textContent = 'Saving\u2026';
+        if (saving)  saving.hidden = true;
+        if (errorEl) { errorEl.hidden = true; errorEl.textContent = ''; }
+
+        console.log('[Predict] saving matchId=%s uid=%s scores=%d-%d',
+          matchId, currentUser.uid, homeScorePred, awayScorePred);
+
         try {
-          const homeScorePred = parseInt(hInput.value);
-          const awayScorePred = parseInt(aInput.value);
-          await savePrediction(currentUser.uid, matchId, { homeScorePred, awayScorePred });
+          await withTimeout(
+            savePrediction(currentUser.uid, matchId, { homeScorePred, awayScorePred }),
+            8000,
+            `savePrediction(${matchId})`
+          );
+          console.log('[Predict] saved OK — matchId=%s', matchId);
           userPredictions[matchId] = { matchId, homeScorePred, awayScorePred };
-          btn.textContent = 'Updated \u2713';
+          btn.textContent = 'Saved \u2713';
           setTimeout(() => { btn.textContent = 'Predict'; btn.disabled = false; }, 1500);
         } catch (err) {
-          console.error('Save prediction failed:', err);
-          btn.textContent = 'Error \u2014 retry';
+          console.error('[Predict] save failed — matchId=%s code=%s message=%s',
+            matchId, err.code, err.message, err);
+          const msg = err.code === 'permission-denied'
+            ? 'Permission denied — are you signed in?'
+            : err.message || 'Save failed — retry';
+          if (errorEl) { errorEl.textContent = msg; errorEl.hidden = false; }
+          btn.textContent = 'Retry';
           btn.disabled = false;
-        } finally {
-          if (saving) saving.hidden = true;
         }
       });
     });
