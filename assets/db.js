@@ -12,7 +12,8 @@ import { db } from "./firebase.js";
 import { auth } from "./firebase.js";
 
 const PROJECT  = "worldcup2026-cfbc2";
-const FS_BASE  = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
+const DATABASE = "wc2026";
+const FS_BASE  = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/${DATABASE}/documents`;
 const RQ_URL   = `${FS_BASE}:runQuery`;
 
 // ─── REST helpers ──────────────────────────────────────────────────────────────
@@ -133,8 +134,8 @@ export async function getUserPredictions(userId) {
       }
     })
   });
-  // 404 means the predictions collection doesn't exist yet (no one has predicted).
-  // Treat it as an empty result — it will auto-create on the first savePrediction call.
+  // 404 means the predictions collection doesn't exist yet — return empty, it
+  // will be auto-created on the first savePrediction call.
   if (res.status === 404) return [];
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
