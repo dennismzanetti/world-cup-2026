@@ -2,21 +2,58 @@
 import {
   collection,
   doc,
-  addDoc,
-  setDoc,
   getDoc,
   getDocs,
   updateDoc,
-  deleteDoc,
   query,
-  where,
-  orderBy,
-  serverTimestamp,
-  onSnapshot
+  orderBy
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { db } from "./firebase.js";
+import { auth } from "./firebase.js";
 
-// ─── MATCHES ─────────────────────────────────────────────────────────────────
+const PROJECT  = "worldcup2026-cfbc2";
+const DATABASE = "wc2026";
+const FS_BASE  = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/${DATABASE}/documents`;
+const RQ_URL   = `${FS_BASE}:runQuery`;
+
+// ─── REST helpers ──────────────────────────────────────────────────────────────
+
+async function getIdToken(forceRefresh = false) {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Not authenticated');
+  return user.getIdToken(forceRefresh);
+}
+
+function toFsValue(v) {
+  if (typeof v === 'string')  return { stringValue: v };
+  if (typeof v === 'number')  return { integerValue: String(v) };
+  if (typeof v === 'boolean') return { booleanValue: v };
+  if (v === null)             return { nullValue: null };
+  return { stringValue: String(v) };
+}
+
+function fromFsValue(fv) {
+  if ('stringValue'  in fv) return fv.stringValue;
+  if ('integerValue' in fv) return parseInt(fv.integerValue);
+  if ('doubleValue'  in fv) return fv.doubleValue;
+  if ('booleanValue' in fv) return fv.booleanValue;
+  if ('nullValue'    in fv) return null;
+  return null;
+}
+
+function docToObj(fsDoc) {
+  const fields = fsDoc.fields || {};
+  const obj = {};
+  for (const [k, v] of Object.entries(fields)) obj[k] = fromFsValue(v);
+  obj.id = fsDoc.name.split('/').pop();
+  return obj;
+}
+
+function predDocUrl(userId, matchId) {
+  return `${FS_BASE}/predictions/${encodeURIComponent(userId)}_${encodeURIComponent(matchId)}`;
+}
+
+// ─── MATCHES ───────────────────────────────────────────────────────────────────
 
 export async function getMatches() {
   const q = query(collection(db, "matches"), orderBy("date"), orderBy("timeLocal"));
@@ -31,59 +68,123 @@ export async function getMatch(matchId) {
 
 export async function updateMatchResult(matchId, { homeScore, awayScore, status }) {
   return updateDoc(doc(db, "matches", matchId), {
-    homeScore,
-    awayScore,
-    status,
-    updatedAt: serverTimestamp()
+    homeScore, awayScore, status,
+    updatedAt: new Date().toISOString()
   });
 }
 
-export function watchMatches(callback) {
+// Uses SDK getDocs polling — no WebChannel, no CORS issues, ad-blocker safe.
+export function watchMatches(callback, intervalMs = 30000) {
   const q = query(collection(db, "matches"), orderBy("date"), orderBy("timeLocal"));
-  return onSnapshot(q, snapshot => {
-    callback(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-  });
+
+  async function fetchMatches() {
+    try {
+      const snapshot = await getDocs(q);
+      callback(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (err) {
+      console.warn('[watchMatches] poll error', err);
+    }
+  }
+
+  fetchMatches();
+  const timerId = setInterval(fetchMatches, intervalMs);
+  return () => clearInterval(timerId);
 }
 
-// ─── PREDICTIONS ─────────────────────────────────────────────────────────────
+// ─── PREDICTIONS (REST) ─────────────────────────────────────────────────────
 
 export async function savePrediction(userId, matchId, { homeScorePred, awayScorePred }) {
-  const ref = doc(db, "predictions", `${userId}_${matchId}`);
-  return setDoc(ref, {
-    userId,
-    matchId,
-    homeScorePred,
-    awayScorePred,
-    updatedAt: serverTimestamp()
-  }, { merge: true });
+  const token = await getIdToken();
+  const url   = predDocUrl(userId, matchId);
+  const res   = await fetch(url, {
+    method:  'PATCH',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      fields: {
+        userId:        toFsValue(userId),
+        matchId:       toFsValue(matchId),
+        homeScorePred: toFsValue(homeScorePred),
+        awayScorePred: toFsValue(awayScorePred),
+        updatedAt:     toFsValue(new Date().toISOString())
+      }
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Firestore REST error ${res.status}: ${err?.error?.message || res.statusText}`);
+  }
+  return res.json();
 }
 
 export async function getUserPredictions(userId) {
-  const q = query(collection(db, "predictions"), where("userId", "==", userId));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+  const token = await getIdToken(true);
+  const res   = await fetch(RQ_URL, {
+    method:  'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      structuredQuery: {
+        from:  [{ collectionId: 'predictions' }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: 'userId' },
+            op:    'EQUAL',
+            value: { stringValue: userId }
+          }
+        }
+      }
+    })
+  });
+  // 404 means the predictions collection doesn't exist yet — return empty, it
+  // will be auto-created on the first savePrediction call.
+  if (res.status === 404) return [];
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Firestore REST query error ${res.status}: ${err?.error?.message || res.statusText}`);
+  }
+  const results = await res.json();
+  return results
+    .filter(r => r.document)
+    .map(r => docToObj(r.document));
 }
 
 export async function getPrediction(userId, matchId) {
-  const snap = await getDoc(doc(db, "predictions", `${userId}_${matchId}`));
-  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+  const token = await getIdToken();
+  const url   = predDocUrl(userId, matchId);
+  const res   = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+  if (res.status === 404) return null;
+  if (!res.ok) return null;
+  return docToObj(await res.json());
 }
 
 export async function deletePrediction(userId, matchId) {
-  return deleteDoc(doc(db, "predictions", `${userId}_${matchId}`));
+  const token = await getIdToken();
+  const url   = predDocUrl(userId, matchId);
+  await fetch(url, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
 }
 
-// ─── USERS ────────────────────────────────────────────────────────────────────
+// ─── USERS ───────────────────────────────────────────────────────────────────
 
 export async function saveUserProfile(uid, { email, displayName }) {
-  return setDoc(doc(db, "users", uid), {
-    email,
-    displayName,
-    updatedAt: serverTimestamp()
-  }, { merge: true });
+  const token = await getIdToken();
+  const url   = `${FS_BASE}/users/${encodeURIComponent(uid)}`;
+  const res   = await fetch(url, {
+    method:  'PATCH',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      fields: {
+        email:       toFsValue(email),
+        displayName: toFsValue(displayName),
+        updatedAt:   toFsValue(new Date().toISOString())
+      }
+    })
+  });
+  if (!res.ok) console.warn('saveUserProfile failed', res.status);
 }
 
 export async function getUserProfile(uid) {
-  const snap = await getDoc(doc(db, "users", uid));
-  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+  const token = await getIdToken();
+  const url   = `${FS_BASE}/users/${encodeURIComponent(uid)}`;
+  const res   = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+  if (!res.ok) return null;
+  return docToObj(await res.json());
 }
