@@ -162,6 +162,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       // Show the Sign In button when signed out
       if (authBtn)       { authBtn.hidden = false; authBtn.textContent = 'Sign In'; }
       if (userBar)       userBar.hidden = true;
+      // Only reveal the auth prompt once we know for sure no session exists
       if (predictPrompt) predictPrompt.hidden = false;
       userPredictions = {};
     }
@@ -438,16 +439,21 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     const container = document.getElementById('predictions-list');
     if (!container) return;
 
+    // Auth not yet resolved — keep prompt hidden, show nothing
     if (!authResolved) {
       container.innerHTML = '';
       if (predictPrompt) predictPrompt.hidden = true;
       return;
     }
+
+    // Resolved but no user — show sign-in prompt
     if (!currentUser) {
       container.innerHTML = '';
       if (predictPrompt) predictPrompt.hidden = false;
       return;
     }
+
+    // Signed in — hide prompt, render prediction cards
     if (predictPrompt) predictPrompt.hidden = true;
     container.innerHTML = '';
 
