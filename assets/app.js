@@ -430,6 +430,14 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     insertDateDividers(container, filtered);
   }
 
+  // ─── Canonical match key ─────────────────────────────────────────────────────
+  // Returns the Firestore document ID once the live-match listener has set it;
+  // falls back to the JS array index as a string until then. The same function
+  // is used for BOTH saving and loading predictions so the keys always match.
+  function matchKey(match) {
+    return match.firestoreId || String(match.id);
+  }
+
   // ─── Render Predictions ───────────────────────────────────────────────────────
   function renderPredictions() {
     const container = document.getElementById('predictions-list');
@@ -461,8 +469,9 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
         container.appendChild(divider);
       }
 
-      const key  = match.firestoreId || (match.home.name + '|' + match.away.name);
-      const pred = userPredictions[key] || userPredictions[match.id] || null;
+      // FIX: use matchKey() consistently for both lookup and saving so keys always match
+      const key  = matchKey(match);
+      const pred = userPredictions[key] || null;
       const status     = (match.status || 'scheduled').toLowerCase();
       const isLive     = status === 'live' || status === 'ht';
       const isFinished = status === 'finished';
@@ -475,14 +484,18 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
         scoreColHTML = `
           <div class="score-final ${isLive ? 'score-live' : ''}">${match.homeScore} : ${match.awayScore}</div>
           ${statusBadgeHTML(match)}
-          ${pred ? `<div class="pred-was">Your pick: ${pred.homeScorePred}–${pred.awayScorePred}</div>` : '<div class="pred-was">No prediction</div>'}`;
+          ${pred ? `<div class="pred-was">Your pick: ${pred.homeScorePred}\u2013${pred.awayScorePred}</div>` : '<div class="pred-was">No prediction</div>'}`;
       } else if (isLive) {
         scoreColHTML = `
           <div class="score-final score-pending">- : -</div>
           ${statusBadgeHTML(match)}
-          ${pred ? `<div class="pred-was">Your pick: ${pred.homeScorePred}–${pred.awayScorePred}</div>` : ''}`;
+          ${pred ? `<div class="pred-was">Your pick: ${pred.homeScorePred}\u2013${pred.awayScorePred}</div>` : ''}`;
       } else {
-        // Scheduled — allow prediction entry
+        // Scheduled — allow prediction entry.
+        // FIX: disable the Predict button until firestoreId is available so the
+        // save always uses the Firestore doc ID (the same key getUserPredictions
+        // returns), never a bare numeric string that won't match on reload.
+        const hasFirestoreId = !!match.firestoreId;
         scoreColHTML = `
           <div class="score-inputs-wrap">
             <input class="pred-input" type="number" min="0" max="20"
@@ -493,8 +506,13 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
               value="${pred ? pred.awayScorePred : ''}" placeholder="?"
               data-pred="${match.id}" data-side="away">
           </div>
-          <button class="btn-save pred-btn" data-pred-save="${match.id}" data-fsid="${match.firestoreId || ''}">Predict</button>
-          <span class="pred-saving" id="pred-saving-${match.id}" hidden>Saving…</span>`;
+          <button class="btn-save pred-btn"
+            data-pred-save="${match.id}"
+            data-fsid="${match.firestoreId || ''}"
+            ${hasFirestoreId ? '' : 'disabled title="Loading match data…"'}>
+            ${hasFirestoreId ? 'Predict' : 'Loading…'}
+          </button>
+          <span class="pred-saving" id="pred-saving-${match.id}" hidden>Saving\u2026</span>`;
       }
 
       const stripLabel = match.group ? 'Group ' + match.group : (match.stage || 'Match');
@@ -515,17 +533,21 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
         btn.disabled = true;
         if (saving) saving.hidden = false;
         try {
+          // FIX: use the same matchKey formula as the display lookup.
+          // fsId is set from match.firestoreId (guaranteed non-empty because the
+          // button is disabled until firestoreId arrives), so this always matches
+          // the key stored in userPredictions by getUserPredictions().
           const matchId = fsId || String(id);
-          await savePrediction(currentUser.uid, matchId, {
-            homeScorePred: parseInt(hInput.value),
-            awayScorePred: parseInt(aInput.value)
-          });
-          userPredictions[matchId] = { matchId, homeScorePred: parseInt(hInput.value), awayScorePred: parseInt(aInput.value) };
-          btn.textContent = 'Updated ✓';
+          const homeScorePred = parseInt(hInput.value);
+          const awayScorePred = parseInt(aInput.value);
+          await savePrediction(currentUser.uid, matchId, { homeScorePred, awayScorePred });
+          // FIX: store under matchId so the lookup in renderPredictions() hits immediately
+          userPredictions[matchId] = { matchId, homeScorePred, awayScorePred };
+          btn.textContent = 'Updated \u2713';
           setTimeout(() => { btn.textContent = 'Predict'; btn.disabled = false; }, 1500);
         } catch (err) {
           console.error('Save prediction failed:', err);
-          btn.textContent = 'Error — retry';
+          btn.textContent = 'Error \u2014 retry';
           btn.disabled = false;
         } finally {
           if (saving) saving.hidden = true;
