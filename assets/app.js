@@ -91,6 +91,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     authError.textContent = '';
   }
 
+  // Auth button: only opens modal when signed out; hidden when signed in
   if (authBtn)       authBtn.addEventListener('click', () => { setAuthMode('signin'); openAuthModal(); });
   if (predictSignin) predictSignin.addEventListener('click', () => { setAuthMode('signin'); openAuthModal(); });
   if (authClose)     authClose.addEventListener('click', closeAuthModal);
@@ -145,7 +146,8 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     currentUser = user;
     authResolved = true;
     if (user) {
-      if (authBtn)       authBtn.textContent = 'Account';
+      // Hide the Sign In button entirely when signed in
+      if (authBtn)       authBtn.hidden = true;
       if (userBar)       userBar.hidden = false;
       if (userGreeting)  userGreeting.textContent = 'Hi, ' + (user.displayName || user.email);
       if (predictPrompt) predictPrompt.hidden = true;
@@ -157,7 +159,8 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
         console.warn('Could not load predictions:', err);
       }
     } else {
-      if (authBtn)       authBtn.textContent = 'Sign In';
+      // Show the Sign In button when signed out
+      if (authBtn)       { authBtn.hidden = false; authBtn.textContent = 'Sign In'; }
       if (userBar)       userBar.hidden = true;
       if (predictPrompt) predictPrompt.hidden = false;
       userPredictions = {};
