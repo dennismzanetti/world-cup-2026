@@ -6,14 +6,14 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 (function () {
   'use strict';
 
-  // ─── State ───────────────────────────────────────────────────────────────────
+  // ─── State ───────────────────────────────────────────────────────────────
   let currentUser = null;
   let authResolved = false;
   let userPredictions = {};
   let authMode = 'signin';
-  let unsubscribeMatches = null; // Firestore live listener handle
+  let unsubscribeMatches = null;
 
-  // ─── Theme ───────────────────────────────────────────────────────────────────
+  // ─── Theme ───────────────────────────────────────────────────────────────
   const themeToggle = document.querySelector('[data-theme-toggle]');
   const html = document.documentElement;
   function setTheme(t) {
@@ -34,7 +34,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     });
   }
 
-  // ─── Navigation ──────────────────────────────────────────────────────────────
+  // ─── Navigation ──────────────────────────────────────────────────────────
   const navBtns = document.querySelectorAll('.nav-btn');
   const views   = document.querySelectorAll('.view');
   navBtns.forEach(btn => {
@@ -47,7 +47,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     });
   });
 
-  // ─── Auth Modal ──────────────────────────────────────────────────────────────
+  // ─── Auth Modal ──────────────────────────────────────────────────────────
   const authModal     = document.getElementById('auth-modal');
   const authBackdrop  = document.getElementById('auth-backdrop');
   const authForm      = document.getElementById('auth-form');
@@ -141,30 +141,19 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     return map[code] || `Something went wrong (${code || 'unknown'}). Please try again.`;
   }
 
-  // ─── Update predictions section UI for auth state ────────────────────────────
-  function updatePredictionsAuthUI(user) {
-    // Never show the prompt until auth state is fully resolved
-    if (!authResolved) {
-      if (predictPrompt) predictPrompt.hidden = true;
-      return;
-    }
-    if (predictPrompt)   predictPrompt.hidden   = !!user;
-    if (predictSubtitle) predictSubtitle.textContent = user
-      ? 'Predict match scores before kickoff — your picks are saved automatically.'
-      : 'Predict match scores before kickoff — sign in to save.';
-  }
-
-  // ─── Auth State Observer ─────────────────────────────────────────────────────
+  // ─── Auth State Observer ─────────────────────────────────────────────────
+  // This is the ONLY place authResolved is set to true.
+  // renderPredictions must never run before this fires.
   watchAuth(async (user) => {
     currentUser = user;
     authResolved = true;
+
     if (user) {
       if (authBtn)      authBtn.textContent = 'Account';
       if (userBar)      userBar.hidden = false;
       if (userGreeting) userGreeting.textContent = 'Hi, ' + (user.displayName || user.email);
-      // Immediately hide the prompt — don't wait for renderPredictions
       if (predictPrompt) predictPrompt.hidden = true;
-      updatePredictionsAuthUI(user);
+      if (predictSubtitle) predictSubtitle.textContent = 'Predict match scores before kickoff — your picks are saved automatically.';
       try {
         const preds = await getUserPredictions(user.uid);
         userPredictions = {};
@@ -175,13 +164,14 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     } else {
       if (authBtn)  authBtn.textContent = 'Sign In';
       if (userBar)  userBar.hidden = true;
-      updatePredictionsAuthUI(null);
+      if (predictPrompt) predictPrompt.hidden = false;
+      if (predictSubtitle) predictSubtitle.textContent = 'Predict match scores before kickoff — sign in to save.';
       userPredictions = {};
     }
     renderAll();
   });
 
-  // ─── Live Firestore Match Listener ───────────────────────────────────────────
+  // ─── Live Firestore Match Listener ───────────────────────────────────────
   function startMatchListener() {
     if (unsubscribeMatches) unsubscribeMatches();
     unsubscribeMatches = watchMatches((liveMatches) => {
@@ -205,18 +195,29 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
         }
       });
       populateDateFilter();
-      renderAll();
+      // Do NOT call renderAll() here — only render groups/matches/standings.
+      // Predictions must never render from the match listener before auth resolves.
+      renderGroupsMatchesStandings();
     });
   }
 
-  // ─── Shared sort helper ───────────────────────────────────────────────────────
+  // ─── Render everything except predictions (safe to call before auth) ─────
+  function renderGroupsMatchesStandings() {
+    const activeView = document.querySelector('.nav-btn.active')?.dataset.view;
+    const f = getFilters();
+    if (activeView === 'groups')    renderGroups();
+    if (activeView === 'matches')   renderMatches(f.group, f.venue, f.date);
+    if (activeView === 'standings') renderStandings();
+  }
+
+  // ─── Shared sort helper ──────────────────────────────────────────────────
   function sortByDateTime(a, b) {
     const ka = (a.date || '9999-99-99') + 'T' + (a.timeLocal || '99:99');
     const kb = (b.date || '9999-99-99') + 'T' + (b.timeLocal || '99:99');
     return ka.localeCompare(kb);
   }
 
-  // ─── Date divider helper ─────────────────────────────────────────────────────
+  // ─── Date divider helper ─────────────────────────────────────────────────
   function insertDateDividers(container, matches) {
     let lastDate = null;
     matches.forEach(match => {
@@ -233,7 +234,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     });
   }
 
-  // ─── Status badge helper ─────────────────────────────────────────────────────
+  // ─── Status badge helper ─────────────────────────────────────────────────
   function statusBadgeHTML(match) {
     const s = (match.status || 'scheduled').toLowerCase();
     if (s === 'live') {
@@ -245,7 +246,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     return '';
   }
 
-  // ─── Points Calculation ───────────────────────────────────────────────────────
+  // ─── Points Calculation ──────────────────────────────────────────────────
   function calcPoints(matches, teamName) {
     let pts = 0, w = 0, d = 0, l = 0, gf = 0, ga = 0;
     matches.forEach(m => {
@@ -262,7 +263,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     return { pts, played: w + d + l, w, d, l, gf, ga, gd: gf - ga };
   }
 
-  // ─── Broadcast Badges ─────────────────────────────────────────────────────────
+  // ─── Broadcast Badges ────────────────────────────────────────────────────
   function broadcastBadgesHTML(match) {
     const tv  = match.tvEnglish || [];
     const esp = match.tvSpanish || [];
@@ -275,7 +276,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     ].join('');
   }
 
-  // ─── Match Card HTML (shared) ─────────────────────────────────────────────────
+  // ─── Match Card HTML (shared) ────────────────────────────────────────────
   function matchCardHTML(match, scoreColHTML, stripLabel) {
     const dateStr = match.date
       ? new Date(match.date + 'T12:00:00').toLocaleDateString('en-US',
@@ -334,7 +335,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     return header + teamsRow + metaRow + broadcastRow;
   }
 
-  // ─── Build match card (Matches view) ─────────────────────────────────────────
+  // ─── Build match card (Matches view) ────────────────────────────────────
   function buildMatchCard(match) {
     const status = (match.status || 'scheduled').toLowerCase();
     const isLive     = status === 'live' || status === 'ht';
@@ -363,7 +364,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     return card;
   }
 
-  // ─── Render Groups ────────────────────────────────────────────────────────────
+  // ─── Render Groups ───────────────────────────────────────────────────────
   function renderGroups() {
     const container = document.getElementById('groups-grid');
     if (!container) return;
@@ -392,7 +393,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     });
   }
 
-  // ─── Date Filter Population ───────────────────────────────────────────────────
+  // ─── Date Filter Population ──────────────────────────────────────────────
   function populateDateFilter() {
     const el = document.getElementById('date-filter');
     if (!el) return;
@@ -407,7 +408,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     });
   }
 
-  // ─── Render Matches ───────────────────────────────────────────────────────────
+  // ─── Render Matches ──────────────────────────────────────────────────────
   function renderMatches(groupFilter = 'all', venueFilter = 'all', dateFilter = 'all') {
     const container = document.getElementById('matches-list');
     if (!container) return;
@@ -433,12 +434,12 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     insertDateDividers(container, filtered);
   }
 
-  // ─── Canonical match key ─────────────────────────────────────────────────────
+  // ─── Canonical match key ─────────────────────────────────────────────────
   function matchKey(match) {
     return match.id;
   }
 
-  // ─── Save with timeout ───────────────────────────────────────────────────────
+  // ─── Save with timeout ───────────────────────────────────────────────────
   function withTimeout(promise, ms, label) {
     const timeout = new Promise((_, reject) =>
       setTimeout(() => reject(new Error(`Timed out after ${ms}ms — ${label}`)), ms)
@@ -446,22 +447,19 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     return Promise.race([promise, timeout]);
   }
 
-  // ─── Render Predictions ───────────────────────────────────────────────────────
+  // ─── Render Predictions ──────────────────────────────────────────────────
+  // ONLY called from renderAll(), which is ONLY called after authResolved = true.
   function renderPredictions() {
     const container = document.getElementById('predictions-list');
     if (!container) return;
 
-    if (!authResolved) {
-      container.innerHTML = '';
-      if (predictPrompt) predictPrompt.hidden = true;
-      return;
-    }
     if (!currentUser) {
       container.innerHTML = '';
       if (predictPrompt) predictPrompt.hidden = false;
       return;
     }
-    // Signed in — always hide the prompt
+
+    // Signed in — hide prompt, render prediction cards
     if (predictPrompt) predictPrompt.hidden = true;
     container.innerHTML = '';
 
@@ -538,18 +536,14 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
         if (saving)  saving.hidden = true;
         if (errorEl) { errorEl.hidden = true; errorEl.textContent = ''; }
 
-        console.log('[Predict] saving matchId=%s uid=%s scores=%d-%d',
-          matchId, currentUser.uid, homeScorePred, awayScorePred);
-
         try {
           await withTimeout(
             savePrediction(currentUser.uid, matchId, { homeScorePred, awayScorePred }),
             8000,
             `savePrediction(${matchId})`
           );
-          console.log('[Predict] saved OK — matchId=%s', matchId);
           userPredictions[matchId] = { matchId, homeScorePred, awayScorePred };
-          btn.textContent = 'Saved \u2713';
+          btn.textContent = 'Saved ✓';
           setTimeout(() => { btn.textContent = 'Predict'; btn.disabled = false; }, 1500);
         } catch (err) {
           console.error('[Predict] save failed — matchId=%s code=%s message=%s',
@@ -565,7 +559,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     });
   }
 
-  // ─── Render Standings ─────────────────────────────────────────────────────────
+  // ─── Render Standings ────────────────────────────────────────────────────
   function renderStandings() {
     const container = document.getElementById('standings-grid');
     if (!container) return;
@@ -603,7 +597,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     });
   }
 
-  // ─── Filters ──────────────────────────────────────────────────────────────────
+  // ─── Filters ─────────────────────────────────────────────────────────────
   const groupFilterEl = document.getElementById('group-filter');
   const venueFilterEl = document.getElementById('venue-filter');
   const dateFilterEl  = document.getElementById('date-filter');
@@ -643,17 +637,18 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   if (venueFilterEl) venueFilterEl.addEventListener('change', onFilterChange);
   if (dateFilterEl)  dateFilterEl.addEventListener('change',  onFilterChange);
 
-  // ─── Render All ───────────────────────────────────────────────────────────────
+  // ─── Render All (only called after authResolved = true) ──────────────────
   function renderAll() {
     const activeView = document.querySelector('.nav-btn.active')?.dataset.view;
     const f = getFilters();
     if (activeView === 'groups')      renderGroups();
     if (activeView === 'matches')     renderMatches(f.group, f.venue, f.date);
-    if (activeView === 'predictions') renderPredictions();
+    if (activeView === 'predictions') renderPredictions();  // safe — authResolved is true here
     if (activeView === 'standings')   renderStandings();
   }
 
-  // ─── Boot ─────────────────────────────────────────────────────────────────────
+  // ─── Boot ─────────────────────────────────────────────────────────────────
+  // Only render groups on boot — everything else waits for auth to resolve.
   renderGroups();
   startMatchListener();
 
