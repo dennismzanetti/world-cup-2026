@@ -50,6 +50,12 @@ function docToObj(fsDoc) {
   return obj;
 }
 
+// Build a prediction doc URL encoding each segment independently so the
+// resulting path always matches the raw doc name returned by Firestore.
+function predDocUrl(userId, matchId) {
+  return `${FS_BASE}/predictions/${encodeURIComponent(userId)}_${encodeURIComponent(matchId)}`;
+}
+
 // ─── MATCHES (SDK — read-only) ───────────────────────────────────────────────────
 
 export async function getMatches() {
@@ -81,8 +87,7 @@ export function watchMatches(callback) {
 
 export async function savePrediction(userId, matchId, { homeScorePred, awayScorePred }) {
   const token = await getIdToken();
-  const docId = `${userId}_${matchId}`;
-  const url   = `${FS_BASE}/predictions/${encodeURIComponent(docId)}`;
+  const url   = predDocUrl(userId, matchId);
   const res   = await fetch(url, {
     method:  'PATCH',
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -135,8 +140,7 @@ export async function getUserPredictions(userId) {
 
 export async function getPrediction(userId, matchId) {
   const token = await getIdToken();
-  const docId = `${userId}_${matchId}`;
-  const url   = `${FS_BASE}/predictions/${encodeURIComponent(docId)}`;
+  const url   = predDocUrl(userId, matchId);
   const res   = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
   if (res.status === 404) return null;
   if (!res.ok) return null;
@@ -145,8 +149,7 @@ export async function getPrediction(userId, matchId) {
 
 export async function deletePrediction(userId, matchId) {
   const token = await getIdToken();
-  const docId = `${userId}_${matchId}`;
-  const url   = `${FS_BASE}/predictions/${encodeURIComponent(docId)}`;
+  const url   = predDocUrl(userId, matchId);
   await fetch(url, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
 }
 
