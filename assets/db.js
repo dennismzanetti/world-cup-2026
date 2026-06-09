@@ -2,20 +2,57 @@
 import {
   collection,
   doc,
-  addDoc,
-  setDoc,
   getDoc,
   getDocs,
   updateDoc,
-  deleteDoc,
   query,
   where,
   orderBy,
   onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { db } from "./firebase.js";
+import { auth } from "./firebase.js";
 
-// ─── MATCHES ─────────────────────────────────────────────────────────────────
+const PROJECT = "worldcup2026-cfbc2";
+const FS_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
+
+// ─── REST helpers ──────────────────────────────────────────────────────────────
+
+async function getIdToken() {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Not authenticated');
+  return user.getIdToken();
+}
+
+// Convert a JS value to Firestore REST field value
+function toFsValue(v) {
+  if (typeof v === 'string')  return { stringValue: v };
+  if (typeof v === 'number')  return { integerValue: String(v) };
+  if (typeof v === 'boolean') return { booleanValue: v };
+  if (v === null)             return { nullValue: null };
+  return { stringValue: String(v) };
+}
+
+// Convert Firestore REST field value back to JS
+function fromFsValue(fv) {
+  if ('stringValue'  in fv) return fv.stringValue;
+  if ('integerValue' in fv) return parseInt(fv.integerValue);
+  if ('doubleValue'  in fv) return fv.doubleValue;
+  if ('booleanValue' in fv) return fv.booleanValue;
+  if ('nullValue'    in fv) return null;
+  return null;
+}
+
+function docToObj(fsDoc) {
+  const fields = fsDoc.fields || {};
+  const obj = {};
+  for (const [k, v] of Object.entries(fields)) obj[k] = fromFsValue(v);
+  // extract id from name: "projects/.../documents/collection/DOC_ID"
+  obj.id = fsDoc.name.split('/').pop();
+  return obj;
+}
+
+// ─── MATCHES (SDK — read-only, WebChannel is fine for reads) ───────────────────────
 
 export async function getMatches() {
   const q = query(collection(db, "matches"), orderBy("date"), orderBy("timeLocal"));
@@ -30,9 +67,7 @@ export async function getMatch(matchId) {
 
 export async function updateMatchResult(matchId, { homeScore, awayScore, status }) {
   return updateDoc(doc(db, "matches", matchId), {
-    homeScore,
-    awayScore,
-    status,
+    homeScore, awayScore, status,
     updatedAt: new Date().toISOString()
   });
 }
@@ -44,47 +79,122 @@ export function watchMatches(callback) {
   });
 }
 
-// ─── PREDICTIONS ─────────────────────────────────────────────────────────────
+// ─── PREDICTIONS (REST — bypasses WebChannel for writes) ────────────────────────
 
 export async function savePrediction(userId, matchId, { homeScorePred, awayScorePred }) {
-  const ref = doc(db, "predictions", `${userId}_${matchId}`);
-  // No merge:true, no serverTimestamp() — both can cause silent hangs
-  // when offline persistence queues the write before the server acks it.
-  return setDoc(ref, {
-    userId,
-    matchId,
-    homeScorePred,
-    awayScorePred,
-    updatedAt: new Date().toISOString()
+  const token   = await getIdToken();
+  const docId   = `${userId}_${matchId}`;
+  const url     = `${FS_BASE}/predictions/${encodeURIComponent(docId)}`;
+  const body    = {
+    fields: {
+      userId:         toFsValue(userId),
+      matchId:        toFsValue(matchId),
+      homeScorePred:  toFsValue(homeScorePred),
+      awayScorePred:  toFsValue(awayScorePred),
+      updatedAt:      toFsValue(new Date().toISOString())
+    }
+  };
+  const res = await fetch(url, {
+    method:  'PATCH',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type':  'application/json'
+    },
+    body: JSON.stringify(body)
   });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Firestore REST error ${res.status}: ${err?.error?.message || res.statusText}`);
+  }
+  return res.json();
 }
 
 export async function getUserPredictions(userId) {
-  const q = query(collection(db, "predictions"), where("userId", "==", userId));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+  const token = await getIdToken();
+  const url   = `${FS_BASE}/predictions?pageSize=500`;
+  // Use REST runQuery to filter by userId
+  const queryUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents:runQuery`;
+  const body = {
+    structuredQuery: {
+      from: [{ collectionId: 'predictions' }],
+      where: {
+        fieldFilter: {
+          field: { fieldPath: 'userId' },
+          op: 'EQUAL',
+          value: { stringValue: userId }
+        }
+      }
+    }
+  };
+  const res = await fetch(queryUrl, {
+    method:  'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type':  'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Firestore REST query error ${res.status}: ${err?.error?.message || res.statusText}`);
+  }
+  const results = await res.json();
+  return results
+    .filter(r => r.document)
+    .map(r => docToObj(r.document));
 }
 
 export async function getPrediction(userId, matchId) {
-  const snap = await getDoc(doc(db, "predictions", `${userId}_${matchId}`));
-  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+  const token  = await getIdToken();
+  const docId  = `${userId}_${matchId}`;
+  const url    = `${FS_BASE}/predictions/${encodeURIComponent(docId)}`;
+  const res    = await fetch(url, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) return null;
+  return docToObj(await res.json());
 }
 
 export async function deletePrediction(userId, matchId) {
-  return deleteDoc(doc(db, "predictions", `${userId}_${matchId}`));
+  const token  = await getIdToken();
+  const docId  = `${userId}_${matchId}`;
+  const url    = `${FS_BASE}/predictions/${encodeURIComponent(docId)}`;
+  await fetch(url, {
+    method:  'DELETE',
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
 }
 
 // ─── USERS ────────────────────────────────────────────────────────────────────
 
 export async function saveUserProfile(uid, { email, displayName }) {
-  return setDoc(doc(db, "users", uid), {
-    email,
-    displayName,
-    updatedAt: new Date().toISOString()
-  }, { merge: true });
+  const token  = await getIdToken();
+  const url    = `${FS_BASE}/users/${encodeURIComponent(uid)}`;
+  const body   = {
+    fields: {
+      email:       toFsValue(email),
+      displayName: toFsValue(displayName),
+      updatedAt:   toFsValue(new Date().toISOString())
+    }
+  };
+  const res = await fetch(url, {
+    method:  'PATCH',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type':  'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) console.warn('saveUserProfile failed', res.status);
 }
 
 export async function getUserProfile(uid) {
-  const snap = await getDoc(doc(db, "users", uid));
-  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+  const token = await getIdToken();
+  const url   = `${FS_BASE}/users/${encodeURIComponent(uid)}`;
+  const res   = await fetch(url, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!res.ok) return null;
+  return docToObj(await res.json());
 }
