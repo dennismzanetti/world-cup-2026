@@ -133,6 +133,8 @@ body {
   font-size: var(--text-base);
   color: var(--color-text);
   background-color: var(--color-bg);
+  /* leave room for the fixed footer so content is never obscured */
+  padding-bottom: var(--footer-h);
 }
 img, svg { display: block; max-width: 100%; }
 button { cursor: pointer; background: none; border: none; font: inherit; color: inherit; }
@@ -446,9 +448,13 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
 .standings-table td.pts { font-weight: 700; color: var(--color-primary); }
 .standings-table tr:last-child td { border-bottom: none; }
 
-/* ---- BUILD FOOTER ---- */
+/* ---- BUILD FOOTER — fixed to viewport bottom ---- */
 .build-footer {
-  width: 100%;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 90;
   height: var(--footer-h);
   background: var(--color-surface);
   border-top: 1px solid var(--color-border);
@@ -457,7 +463,6 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
   justify-content: center;
   font-size: var(--text-xs);
   color: var(--color-text-faint);
-  flex-shrink: 0;
 }
 
 /* ---- EMPTY / LOADING ---- */
