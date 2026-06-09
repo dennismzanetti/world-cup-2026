@@ -143,6 +143,11 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 
   // ─── Update predictions section UI for auth state ────────────────────────────
   function updatePredictionsAuthUI(user) {
+    // Never show the prompt until auth state is fully resolved
+    if (!authResolved) {
+      if (predictPrompt) predictPrompt.hidden = true;
+      return;
+    }
     if (predictPrompt)   predictPrompt.hidden   = !!user;
     if (predictSubtitle) predictSubtitle.textContent = user
       ? 'Predict match scores before kickoff — your picks are saved automatically.'
@@ -157,6 +162,8 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       if (authBtn)      authBtn.textContent = 'Account';
       if (userBar)      userBar.hidden = false;
       if (userGreeting) userGreeting.textContent = 'Hi, ' + (user.displayName || user.email);
+      // Immediately hide the prompt — don't wait for renderPredictions
+      if (predictPrompt) predictPrompt.hidden = true;
       updatePredictionsAuthUI(user);
       try {
         const preds = await getUserPredictions(user.uid);
@@ -454,6 +461,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       if (predictPrompt) predictPrompt.hidden = false;
       return;
     }
+    // Signed in — always hide the prompt
     if (predictPrompt) predictPrompt.hidden = true;
     container.innerHTML = '';
 
