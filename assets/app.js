@@ -6,6 +6,16 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 (function () {
   'use strict';
 
+  // ─── Admin UIDs ───────────────────────────────────────────────────────────────
+  // Only users whose Firebase UID appears here will see score-input controls
+  // in the Match Schedule view.  All other users see read-only scores.
+  const ADMIN_UIDS = new Set([
+    'YOUR_FIREBASE_UID_HERE', // replace with your actual Firebase UID
+  ]);
+  function isAdmin(user) {
+    return user && ADMIN_UIDS.has(user.uid);
+  }
+
   // ─── State ───────────────────────────────────────────────────────────────────
   let currentUser = null;
   let authResolved = false;
@@ -255,9 +265,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   }
 
   // ─── Predicted Group Standings ────────────────────────────────────────────────
-  // Returns teams for a group sorted by predicted points (descending).
-  // Falls back to alphabetical order for unpredicted groups so callers always
-  // get a stable array they can index by position (0 = 1st, 1 = 2nd, …).
   function getPredictedGroupStandings(groupId) {
     const group = WC_GROUPS.find(g => g.id === groupId);
     if (!group) return [];
@@ -268,9 +275,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   }
 
   // ─── Resolve Knockout Team ────────────────────────────────────────────────────
-  // Given a homeSource / awaySource descriptor from WC_KNOCKOUT_FIXTURES,
-  // returns { name, flag } for display — or null if not yet resolvable.
-  // Does NOT mutate any match objects.
   function resolveKnockoutTeam(source, fallbackTeam) {
     if (!source) return null;
 
@@ -278,18 +282,16 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       const standings = getPredictedGroupStandings(source.group);
       const groupMatches = WC_MATCHES.filter(m => m.group === source.group);
       const hasPreds = groupMatches.some(m => userPredictions[m.id]);
-      if (!hasPreds) return null; // no predictions yet — keep placeholder
+      if (!hasPreds) return null;
       const team = standings[source.pos - 1];
       return team ? { name: team.name, flag: team.flag } : null;
     }
 
     if (source.type === 'winner' || source.type === 'loser') {
-      // Reserved for Step 5 — winnerPred not yet stored
       return null;
     }
 
     if (source.type === 'best3rd') {
-      // Best 3rd-place teams TBD until group stage completes
       return null;
     }
 
@@ -297,12 +299,8 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   }
 
   // ─── Build Display Match ──────────────────────────────────────────────────────
-  // For knockout matches in the Predictions tab, replace home/away with resolved
-  // team names based on predicted standings.  Falls back to the original team
-  // object (placeholder name) if no predictions exist yet.
-  // The original match object is never mutated.
   function buildDisplayMatch(match) {
-    if (!match.stage) return match; // group stage — no resolution needed
+    if (!match.stage) return match;
     const resolvedHome = resolveKnockoutTeam(match.homeSource, match.home);
     const resolvedAway = resolveKnockoutTeam(match.awaySource, match.away);
     if (!resolvedHome && !resolvedAway) return match;
@@ -526,10 +524,14 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       return;
     }
 
+    // Only the admin user may edit scores — all other visitors see read-only cards
+    const adminMode = isAdmin(currentUser);
+
     filtered.forEach(match => {
       const card = buildMatchCard(match);
-      // Score inputs (admin)
-      if (currentUser) {
+
+      if (adminMode) {
+        // ── Admin: inline score inputs + save button ──────────────────────────
         const scoreInputsHTML = `
           <div class="score-inputs-wrap">
             <input type="number" min="0" max="99" class="score-input" data-match-id="${match.id}" data-side="home"
@@ -570,6 +572,8 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
           });
         }
       }
+      // Non-admin users already see the read-only card built by buildMatchCard()
+
       container.appendChild(card);
     });
   }
@@ -654,8 +658,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     }
     if (date !== 'all') filtered = filtered.filter(m => m.date === date);
 
-    // Apply display-match resolution (team name substitution) before team text filter
-    // so filtering by e.g. "Mexico" also matches resolved knockout slots.
     const displayMatches = filtered.map(buildDisplayMatch);
 
     if (team) {
@@ -673,9 +675,8 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     }
 
     filtered.forEach((match, idx) => {
-      // Use resolved display version for rendering; keep original match for save logic
       const dm = team
-        ? buildDisplayMatch(match)  // re-resolve if filtered (filtered array is subset)
+        ? buildDisplayMatch(match)
         : displayMatches[filtered.indexOf(match)] || buildDisplayMatch(match);
 
       const status = (match.status || 'scheduled').toLowerCase();
@@ -832,7 +833,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     const byGroup = {};
     q.forEach(g => { byGroup[g.groupId] = g; });
 
-    // Build a single knockout match card (match-card style)
     function koCardHTML(matchNum, teamA, teamB, roundTag) {
       const nameA = teamA ? teamA.name : 'TBD';
       const flagA = teamA ? teamA.flag : '\u2753';
@@ -880,7 +880,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
         </div>`;
     }
 
-    // Helper: attach qualifier label to a resolved team
     function teamWithQualifier(team, groupId, position) {
       if (!team) return null;
       return {
@@ -889,7 +888,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       };
     }
 
-    // 2026 World Cup R32 pairings
     const r32Pairs = [
       { a: { g: 'A', p: 'first'  }, b: { g: 'B', p: 'second' }, label: 'Match 1'  },
       { a: { g: 'C', p: 'first'  }, b: { g: 'D', p: 'second' }, label: 'Match 2'  },
