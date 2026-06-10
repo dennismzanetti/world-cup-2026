@@ -1,4 +1,5 @@
 // World Cup 2026 App — Firebase-connected
+import { WC_GROUPS, WC_MATCHES, WC_KNOCKOUT_FIXTURES } from './data.js';
 import { auth } from './firebase.js';
 import { signUp, signIn, logOut, watchAuth } from './auth.js';
 import { watchMatches, savePrediction, getUserPredictions } from './db.js';

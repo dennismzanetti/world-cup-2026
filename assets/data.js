@@ -184,8 +184,6 @@ const WC_FIXTURE_META = {
 };
 
 // Generates a stable, URL-safe match ID from date + team names.
-// e.g. "2026-06-11-mexico-south-africa"
-// This is the canonical prediction key — no Firestore dependency.
 function makeMatchId(date, homeName, awayName) {
   function slug(s) {
     return s.toLowerCase()
@@ -203,14 +201,12 @@ function generateMatches() {
     const teams = group.teams;
     for (let i = 0; i < teams.length; i++) {
       for (let j = i + 1; j < teams.length; j++) {
-        // Try both key orderings — fixture meta may list either team as home
         const keyFwd = teams[i].name + '|' + teams[j].name;
         const keyRev = teams[j].name + '|' + teams[i].name;
         const metaFwd = WC_FIXTURE_META[keyFwd];
         const metaRev = WC_FIXTURE_META[keyRev];
         const meta = metaFwd || metaRev || {};
 
-        // If the reversed key matched, swap home/away to reflect actual fixture
         const homeTeam = metaRev && !metaFwd ? teams[j] : teams[i];
         const awayTeam = metaRev && !metaFwd ? teams[i] : teams[j];
 
@@ -240,12 +236,6 @@ function generateMatches() {
 const WC_MATCHES = generateMatches();
 
 // ── KNOCKOUT STAGE FIXTURES ────────────────────────────────────────────────
-// homeSource / awaySource describe where each team qualifies from so app.js
-// can resolve real team names from predicted group standings at render time.
-// type 'group'  → pos 1 = group winner, pos 2 = runner-up
-// type 'winner' → winner of the referenced knockout matchId
-// type 'loser'  → loser  of the referenced knockout matchId
-// type 'best3rd'→ nth-best 3rd-place finisher (TBD until group stage ends)
 const WC_KNOCKOUT_FIXTURES = [
   // ── ROUND OF 32 ──────────────────────────────────────────────────────────
   { id:'r32-1',  stage:'Round of 32', homeSource:{type:'group',group:'A',pos:1}, awaySource:{type:'group',group:'B',pos:2}, home:{name:'1A',flag:'🏳️'}, away:{name:'2B',flag:'🏳️'}, date:'2026-06-28', timeLocal:'15:00', tz:'ET', venue:'Estadio Azteca',           city:'Mexico City, Mexico',        tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
@@ -293,3 +283,5 @@ WC_KNOCKOUT_FIXTURES.forEach(m => {
   m.awayScore = null;
   WC_MATCHES.push(m);
 });
+
+export { WC_GROUPS, WC_MATCHES, WC_KNOCKOUT_FIXTURES };
