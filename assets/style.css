@@ -146,6 +146,9 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Restore native hidden attribute behavior — required for auth modal/backdrop toggling */
+[hidden] { display: none !important; }
+
 html {
   -webkit-text-size-adjust: none;
   text-size-adjust: none;
