@@ -17,7 +17,6 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
   const ADMIN_UIDS = ['EAi3lYhlSFYGaqm9F87BdJb1Vrg1'];
 
   // ─── Team name helper ─────────────────────────────────────────────────────
-  // data.js teams are objects {name, flag} — always use .name for display/compare
   function teamName(t) { return (t && typeof t === 'object') ? t.name : (t || ''); }
   function teamFlag(t) { return (t && typeof t === 'object') ? (t.flag || '') : ''; }
   function teamDisplay(t) { return teamFlag(t) ? `${teamFlag(t)} ${teamName(t)}` : teamName(t); }
@@ -40,16 +39,11 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
       btn.classList.toggle('active', active);
       btn.setAttribute('aria-selected', String(active));
     });
-    // Toggle both the `active` class (used by CSS for display) AND
-    // the `hidden` attribute so they stay in sync.
     document.querySelectorAll('.sub-tab-panel').forEach(panel => {
       const active = panel.id === `subtab-${id}`;
       panel.classList.toggle('active', active);
-      if (active) {
-        panel.removeAttribute('hidden');
-      } else {
-        panel.setAttribute('hidden', '');
-      }
+      if (active) panel.removeAttribute('hidden');
+      else        panel.setAttribute('hidden', '');
     });
     const predFilters = document.getElementById('pred-filters');
     if (predFilters) predFilters.hidden = (id !== 'my-picks');
@@ -175,13 +169,10 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
   document.getElementById('pred-team-filter')?.addEventListener('input', renderPredictions);
 
   // ─── Live match data ──────────────────────────────────────────────────────
-  // watchMatches delivers ALL matches each poll — merge scores into liveMatches
   watchMatches(allMatches => {
     allMatches.forEach(um => {
       const idx = liveMatches.findIndex(m => m.id === um.id);
-      if (idx !== -1) {
-        liveMatches[idx] = { ...liveMatches[idx], ...um };
-      }
+      if (idx !== -1) liveMatches[idx] = { ...liveMatches[idx], ...um };
     });
     renderAll();
   });
@@ -307,82 +298,147 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
 
   // ─── Match card ───────────────────────────────────────────────────────────
   function buildMatchCard(m, isPred) {
-    const card       = document.createElement('div');
-    card.className   = 'match-card';
+    const card     = document.createElement('div');
+    card.className = 'match-card' + (m.status === 'live' ? ' match-card-live' : '');
+
     const stageLabel = m.group ? `Group ${m.group}` : stageKeyToLabel(m.stage || '');
     const isAdmin    = currentUser && ADMIN_UIDS.includes(currentUser.uid);
     const hn         = teamName(m.home);
     const an         = teamName(m.away);
-    let scoreHtml    = '';
+    const hFlag      = teamFlag(m.home);
+    const aFlag      = teamFlag(m.away);
+    const isLocked   = m.status === 'ft' || m.status === 'final';
+
+    // ── Status badge ────────────────────────────────────────────────────────
+    let statusBadge = '';
+    if      (m.status === 'live') statusBadge = '<span class="status-badge status-live"><span class="live-dot"></span>Live</span>';
+    else if (m.status === 'ht')   statusBadge = '<span class="status-badge status-ht">HT</span>';
+    else if (m.status === 'ft' || m.status === 'final') statusBadge = '<span class="status-badge status-ft">FT</span>';
+
+    // ── Centre score column ──────────────────────────────────────────────────
+    let scoreColHtml = '';
 
     if (isPred && currentUser) {
       const pred = userPredictions[m.id] || {};
-      scoreHtml = `
-        <div class="score-inputs">
-          <input type="number" class="score-input" min="0" max="99"
-            data-match="${m.id}" data-side="home"
-            value="${pred.homeScorePred !== undefined ? pred.homeScorePred : ''}">
-          <span class="score-sep">–</span>
-          <input type="number" class="score-input" min="0" max="99"
-            data-match="${m.id}" data-side="away"
-            value="${pred.awayScorePred !== undefined ? pred.awayScorePred : ''}">
-        </div>
-        <div class="score-save-row">
-          <button class="btn btn-sm btn-primary save-pred-btn" data-match="${m.id}">Save</button>
+      const hVal = pred.homeScorePred !== undefined ? pred.homeScorePred : '';
+      const aVal = pred.awayScorePred !== undefined ? pred.awayScorePred : '';
+      scoreColHtml = `
+        <div class="card-score-col">
+          <div class="score-inputs-wrap">
+            <input type="number" class="score-input" min="0" max="99"
+              data-match="${m.id}" data-side="home" value="${hVal}"
+              aria-label="${hn} predicted score"${isLocked ? ' disabled' : ''}>
+            <span class="score-sep">–</span>
+            <input type="number" class="score-input" min="0" max="99"
+              data-match="${m.id}" data-side="away" value="${aVal}"
+              aria-label="${an} predicted score"${isLocked ? ' disabled' : ''}>
+          </div>
+          ${!isLocked ? `<button class="btn-save pred-btn save-pred-btn" data-match="${m.id}">Save</button>` : ''}
+          <span class="pred-saving" hidden>Saving…</span>
+          <span class="pred-saved" hidden>Saved ✓</span>
+          <span class="pred-error" hidden></span>
         </div>`;
     } else if (!isPred && isAdmin) {
-      scoreHtml = `
-        <div class="score-inputs">
-          <input type="number" class="score-input" min="0" max="99"
-            data-match="${m.id}" data-side="home"
-            value="${m.homeScore != null ? m.homeScore : ''}">
-          <span class="score-sep">–</span>
-          <input type="number" class="score-input" min="0" max="99"
-            data-match="${m.id}" data-side="away"
-            value="${m.awayScore != null ? m.awayScore : ''}">
-        </div>
-        <div class="score-save-row">
-          <button class="btn btn-sm btn-primary save-score-btn" data-match="${m.id}">Save</button>
+      scoreColHtml = `
+        <div class="card-score-col">
+          <div class="score-inputs-wrap">
+            <input type="number" class="score-input" min="0" max="99"
+              data-match="${m.id}" data-side="home"
+              value="${m.homeScore != null ? m.homeScore : ''}" aria-label="${hn} score">
+            <span class="score-sep">–</span>
+            <input type="number" class="score-input" min="0" max="99"
+              data-match="${m.id}" data-side="away"
+              value="${m.awayScore != null ? m.awayScore : ''}" aria-label="${an} score">
+          </div>
+          <button class="btn-save save-score-btn" data-match="${m.id}">Save</button>
+          <span class="result-saved" style="display:none">Saved ✓</span>
         </div>`;
     } else {
-      const hs = m.homeScore != null ? m.homeScore : '–';
-      const as = m.awayScore != null ? m.awayScore : '–';
-      scoreHtml = `<div class="score-display">${hs} – ${as}</div>`;
+      const hs  = m.homeScore != null ? m.homeScore : '–';
+      const as_ = m.awayScore != null ? m.awayScore : '–';
+      const cls = m.status === 'live'  ? 'score-final score-live'
+                : m.homeScore != null  ? 'score-final'
+                                       : 'score-final score-pending';
+      scoreColHtml = `<div class="card-score-col"><span class="${cls}">${hs} – ${as_}</span></div>`;
     }
 
-    card.innerHTML = `
-      <div class="match-card-header">
-        <span class="match-meta">${stageLabel}</span>
-        <span class="match-meta">${m.date || ''} ${m.timeLocal || ''} ${m.tz || ''}</span>
-      </div>
-      <div class="match-teams">
-        <span class="team home-team">${teamDisplay(m.home)}</span>
-        ${scoreHtml}
-        <span class="team away-team">${teamDisplay(m.away)}</span>
-      </div>
-      ${m.venue ? `<div class="match-venue">${m.venue}${m.city ? ', ' + m.city : ''}</div>` : ''}`;
+    // ── Date/time string ────────────────────────────────────────────────────
+    const dtStr = [m.date, m.timeLocal, m.tz].filter(Boolean).join(' ');
 
+    // ── Card HTML ────────────────────────────────────────────────────────────
+    card.innerHTML = `
+      <div class="card-header">
+        <span class="card-header-group">${stageLabel}</span>
+        ${dtStr ? `<span class="card-header-date">${dtStr}</span>` : ''}
+        ${statusBadge}
+      </div>
+      <div class="card-teams">
+        <div class="card-team home-team">
+          ${hFlag ? `<span class="team-flag" aria-hidden="true">${hFlag}</span>` : ''}
+          <span class="card-team-name">${hn}</span>
+        </div>
+        ${scoreColHtml}
+        <div class="card-team away-team">
+          <span class="card-team-name">${an}</span>
+          ${aFlag ? `<span class="team-flag" aria-hidden="true">${aFlag}</span>` : ''}
+        </div>
+      </div>
+      ${m.venue ? `
+      <div class="card-meta">
+        <span class="card-meta-item">
+          <svg class="meta-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/><path d="M13 6c0 4.5-5 8.5-5 8.5S3 10.5 3 6a5 5 0 0 1 10 0z"/></svg>
+          ${m.venue}${m.city ? ', ' + m.city : ''}
+        </span>
+      </div>` : ''}`;
+
+    // ── Event listeners ──────────────────────────────────────────────────────
     if (isPred && currentUser) {
       card.querySelector('.save-pred-btn')?.addEventListener('click', async () => {
-        const homeVal = parseInt(card.querySelector('[data-side="home"]')?.value);
-        const awayVal = parseInt(card.querySelector('[data-side="away"]')?.value);
-        if (isNaN(homeVal) || isNaN(awayVal)) return;
+        const savingEl = card.querySelector('.pred-saving');
+        const savedEl  = card.querySelector('.pred-saved');
+        const errEl    = card.querySelector('.pred-error');
+        const btn      = card.querySelector('.save-pred-btn');
+        const homeVal  = parseInt(card.querySelector('[data-side="home"]')?.value);
+        const awayVal  = parseInt(card.querySelector('[data-side="away"]')?.value);
+        if (isNaN(homeVal) || isNaN(awayVal)) {
+          if (errEl) { errEl.textContent = 'Enter both scores.'; errEl.hidden = false; }
+          return;
+        }
+        if (errEl)    errEl.hidden    = true;
+        if (savingEl) savingEl.hidden = false;
+        if (btn)      btn.disabled    = true;
         userPredictions[m.id] = { homeScorePred: homeVal, awayScorePred: awayVal };
         try {
           await savePrediction(currentUser.uid, m.id, { homeScorePred: homeVal, awayScorePred: awayVal });
-        } catch (e) { console.warn('[app] savePrediction error', e); }
+          if (savingEl) savingEl.hidden = true;
+          if (savedEl)  { savedEl.hidden = false; setTimeout(() => { savedEl.hidden = true; }, 2000); }
+        } catch (err) {
+          if (savingEl) savingEl.hidden = true;
+          if (errEl)    { errEl.textContent = 'Save failed.'; errEl.hidden = false; }
+          console.warn('[app] savePrediction error', err);
+        }
+        if (btn) btn.disabled = false;
       });
     }
+
     if (!isPred && isAdmin) {
       card.querySelector('.save-score-btn')?.addEventListener('click', async () => {
+        const btn     = card.querySelector('.save-score-btn');
+        const savedEl = card.querySelector('.result-saved');
         const homeVal = parseInt(card.querySelector('[data-side="home"]')?.value);
         const awayVal = parseInt(card.querySelector('[data-side="away"]')?.value);
         if (isNaN(homeVal) || isNaN(awayVal)) return;
+        if (btn) btn.disabled = true;
         try {
-          await updateMatchResult(m.id, { homeScore: homeVal, awayScore: awayVal, status: 'final' });
-        } catch (e) { console.warn('[app] updateMatchResult error', e); }
+          await updateMatchResult(m.id, { homeScore: homeVal, awayScore: awayVal, status: 'ft' });
+          if (savedEl) { savedEl.style.display = 'inline'; setTimeout(() => { savedEl.style.display = 'none'; if (btn) btn.disabled = false; }, 2000); }
+        } catch (err) {
+          console.warn('[app] updateMatchResult error', err);
+          if (btn) btn.disabled = false;
+        }
       });
     }
+
     return card;
   }
 
@@ -431,7 +487,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     const dateVal  = document.getElementById('pred-date-filter')?.value  || 'all';
     const stageVal = document.getElementById('pred-group-filter')?.value || 'all';
     const teamVal  = (document.getElementById('pred-team-filter')?.value || '').toLowerCase().trim();
-    let matches = liveMatches.filter(m => m.group); // group-stage only
+    let matches = liveMatches.filter(m => m.group);
     if (dateVal  !== 'all') matches = matches.filter(m => m.date === dateVal);
     if (stageVal !== 'all') matches = matches.filter(m => (m.group || m.stage) === stageVal);
     if (teamVal)            matches = matches.filter(m =>
@@ -572,7 +628,6 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     const group = WC_GROUPS.find(g => g.id === groupId);
     if (!group) return null;
     const gm = liveMatches.filter(m => m.group === groupId);
-    // Only show result if all group matches have scores
     if (gm.some(m => m.homeScore == null)) return null;
     const standings = calcPoints(group.teams, gm);
     return standings[rank - 1]?.team || null;
