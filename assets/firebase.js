@@ -15,7 +15,8 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+// Explicitly target the 'wc2026' named database (not the default)
+export const db = getFirestore(app, 'wc2026');
 
 // Use sessionStorage-backed persistence instead of IndexedDB (the default).
 // IndexedDB is blocked in sandboxed iframes (GitHub Pages preview proxy),
