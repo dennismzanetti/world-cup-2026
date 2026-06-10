@@ -6,6 +6,21 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 (function () {
   'use strict';
 
+  // ─── Constants ───────────────────────────────────────────────────────────────
+  const STAGE_LABELS = {
+    R32: 'Round of 32',
+    R16: 'Round of 16',
+    QF:  'Quarterfinals',
+    SF:  'Semifinals',
+    '3P': 'Third Place',
+    F:   'Final',
+  };
+
+  // Replace with real admin Firebase UIDs to enable the score-entry UI
+  const ADMIN_UIDS = [
+    'REPLACE_WITH_YOUR_FIREBASE_UID',
+  ];
+
   // ─── State ───────────────────────────────────────────────────────────────────
   let currentUser = null;
   let authResolved = false;
@@ -669,12 +684,12 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     }
 
     const stages = [
-      { key: 'R32', label: 'Round of 32' },
-      { key: 'R16', label: 'Round of 16' },
-      { key: 'QF',  label: 'Quarterfinals' },
-      { key: 'SF',  label: 'Semifinals' },
-      { key: '3P',  label: 'Third Place' },
-      { key: 'F',   label: 'Final' },
+      { key: 'R32', label: STAGE_LABELS.R32 },
+      { key: 'R16', label: STAGE_LABELS.R16 },
+      { key: 'QF',  label: STAGE_LABELS.QF  },
+      { key: 'SF',  label: STAGE_LABELS.SF  },
+      { key: '3P',  label: STAGE_LABELS['3P'] },
+      { key: 'F',   label: STAGE_LABELS.F   },
     ];
 
     container.innerHTML = '';
