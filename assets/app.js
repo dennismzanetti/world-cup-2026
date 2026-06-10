@@ -7,11 +7,14 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 (function () {
 
   // ─── State ───────────────────────────────────────────────────────────────────
-  let currentUser  = null;
-  let authResolved = false;
+  let currentUser     = null;
+  let authResolved    = false;
   let activeTab       = 'groups';
   let activePredSubtab = 'pred-matches';
   let userPredictions = {};
+
+  // ─── Admin UIDs ───────────────────────────────────────────────────────────
+  const ADMIN_UIDS = ['EAi3lYhlSFYGaqm9F87BdJb1Vrg1'];
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
   function openModal()  { document.getElementById('auth-modal')?.removeAttribute('hidden'); }
@@ -61,27 +64,24 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   watchAuth(async (user) => {
     currentUser = user;
     authResolved = true;
-    const userInfo = document.getElementById('user-info');
+    const userInfo  = document.getElementById('user-info');
     const signInBtn = document.getElementById('sign-in-btn');
     const signOutBtn = document.getElementById('sign-out-btn');
 
     if (user) {
-      if (userInfo)  userInfo.textContent = user.email;
+      if (userInfo)   userInfo.textContent = user.email;
       if (signInBtn)  signInBtn.hidden = true;
       if (signOutBtn) signOutBtn.hidden = false;
 
-      // Load this user's predictions from Firestore
       getUserPredictions(user.uid, (preds) => {
+        userPredictions = {};
         if (preds && preds.length) {
-          userPredictions = {};
           preds.forEach(p => { userPredictions[p.matchId] = p; });
-        } else {
-          userPredictions = {};
         }
         renderAll();
       });
     } else {
-      if (userInfo)  userInfo.textContent = '';
+      if (userInfo)   userInfo.textContent = '';
       if (signInBtn)  signInBtn.hidden = false;
       if (signOutBtn) signOutBtn.hidden = true;
       userPredictions = {};
@@ -100,7 +100,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   document.querySelectorAll('.nav-tab').forEach(btn => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
   });
-
   document.querySelectorAll('.sub-tab').forEach(btn => {
     btn.addEventListener('click', () => switchPredSubtab(btn.dataset.subtab));
   });
@@ -118,12 +117,12 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   });
 
   const authForm = document.getElementById('auth-form');
-  authForm?.addEventListener('submit', async (e) => {
+  authForm?.addEventListener('submit', async e => {
     e.preventDefault();
-    const email = document.getElementById('auth-email').value.trim();
+    const email    = document.getElementById('auth-email').value.trim();
     const password = document.getElementById('auth-password').value;
     const isSignUp = document.getElementById('auth-mode').value === 'signup';
-    const errEl = document.getElementById('auth-error');
+    const errEl    = document.getElementById('auth-error');
     try {
       if (isSignUp) await signUp(email, password);
       else          await signIn(email, password);
@@ -134,10 +133,10 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   });
 
   document.getElementById('auth-toggle')?.addEventListener('click', () => {
-    const modeEl = document.getElementById('auth-mode');
+    const modeEl    = document.getElementById('auth-mode');
     const submitBtn = document.getElementById('auth-submit');
     const toggleBtn = document.getElementById('auth-toggle');
-    const titleEl = document.getElementById('auth-modal-title');
+    const titleEl   = document.getElementById('auth-modal-title');
     if (modeEl.value === 'signin') {
       modeEl.value = 'signup';
       if (titleEl)   titleEl.textContent = 'Create Account';
@@ -162,18 +161,13 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   document.getElementById('pred-team-filter')?.addEventListener('input', renderPredictions);
 
   // ─── Live match data ──────────────────────────────────────────────────────
-  watchMatches((updatedMatches) => {
+  watchMatches(updatedMatches => {
     updatedMatches.forEach(um => {
       const idx = WC_MATCHES.findIndex(m => m.id === um.id);
-      if (idx !== -1) {
-        WC_MATCHES[idx] = { ...WC_MATCHES[idx], ...um };
-      }
+      if (idx !== -1) WC_MATCHES[idx] = { ...WC_MATCHES[idx], ...um };
     });
     renderAll();
   });
-
-  // ─── Admin UID ────────────────────────────────────────────────────────────
-  const ADMIN_UID = 'EAi3lYhlSFYGaqm9F87BdJb1Vrg1';
 
   // ─── Groups ───────────────────────────────────────────────────────────────
   function renderGroups() {
@@ -234,6 +228,17 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   }
 
   // ─── Matches ──────────────────────────────────────────────────────────────
+  const stageKeyToLabel = key => {
+    const labels = {
+      R32: 'Round of 32', R16: 'Round of 16',
+      QF: 'Quarter-Finals', SF: 'Semi-Finals',
+      '3P': 'Third Place', F: 'Final'
+    };
+    if (labels[key]) return labels[key];
+    if (/^[A-Z]$/.test(key)) return `Group ${key}`;
+    return key;
+  };
+
   function populateMatchFilters() {
     const dateSelect  = document.getElementById('date-filter');
     const stageSelect = document.getElementById('group-filter');
@@ -258,17 +263,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       stages.map(s => `<option value="${s}">${stageKeyToLabel(s)}</option>`).join('');
   }
 
-  const stageKeyToLabel = (key) => {
-    const labels = {
-      R32: 'Round of 32', R16: 'Round of 16',
-      QF: 'Quarter-Finals', SF: 'Semi-Finals',
-      '3P': 'Third Place', F: 'Final'
-    };
-    if (labels[key]) return labels[key];
-    if (/^[A-Z]$/.test(key)) return `Group ${key}`;
-    return key;
-  };
-
   function renderMatches() {
     const container = document.getElementById('matches-container');
     if (!container) return;
@@ -281,10 +275,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     if (teamVal)  matches = matches.filter(m =>
       m.home.toLowerCase().includes(teamVal) || m.away.toLowerCase().includes(teamVal));
     container.innerHTML = '';
-    if (!matches.length) {
-      container.innerHTML = '<p class="muted">No matches found.</p>';
-      return;
-    }
+    if (!matches.length) { container.innerHTML = '<p class="muted">No matches found.</p>'; return; }
     matches.forEach(m => container.appendChild(buildMatchCard(m, false)));
   }
 
@@ -292,7 +283,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     const card = document.createElement('div');
     card.className = 'match-card';
     const stageLabel = m.group ? `Group ${m.group}` : stageKeyToLabel(m.stage || '');
-    const isAdmin = currentUser && currentUser.uid === ADMIN_UID;
+    const isAdmin = currentUser && ADMIN_UIDS.includes(currentUser.uid);
     let scoreHtml = '';
     if (isPred) {
       const pred = userPredictions[m.id] || {};
@@ -404,7 +395,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   function renderPredictions() {
     const container = document.getElementById('predictions-container');
     if (!container) return;
-
     const authPrompt = document.getElementById('predictions-auth-prompt');
     if (!currentUser) {
       if (authPrompt) authPrompt.hidden = false;
@@ -412,7 +402,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       return;
     }
     if (authPrompt) authPrompt.hidden = true;
-
     const dateVal  = document.getElementById('pred-date-filter')?.value  || '';
     const stageVal = document.getElementById('pred-group-filter')?.value || '';
     const teamVal  = (document.getElementById('pred-team-filter')?.value || '').toLowerCase();
@@ -422,10 +411,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     if (teamVal)  matches = matches.filter(m =>
       m.home.toLowerCase().includes(teamVal) || m.away.toLowerCase().includes(teamVal));
     container.innerHTML = '';
-    if (!matches.length) {
-      container.innerHTML = '<p class="muted">No matches found.</p>';
-      return;
-    }
+    if (!matches.length) { container.innerHTML = '<p class="muted">No matches found.</p>'; return; }
     matches.forEach(m => container.appendChild(buildMatchCard(m, true)));
   }
 
@@ -514,7 +500,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     const stats = {};
     teams.forEach(t => stats[t] = { team: t, pts: 0, gd: 0, gf: 0 });
     for (const m of matches) {
-      if (m.homeScore == null || m.awayScore == null) return null; // incomplete
+      if (m.homeScore == null || m.awayScore == null) return null;
       const h = m.homeScore, a = m.awayScore;
       stats[m.home].gf += h; stats[m.home].gd += h - a;
       stats[m.away].gf += a; stats[m.away].gd += a - h;
@@ -532,7 +518,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     if (!group) return null;
     const groupMatches = WC_MATCHES.filter(m => m.group === groupId);
     const standings = calcActualPoints(group.teams, groupMatches);
-    if (!standings) return null; // incomplete results
+    if (!standings) return null;
     return standings[rank - 1]?.team || null;
   }
 
@@ -540,7 +526,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     const group = WC_GROUPS.find(g => g.id === groupId);
     if (!group) return null;
     const groupMatches = WC_MATCHES.filter(m => m.group === groupId);
-    // Only use predictions if at least one match is predicted
     const hasPredictions = groupMatches.some(m => {
       const pred = userPredictions[m.id];
       return pred && pred.homeScorePred !== undefined;
@@ -551,13 +536,10 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   }
 
   function resolveKnockoutTeam(slot, depth = 0) {
-    if (depth > 10) return slot; // guard against infinite loops
+    if (depth > 10) return slot;
     if (!slot || typeof slot !== 'string') return slot;
-    // Already a team name (not a slot code)
     const slotPattern = /^(\d+)([A-Z])$|^(W|L)(\d+)$|^B3([A-Z]{3,})$/;
     if (!slotPattern.test(slot)) return slot;
-
-    // e.g. "1A" → winner of group A
     const groupMatch = slot.match(/^(\d)([A-Z])$/);
     if (groupMatch) {
       const rank = parseInt(groupMatch[1]);
@@ -566,7 +548,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
           || getPredictedGroupFinisher(groupId, rank)
           || slot;
     }
-    // e.g. "W49" → winner of match 49
     const winnerMatch = slot.match(/^W(\d+)$/);
     if (winnerMatch) {
       const matchId = parseInt(winnerMatch[1]);
@@ -589,11 +570,8 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       if (visited.has(id)) continue;
       visited.add(id);
       delete bracketPicks[id];
-      // Find fixtures that reference this match's winner
       WC_KNOCKOUT_FIXTURES.forEach(f => {
-        if (f.home === `W${id}` || f.away === `W${id}`) {
-          toVisit.push(f.id);
-        }
+        if (f.home === `W${id}` || f.away === `W${id}`) toVisit.push(f.id);
       });
     }
   }
@@ -607,23 +585,18 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       return;
     }
     loadBracketPicks();
-
     const rounds = [
-      { label: 'Round of 32', ids: [49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64] },
-      { label: 'Round of 16', ids: [65,66,67,68,69,70,71,72] },
+      { label: 'Round of 32',    ids: [49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64] },
+      { label: 'Round of 16',    ids: [65,66,67,68,69,70,71,72] },
       { label: 'Quarter-Finals', ids: [73,74,75,76] },
-      { label: 'Semi-Finals', ids: [77,78] },
-      { label: 'Final', ids: [79] },
+      { label: 'Semi-Finals',    ids: [77,78] },
+      { label: 'Final',          ids: [79] },
     ];
-
     const totalPicks = rounds.reduce((sum, r) => sum + r.ids.length, 0);
     const madePicksCount = rounds.reduce((sum, r) =>
       sum + r.ids.filter(id => bracketPicks[id]).length, 0);
     const pct = Math.round((madePicksCount / totalPicks) * 100);
-
     container.innerHTML = '';
-
-    // Header
     const header = document.createElement('div');
     header.className = 'bracket-header';
     header.innerHTML = `
@@ -636,17 +609,13 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
         <button class="btn btn-sm btn-ghost" id="bracket-reset-all-btn">Reset All</button>
       </div>`;
     container.appendChild(header);
-
-    // Bracket scroll area
     const scrollArea = document.createElement('div');
     scrollArea.className = 'bracket-scroll';
     container.appendChild(scrollArea);
-
     rounds.forEach(round => {
       const roundEl = document.createElement('div');
       roundEl.className = 'bracket-round';
       roundEl.innerHTML = `<div class="bracket-round-label">${round.label}</div>`;
-
       const resetBtn = document.createElement('button');
       resetBtn.className = 'btn btn-xs btn-ghost bracket-round-reset';
       resetBtn.textContent = 'Reset';
@@ -655,17 +624,14 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
         saveBracketPicks(); renderKnockoutBracket();
       });
       roundEl.querySelector('.bracket-round-label').appendChild(resetBtn);
-
       round.ids.forEach(matchId => {
         const fixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === matchId);
         if (!fixture) return;
         const homeTeam = resolveKnockoutTeam(fixture.home);
         const awayTeam = resolveKnockoutTeam(fixture.away);
         const pick = bracketPicks[matchId];
-
         const matchEl = document.createElement('div');
         matchEl.className = 'bracket-match';
-
         const homeEl = document.createElement('div');
         homeEl.className = 'bracket-team' + (pick === 'home' ? ' picked' : '');
         homeEl.textContent = homeTeam || fixture.home;
@@ -674,7 +640,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
           bracketPicks[matchId] = 'home';
           saveBracketPicks(); renderKnockoutBracket();
         });
-
         const awayEl = document.createElement('div');
         awayEl.className = 'bracket-team' + (pick === 'away' ? ' picked' : '');
         awayEl.textContent = awayTeam || fixture.away;
@@ -683,16 +648,12 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
           bracketPicks[matchId] = 'away';
           saveBracketPicks(); renderKnockoutBracket();
         });
-
         matchEl.appendChild(homeEl);
         matchEl.appendChild(awayEl);
         roundEl.appendChild(matchEl);
       });
-
       scrollArea.appendChild(roundEl);
     });
-
-    // Champion column
     const finalPick = bracketPicks[79];
     let champion = null;
     if (finalPick) {
@@ -707,15 +668,14 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     champEl.className = 'bracket-round bracket-champion';
     champEl.innerHTML = `
       <div class="bracket-round-label">Champion</div>
-      <div class="champion-card">${champion ? `<span class="trophy">🏆</span><span>${champion}</span>` : '<span class="muted">TBD</span>'}</div>`;
+      <div class="champion-card">${champion
+        ? `<span class="trophy">🏆</span><span>${champion}</span>`
+        : '<span class="muted">TBD</span>'}</div>`;
     scrollArea.appendChild(champEl);
-
-    // Wire up header buttons
     container.querySelector('#bracket-reset-all-btn')?.addEventListener('click', () => {
       bracketPicks = {};
       saveBracketPicks(); renderKnockoutBracket();
     });
-
     const seedBtn = container.querySelector('#bracket-seed-btn');
     if (seedBtn) {
       seedBtn.addEventListener('click', () => {
