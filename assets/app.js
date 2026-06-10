@@ -447,8 +447,21 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     if (!container) return;
     container.innerHTML = '';
 
+    // Knockout stage names that can appear in the group/stage filter
+    const KNOCKOUT_STAGES = ['Round of 32', 'Round of 16', 'Quarterfinals', 'Semifinals', 'Third Place', 'Final'];
+
     let filtered = WC_MATCHES.slice();
-    if (groupFilter !== 'all') filtered = filtered.filter(m => m.group === groupFilter);
+
+    if (groupFilter !== 'all') {
+      if (KNOCKOUT_STAGES.includes(groupFilter)) {
+        // Filter by knockout stage
+        filtered = filtered.filter(m => m.stage === groupFilter);
+      } else {
+        // Filter by group letter (group-stage matches only)
+        filtered = filtered.filter(m => m.group === groupFilter);
+      }
+    }
+
     if (venueFilter !== 'all') filtered = filtered.filter(m => m.venue === venueFilter);
     if (dateFilter  !== 'all') filtered = filtered.filter(m => m.date  === dateFilter);
 
@@ -526,12 +539,18 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 
   function getFilteredPredictionMatches() {
     const { group, date, team } = getPredFilters();
+    const KNOCKOUT_STAGES = ['Round of 32', 'Round of 16', 'Quarterfinals', 'Semifinals', 'Third Place', 'Final'];
     return WC_MATCHES.slice()
       .sort(sortByDateTime)
       .filter(match => {
-        const matchGroup = match.group || match.stage || '';
-        if (group !== 'all' && matchGroup !== group) return false;
-        if (date  !== 'all' && (match.date || '') !== date) return false;
+        if (group !== 'all') {
+          if (KNOCKOUT_STAGES.includes(group)) {
+            if (match.stage !== group) return false;
+          } else {
+            if ((match.group || '') !== group) return false;
+          }
+        }
+        if (date !== 'all' && (match.date || '') !== date) return false;
         if (team) {
           const home = (match.home?.name || '').toLowerCase();
           const away = (match.away?.name || '').toLowerCase();
@@ -794,9 +813,19 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   const dateFilterEl  = document.getElementById('date-filter');
 
   if (groupFilterEl) {
+    // Group-stage options
     WC_GROUPS.forEach(g => {
       const opt = document.createElement('option');
       opt.value = g.id; opt.textContent = 'Group ' + g.id;
+      groupFilterEl.appendChild(opt);
+    });
+    // Separator + knockout stage options
+    const sep = document.createElement('option');
+    sep.disabled = true; sep.textContent = '── Knockout ──';
+    groupFilterEl.appendChild(sep);
+    ['Round of 32', 'Round of 16', 'Quarterfinals', 'Semifinals', 'Third Place', 'Final'].forEach(stage => {
+      const opt = document.createElement('option');
+      opt.value = stage; opt.textContent = stage;
       groupFilterEl.appendChild(opt);
     });
   }
