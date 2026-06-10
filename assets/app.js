@@ -199,7 +199,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       userPredictions = {};
     }
 
-    // Always re-render on auth state change (sign in, sign out, token refresh)
     renderAll();
     firstAuthFire = false;
   });
@@ -238,7 +237,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     stages.forEach(s => {
       const opt = document.createElement('option');
       opt.value = s;
-      opt.textContent = s.startsWith('Group') ? s : (STAGE_LABELS[s] || s);
+      opt.textContent = s.length <= 2 ? 'Group ' + s : s;
       sel.appendChild(opt);
     });
   }
@@ -293,7 +292,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   if (predTeamFilter)  predTeamFilter.addEventListener('input',   renderPredictions);
 
   // ─── Initial render — runs immediately, before auth resolves ─────────────────
-  // Groups, Matches, and Standings don't need auth and should be visible right away.
   renderGroups();
   renderMatches();
   renderStandings();
@@ -303,6 +301,16 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     if (!iso) return '';
     const [y, m, d] = iso.split('-').map(Number);
     return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  // ─── stageKeyToLabel: converts raw group/stage key to display label ──────────────
+  // Group IDs are single/double letters (A–L); knockout stages are full strings.
+  function stageKeyToLabel(key) {
+    if (!key) return '';
+    // Single or double uppercase letter = group ID
+    if (/^[A-Z]{1,2}$/.test(key)) return 'Group ' + key;
+    // Already a human-readable knockout stage string (e.g. 'Round of 32')
+    return key;
   }
 
   // ─── Resolve TBD teams from group standings ───────────────────────────────────
@@ -420,7 +428,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   }
 
   // ─── Render Groups ────────────────────────────────────────────────────────────
-  // Uses shared buildStandingsCard() so Groups tab looks identical to Standings tab.
   function renderGroups() {
     const container = document.getElementById('groups-grid');
     if (!container) return;
@@ -496,7 +503,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
           ? `<div class="broadcast-row">${m.broadcast.map(b => `<span class="broadcast-badge">${b}</span>`).join('')}</div>`
           : '';
 
-        card.innerHTML = matchCardHTML(m, scoreCol, m.group || STAGE_LABELS[m.stage] || m.stage || '') + broadcast;
+        card.innerHTML = matchCardHTML(m, scoreCol, stageKeyToLabel(m.group || m.stage)) + broadcast;
 
         if (isAdmin && !hasScore) {
           const btn = card.querySelector('.save-score-btn');
@@ -552,6 +559,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 
     container.innerHTML = '';
 
+    // Group by the raw key (group ID like 'A' or stage string like 'Round of 32')
     const byStage = {};
     filtered.forEach(m => {
       const key = m.group || m.stage || 'Other';
@@ -559,9 +567,11 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       byStage[key].push(m);
     });
 
+    // Order: group IDs A–L first, then knockout stages in order
     const stageOrder = [
-      ...WC_GROUPS.map(g => g.id),
-      'R32', 'R16', 'QF', 'SF', '3P', 'F'
+      ...WC_GROUPS.map(g => g.id),                  // 'A', 'B', ... 'L'
+      'Round of 32', 'Round of 16', 'Quarterfinals',
+      'Semifinals', 'Third Place', 'Final'
     ];
 
     let anyStage = false;
@@ -574,7 +584,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 
       const heading = document.createElement('div');
       heading.className = 'date-divider';
-      heading.textContent = stageKey.startsWith('Group') ? stageKey : (STAGE_LABELS[stageKey] || stageKey);
+      heading.textContent = stageKeyToLabel(stageKey);
       section.appendChild(heading);
 
       byStage[stageKey].forEach(match => {
@@ -609,7 +619,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
             <button class="btn btn-xs btn-primary save-pred-btn" data-match-id="${match.id}">Save</button>
           </div>`;
 
-        card.innerHTML = matchCardHTML(dm, scoreCol, stageKey.startsWith('Group') ? stageKey : (STAGE_LABELS[stageKey] || stageKey));
+        card.innerHTML = matchCardHTML(dm, scoreCol, stageKeyToLabel(stageKey));
 
         const saveBtn = card.querySelector('.save-pred-btn');
         if (saveBtn) {
@@ -644,8 +654,8 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     if (!anyStage) {
       container.innerHTML = `
         <div class="empty-filter-msg">
-          No knockout matches scheduled yet.<br>
-          <span style="font-size:var(--text-xs);opacity:0.7">Bracket populates after the group stage.</span>
+          No matches found.<br>
+          <span style="font-size:var(--text-xs);opacity:0.7">Try adjusting your filters.</span>
         </div>`;
     }
   }
@@ -780,7 +790,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 
   // ─── getAllMatches ────────────────────────────────────────────────────────────
   function getAllMatches() {
-    return WC_MATCHES.concat(WC_KNOCKOUT_FIXTURES);
+    return [...WC_MATCHES];
   }
 
 })();
