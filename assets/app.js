@@ -9,10 +9,11 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   // ─── State ───────────────────────────────────────────────────────────────────
   let currentUser = null;
   let authResolved = false;
-  let firstAuthFire = true;   // Firebase always fires null first on page load
+  let firstAuthFire = true;
   let userPredictions = {};
   let authMode = 'signin';
   let unsubscribeMatches = null;
+  let activePredSubtab = 'my-picks'; // tracks which predictions sub-tab is showing
 
   // ─── Theme ───────────────────────────────────────────────────────────────────
   const themeToggle = document.querySelector('[data-theme-toggle]');
@@ -48,6 +49,23 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     });
   });
 
+  // ─── Predictions Sub-Tabs ─────────────────────────────────────────────────────
+  document.querySelectorAll('.sub-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      activePredSubtab = tab.dataset.subtab;
+      document.querySelectorAll('.sub-tab').forEach(t => {
+        t.classList.toggle('active', t === tab);
+        t.setAttribute('aria-selected', t === tab ? 'true' : 'false');
+      });
+      document.querySelectorAll('.sub-tab-panel').forEach(p => {
+        const isActive = p.id === 'subtab-' + activePredSubtab;
+        p.classList.toggle('active', isActive);
+        p.hidden = !isActive;
+      });
+      renderAll();
+    });
+  });
+
   // ─── Auth Modal ──────────────────────────────────────────────────────────────
   const authModal     = document.getElementById('auth-modal');
   const authBackdrop  = document.getElementById('auth-backdrop');
@@ -67,6 +85,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   const signOutBtn    = document.getElementById('sign-out-btn');
   const predictSignin = document.getElementById('predict-signin-btn');
   const predictPrompt = document.getElementById('predictions-auth-prompt');
+  const predStandingsAuthPrompt = document.getElementById('pred-standings-auth-prompt');
 
   function openAuthModal() {
     authModal.hidden = false;
@@ -98,6 +117,11 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   if (authBackdrop)  authBackdrop.addEventListener('click', closeAuthModal);
   if (authSwitch)    authSwitch.addEventListener('click', () => setAuthMode(authMode === 'signin' ? 'signup' : 'signin'));
   if (signOutBtn)    signOutBtn.addEventListener('click', () => logOut());
+
+  // Wire sign-in button on prediction standings auth prompt
+  document.querySelectorAll('.pred-standings-signin-btn').forEach(btn => {
+    btn.addEventListener('click', () => { setAuthMode('signin'); openAuthModal(); });
+  });
 
   if (authForm) {
     authForm.addEventListener('submit', async (e) => {
@@ -142,19 +166,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   }
 
   // ─── Auth State Observer ─────────────────────────────────────────────────────
-  // Firebase always fires onAuthStateChanged twice on page load when a session
-  // exists: first with user=null (before IndexedDB token is restored), then with
-  // the real user. We skip the first null fire entirely so the sign-in prompt
-  // never flashes for an already-authenticated user.
-  //
-  // Safe because:
-  //  - If the user is truly signed out, the second fire also comes with null,
-  //    so we still render the prompt correctly on that second fire.
-  //  - If the user is signed in, the second fire comes with the real user object.
-  //  - firstAuthFire is reset to false after the first call, so subsequent
-  //    sign-in / sign-out events (which are single fires) are never skipped.
   watchAuth(async (user) => {
-    // Skip the very first null fire — it's always a false negative on page load
     if (firstAuthFire && user === null) {
       firstAuthFire = false;
       return;
@@ -249,11 +261,13 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   }
 
   // ─── Points Calculation ───────────────────────────────────────────────────────
-  function calcPoints(matches, teamName) {
+  // scoreFn(match) must return { home, away } score integers or null if no score
+  function calcPointsFromScores(matches, teamName, scoreFn) {
     let pts = 0, w = 0, d = 0, l = 0, gf = 0, ga = 0;
     matches.forEach(m => {
-      if (m.homeScore === null || m.awayScore === null) return;
-      const hs = parseInt(m.homeScore), as_ = parseInt(m.awayScore);
+      const scores = scoreFn(m);
+      if (!scores) return;
+      const hs = scores.home, as_ = scores.away;
       if (m.home.name === teamName) {
         gf += hs; ga += as_;
         if (hs > as_) { pts += 3; w++; } else if (hs === as_) { pts += 1; d++; } else { l++; }
@@ -265,7 +279,25 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     return { pts, played: w + d + l, w, d, l, gf, ga, gd: gf - ga };
   }
 
-  // ─── Broadcast Badges ─────────────────────────────────────────────────────────
+  // Legacy wrapper — uses actual match scores (for Groups / Standings views)
+  function calcPoints(matches, teamName) {
+    return calcPointsFromScores(matches, teamName, m => {
+      if (m.homeScore === null || m.homeScore === undefined ||
+          m.awayScore === null || m.awayScore === undefined) return null;
+      return { home: parseInt(m.homeScore), away: parseInt(m.awayScore) };
+    });
+  }
+
+  // Prediction-based standings — uses userPredictions scores
+  function calcPredictionPoints(matches, teamName) {
+    return calcPointsFromScores(matches, teamName, m => {
+      const pred = userPredictions[m.id];
+      if (!pred) return null;
+      return { home: pred.homeScorePred, away: pred.awayScorePred };
+    });
+  }
+
+  // ─── Broadcast Badges ────────────────────────────────────────────────────────
   function broadcastBadgesHTML(match) {
     const tv  = match.tvEnglish || [];
     const esp = match.tvSpanish || [];
@@ -446,8 +478,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   }
 
   // ─── Prediction Filters ───────────────────────────────────────────────────────
-  // Declared early (before watchAuth/renderAll) to avoid the initialization-order
-  // bug where const declarations after the auth observer were null at boot time.
   const predDateFilterEl  = document.getElementById('pred-date-filter');
   const predGroupFilterEl = document.getElementById('pred-group-filter');
   const predTeamFilterEl  = document.getElementById('pred-team-filter');
@@ -481,7 +511,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       opt.value = d; opt.textContent = label;
       predDateFilterEl.appendChild(opt);
     });
-    // Restore selection if it still exists after repopulation
     if ([...predDateFilterEl.options].some(o => o.value === currentValue)) {
       predDateFilterEl.value = currentValue;
     }
@@ -512,26 +541,19 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       });
   }
 
-  function onPredFilterChange() {
-    renderPredictions();
-  }
+  function onPredFilterChange() { renderPredictions(); }
 
   if (predDateFilterEl)  predDateFilterEl.addEventListener('change', onPredFilterChange);
   if (predGroupFilterEl) predGroupFilterEl.addEventListener('change', onPredFilterChange);
   if (predTeamFilterEl)  predTeamFilterEl.addEventListener('input',  onPredFilterChange);
 
-  // Populate date filter options on boot
   populatePredDateFilter();
 
-  // ─── Render Predictions ───────────────────────────────────────────────────────
-  // predictPrompt is only ever shown after authResolved=true AND currentUser=null.
-  // The firstAuthFire guard in watchAuth ensures we never render with the false
-  // null that Firebase emits before restoring a cached session.
+  // ─── Render Predictions (My Picks sub-tab) ────────────────────────────────────
   function renderPredictions() {
     const container = document.getElementById('predictions-list');
     if (!container) return;
 
-    // Auth not yet resolved — keep everything hidden, wait for watchAuth
     if (!authResolved) {
       if (predictPrompt)  predictPrompt.hidden = true;
       if (predFiltersBar) predFiltersBar.hidden = true;
@@ -539,7 +561,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       return;
     }
 
-    // Resolved: no user — show sign-in prompt, hide filters
     if (!currentUser) {
       if (predictPrompt)  predictPrompt.hidden = false;
       if (predFiltersBar) predFiltersBar.hidden = true;
@@ -547,7 +568,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       return;
     }
 
-    // Signed in — hide prompt, show filters, render filtered prediction cards
     if (predictPrompt)  predictPrompt.hidden = true;
     if (predFiltersBar) predFiltersBar.hidden = false;
 
@@ -636,6 +656,8 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
           );
           userPredictions[matchId] = { matchId, homeScorePred, awayScorePred };
           btn.textContent = 'Saved \u2713';
+          // Immediately refresh the Prediction Standings table
+          renderPredictionStandings();
           setTimeout(() => { btn.textContent = 'Predict'; btn.disabled = false; }, 1500);
         } catch (err) {
           console.error('[Predict] save failed', matchId, err);
@@ -648,6 +670,84 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
         }
       });
     });
+  }
+
+  // ─── Render Prediction Standings sub-tab ─────────────────────────────────────
+  function renderPredictionStandings() {
+    const container = document.getElementById('pred-standings-grid');
+    if (!container) return;
+
+    if (!authResolved || !currentUser) {
+      if (predStandingsAuthPrompt) predStandingsAuthPrompt.hidden = !authResolved || !!currentUser ? true : false;
+      container.innerHTML = '';
+      // Show auth prompt only when resolved + signed out
+      if (predStandingsAuthPrompt) {
+        predStandingsAuthPrompt.hidden = !(authResolved && !currentUser);
+      }
+      return;
+    }
+
+    if (predStandingsAuthPrompt) predStandingsAuthPrompt.hidden = true;
+    container.innerHTML = '';
+
+    // Check if the user has made any predictions at all
+    const predCount = Object.keys(userPredictions).length;
+    if (predCount === 0) {
+      container.innerHTML = `
+        <div class="empty-filter-msg" style="grid-column:1/-1">
+          No predictions yet — make your picks on the My Predictions tab to see your standings.
+        </div>`;
+      return;
+    }
+
+    WC_GROUPS.forEach(group => {
+      const groupMatches = WC_MATCHES.filter(m => m.group === group.id);
+      // Only render this group card if the user has predicted at least one match in it
+      const hasPreds = groupMatches.some(m => userPredictions[m.id]);
+      if (!hasPreds) return;
+
+      const teamsWithStats = group.teams
+        .map(t => ({ ...t, ...calcPredictionPoints(groupMatches, t.name) }))
+        .sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+
+      const card = document.createElement('div');
+      card.className = 'standings-card';
+      card.innerHTML = `
+        <div class="standings-header pred-standings-header">
+          Group ${group.id}
+          <span class="pred-standings-badge">Predicted</span>
+        </div>
+        <table class="standings-table">
+          <thead>
+            <tr>
+              <th></th><th>Team</th>
+              <th title="Played">P</th><th title="Won">W</th><th title="Drawn">D</th>
+              <th title="Lost">L</th><th title="Goals For">GF</th>
+              <th title="Goals Against">GA</th><th title="Goal Difference">GD</th>
+              <th title="Points">Pts</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${teamsWithStats.map((t, i) => `
+              <tr class="${i < 2 ? 'qualified' : ''}">
+                <td>${t.flag}</td><td>${t.name}</td>
+                <td>${t.played}</td><td>${t.w}</td><td>${t.d}</td><td>${t.l}</td>
+                <td>${t.gf}</td><td>${t.ga}</td>
+                <td>${t.gd > 0 ? '+' + t.gd : t.gd}</td>
+                <td class="pts">${t.pts}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`;
+      container.appendChild(card);
+    });
+
+    // If no groups were rendered (user has predictions but none map to a group)
+    if (container.childElementCount === 0) {
+      container.innerHTML = `
+        <div class="empty-filter-msg" style="grid-column:1/-1">
+          No group-stage predictions yet — predictions for knockout matches don't appear here.
+        </div>`;
+    }
   }
 
   // ─── Render Standings ─────────────────────────────────────────────────────────
@@ -727,10 +827,13 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   function renderAll() {
     const activeView = document.querySelector('.nav-btn.active')?.dataset.view;
     const f = getFilters();
-    if (activeView === 'groups')      renderGroups();
-    if (activeView === 'matches')     renderMatches(f.group, f.venue, f.date);
-    if (activeView === 'predictions') renderPredictions();
-    if (activeView === 'standings')   renderStandings();
+    if (activeView === 'groups')    renderGroups();
+    if (activeView === 'matches')   renderMatches(f.group, f.venue, f.date);
+    if (activeView === 'standings') renderStandings();
+    if (activeView === 'predictions') {
+      if (activePredSubtab === 'my-picks')       renderPredictions();
+      if (activePredSubtab === 'pred-standings') renderPredictionStandings();
+    }
   }
 
   // ─── Boot ─────────────────────────────────────────────────────────────────────

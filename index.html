@@ -26,7 +26,6 @@
       <h2 id="auth-title" class="auth-heading">Sign In</h2>
       <p class="auth-sub" id="auth-sub">Sign in to save your predictions.</p>
       <form id="auth-form" novalidate>
-        <!-- Name field shown only for sign-up -->
         <div class="form-group" id="auth-name" style="display:none">
           <label for="auth-name-input" id="name-label">Name</label>
           <input type="text" id="auth-name-input" placeholder="Your name" autocomplete="name">
@@ -50,7 +49,6 @@
 
   <!-- Header -->
   <header class="site-header">
-    <!-- Top row: logo + auth + theme (always visible) -->
     <div class="container header-top">
       <a href="#" class="logo" aria-label="World Cup 2026 Home">
         <svg width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -72,7 +70,6 @@
         </button>
       </div>
     </div>
-    <!-- Nav row: tabs always full-width -->
     <nav class="header-nav" aria-label="Main navigation">
       <div class="container nav-inner">
         <button class="nav-btn active" data-view="groups">Groups</button>
@@ -83,7 +80,7 @@
     </nav>
   </header>
 
-  <!-- User Bar (visible when signed in) -->
+  <!-- User Bar -->
   <div class="user-bar" id="user-bar" hidden>
     <div class="container user-bar-inner">
       <span class="user-greeting" id="user-greeting"></span>
@@ -134,34 +131,54 @@
     <section class="view" id="view-predictions">
       <div class="container">
         <div class="page-header">
-          <h1 class="page-title">Your Predictions</h1>
+          <h1 class="page-title">Predictions</h1>
           <p class="page-subtitle">Predict match scores before kickoff &mdash; sign in to save</p>
         </div>
-        <!-- Shown when signed out; starts hidden until auth state is resolved -->
-        <div id="predictions-auth-prompt" class="auth-prompt" hidden>
-          <p>Sign in to save and track your predictions across devices.</p>
-          <button class="btn btn-primary" id="predict-signin-btn">Sign In to Predict</button>
+
+        <!-- Sub-tab bar -->
+        <div class="sub-tabs" role="tablist" aria-label="Predictions sub-tabs">
+          <button class="sub-tab active" data-subtab="my-picks" role="tab" aria-selected="true" aria-controls="subtab-my-picks">My Predictions</button>
+          <button class="sub-tab" data-subtab="pred-standings" role="tab" aria-selected="false" aria-controls="subtab-pred-standings">Prediction Standings</button>
         </div>
-        <!-- Prediction filters (only visible when signed in) -->
-        <div class="matches-filter" id="pred-filters" hidden>
-          <label for="pred-date-filter">Date:</label>
-          <select id="pred-date-filter">
-            <option value="all">All Dates</option>
-          </select>
-          <label for="pred-group-filter">Group:</label>
-          <select id="pred-group-filter">
-            <option value="all">All Groups</option>
-          </select>
-          <label for="pred-team-filter">Team:</label>
-          <input
-            id="pred-team-filter"
-            type="search"
-            placeholder="Search team"
-            autocomplete="off"
-            class="filter-search-input"
-          />
+
+        <!-- My Predictions panel -->
+        <div class="sub-tab-panel active" id="subtab-my-picks" role="tabpanel">
+          <!-- Auth prompt (signed out) -->
+          <div id="predictions-auth-prompt" class="auth-prompt" hidden>
+            <p>Sign in to save and track your predictions across devices.</p>
+            <button class="btn btn-primary" id="predict-signin-btn">Sign In to Predict</button>
+          </div>
+          <!-- Filters (signed in only) -->
+          <div class="matches-filter" id="pred-filters" hidden>
+            <label for="pred-date-filter">Date:</label>
+            <select id="pred-date-filter">
+              <option value="all">All Dates</option>
+            </select>
+            <label for="pred-group-filter">Group:</label>
+            <select id="pred-group-filter">
+              <option value="all">All Groups</option>
+            </select>
+            <label for="pred-team-filter">Team:</label>
+            <input
+              id="pred-team-filter"
+              type="search"
+              placeholder="Search team"
+              autocomplete="off"
+              class="filter-search-input"
+            />
+          </div>
+          <div class="predictions-list" id="predictions-list"></div>
         </div>
-        <div class="predictions-list" id="predictions-list"></div>
+
+        <!-- Prediction Standings panel -->
+        <div class="sub-tab-panel" id="subtab-pred-standings" role="tabpanel" hidden>
+          <div id="pred-standings-auth-prompt" class="auth-prompt" hidden>
+            <p>Sign in to see your Prediction Standings.</p>
+            <button class="btn btn-primary pred-standings-signin-btn">Sign In</button>
+          </div>
+          <div class="standings-grid" id="pred-standings-grid"></div>
+        </div>
+
       </div>
     </section>
 
@@ -178,16 +195,12 @@
 
   </main>
 
-  <!-- Build footer -->
   <footer class="build-footer" id="build-footer" aria-label="Build information">
     <span id="build-badge">Loading build&hellip;</span>
   </footer>
 
-  <!-- Data (global WC_MATCHES / WC_GROUPS) must load before app module -->
   <script src="./assets/data.js"></script>
-  <!-- Firebase + App as ES modules -->
   <script type="module" src="./assets/app.js"></script>
-  <!-- Build footer version script -->
   <script src="./assets/version.js" defer></script>
 
 </body>
