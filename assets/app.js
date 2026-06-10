@@ -236,27 +236,18 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   }
 
   // ─── Shared Filter Utilities ─────────────────────────────────────────────────
-
-  /**
-   * Returns a sorted, de-duped list of date strings (YYYY-MM-DD) from a match array.
-   */
   function getUniqueDates(matches) {
     const seen = new Set();
     matches.forEach(m => { if (m.date) seen.add(m.date); });
     return [...seen].sort();
   }
 
-  /**
-   * Returns a sorted list of group/stage labels from a match array.
-   * Group matches use "Group A" etc.; knockout matches use their stage label.
-   */
   function getUniqueStages(matches) {
     const seen = new Set();
     matches.forEach(m => {
       if (m.group) seen.add('Group ' + m.group);
       else if (m.stage) seen.add(m.stage);
     });
-    // Sort: groups first (alphabetical), then knockout stages in bracket order
     const stageOrder = Object.values(STAGE_LABELS);
     return [...seen].sort((a, b) => {
       const aIsGroup = a.startsWith('Group');
@@ -268,10 +259,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     });
   }
 
-  /**
-   * Populates a <select> element with date options derived from matches.
-   * Preserves the current selection if still valid.
-   */
   function populateDateSelect(selectEl, matches) {
     if (!selectEl) return;
     const prev = selectEl.value;
@@ -285,10 +272,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     if ([...selectEl.options].some(o => o.value === prev)) selectEl.value = prev;
   }
 
-  /**
-   * Populates a <select> element with stage/group options derived from matches.
-   * Preserves the current selection if still valid.
-   */
   function populateStageSelect(selectEl, matches, allLabel = 'All Matches') {
     if (!selectEl) return;
     const prev = selectEl.value;
@@ -302,10 +285,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     if ([...selectEl.options].some(o => o.value === prev)) selectEl.value = prev;
   }
 
-  /**
-   * Populates a <select> element with venue options derived from matches.
-   * Preserves the current selection if still valid.
-   */
   function populateVenueSelect(selectEl, matches) {
     if (!selectEl) return;
     const prev = selectEl.value;
@@ -321,20 +300,11 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     if ([...selectEl.options].some(o => o.value === prev)) selectEl.value = prev;
   }
 
-  /**
-   * Filters a match array by date, stage/group, and team search string.
-   * @param {Array}  matches  - source match array
-   * @param {string} date     - YYYY-MM-DD or "all"
-   * @param {string} stage    - stage/group label or "all"
-   * @param {string} team     - partial team name search (case-insensitive) or ""
-   */
   function applyMatchFilters(matches, date, stage, team) {
     return matches.filter(m => {
       if (date !== 'all' && m.date !== date) return false;
       if (stage !== 'all') {
-        const matchStageLabel = m.group
-          ? 'Group ' + m.group
-          : (m.stage || '');
+        const matchStageLabel = m.group ? 'Group ' + m.group : (m.stage || '');
         if (matchStageLabel !== stage) return false;
       }
       if (team) {
@@ -408,16 +378,9 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     };
   }
 
-  /**
-   * For knockout fixtures whose team is a qualifier placeholder
-   * (e.g. { name: "1st Group A", flag: "?" }), try to resolve it
-   * from the computed predicted standings.
-   */
   function resolveKnockoutTeam(teamRef) {
     if (!teamRef || teamRef.flag !== '?') return teamRef;
     const name = teamRef.name || '';
-
-    // Pattern: "1st Group A", "2nd Group B", "3rd Group C" etc.
     const posMatch = name.match(/^(\d+)(?:st|nd|rd|th) Group ([A-L])$/i);
     if (posMatch) {
       const pos   = parseInt(posMatch[1], 10) - 1;
@@ -453,44 +416,81 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     return { pts, gf, ga, gd: gf - ga, w, d, l };
   }
 
-  // ─── Match Card HTML helper ───────────────────────────────────────────────────
+  // ─── Match Card HTML — aligned with style.css class names ────────────────────
   function matchCardHTML(dm, scoreColContent, groupOrStage) {
-    const dateStr  = dm.date      ? formatDate(dm.date) : '';
-    const timeStr  = dm.timeLocal ? dm.timeLocal + (dm.tz ? ' ' + dm.tz : '') : '';
-    const venue    = dm.venue     ? dm.venue : '';
-    const label    = groupOrStage ? groupOrStage : '';
-    const status   = (dm.status || '').toLowerCase();
-    const isLive   = status === 'live' || status === 'ht';
-    const statusBadge = isLive
-      ? `<span class="live-badge">LIVE${dm.minute ? ' ' + dm.minute + "'" : ''}</span>`
-      : '';
+    const dateStr = dm.date      ? formatDate(dm.date) : '';
+    const timeStr = dm.timeLocal ? dm.timeLocal + (dm.tz ? ' ' + dm.tz : '') : '';
+    const venue   = dm.venue     || '';
+    const label   = groupOrStage || '';
+    const status  = (dm.status || '').toLowerCase();
+    const isLive  = status === 'live' || status === 'ht';
+
+    const metaParts = [dateStr, timeStr, venue].filter(Boolean);
+
     return `
       <div class="card-header">
-        <span class="match-meta">${label}${dateStr ? ' · ' + dateStr : ''}${timeStr ? ' · ' + timeStr : ''}${venue ? ' · ' + venue : ''}</span>
-        ${statusBadge}
+        <span class="card-header-group">${label}</span>
+        <div class="card-header-matchup">
+          <span class="card-header-home">${dm.home.flag} ${dm.home.name}</span>
+          <span class="card-header-vs">vs</span>
+          <span class="card-header-away">${dm.away.name} ${dm.away.flag}</span>
+        </div>
+        ${isLive ? `<span class="status-badge status-live"><span class="live-dot"></span>LIVE${dm.minute ? ' ' + dm.minute + "'" : ''}</span>` : ''}
       </div>
-      <div class="card-body">
-        <div class="team home-team">
+      <div class="card-teams">
+        <div class="card-team home-team">
           <span class="team-flag">${dm.home.flag}</span>
           <span class="team-name">${dm.home.name}</span>
         </div>
-        <div class="score-col">
+        <div class="card-score-col">
           ${scoreColContent}
         </div>
-        <div class="team away-team">
+        <div class="card-team away-team">
           <span class="team-name">${dm.away.name}</span>
           <span class="team-flag">${dm.away.flag}</span>
         </div>
-      </div>`;
+      </div>
+      ${metaParts.length ? `
+      <div class="card-meta">
+        ${dateStr  ? `<span class="card-meta-item">${dateStr}</span>` : ''}
+        ${timeStr  ? `<span class="card-meta-item">${timeStr}</span>` : ''}
+        ${venue    ? `<span class="card-meta-item">${venue}</span>`   : ''}
+      </div>` : ''}`;
   }
 
   // ─── Render All ──────────────────────────────────────────────────────────────
   function renderAll() {
+    renderGroups();
     renderMatches();
-    if (activePredSubtab === 'my-picks')     renderPredictions();
-    if (activePredSubtab === 'pred-bracket') renderKnockoutBracket();
+    if (activePredSubtab === 'my-picks')       renderPredictions();
+    if (activePredSubtab === 'pred-bracket')   renderKnockoutBracket();
     if (activePredSubtab === 'pred-standings') renderPredStandings();
     renderStandings();
+  }
+
+  // ─── Render Groups ────────────────────────────────────────────────────────────
+  function renderGroups() {
+    const container = document.getElementById('groups-grid');
+    if (!container) return;
+    container.innerHTML = '';
+    WC_GROUPS.forEach(group => {
+      const card = document.createElement('div');
+      card.className = 'group-card';
+      card.innerHTML = `
+        <div class="group-card-header">
+          <span class="group-name">Group ${group.id}</span>
+          <span class="group-count">${group.teams.length} teams</span>
+        </div>
+        <div class="group-teams">
+          ${group.teams.map(t => `
+            <div class="group-team-row">
+              <span class="team-flag">${t.flag}</span>
+              <span class="team-name">${t.name}</span>
+              <span class="team-pts">${t.pts !== undefined ? t.pts : 0} pts</span>
+            </div>`).join('')}
+        </div>`;
+      container.appendChild(card);
+    });
   }
 
   // ─── Render Matches ───────────────────────────────────────────────────────────
@@ -498,10 +498,10 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     const container = document.getElementById('matches-list');
     if (!container) return;
 
-    const dateVal  = matchDateFilter  ? matchDateFilter.value  : 'all';
-    const groupVal = matchGroupFilter ? matchGroupFilter.value : 'all';
-    const venueVal = matchVenueFilter ? matchVenueFilter.value : 'all';
-    const teamVal  = matchTeamFilter  ? matchTeamFilter.value.trim()  : '';
+    const dateVal  = matchDateFilter  ? matchDateFilter.value        : 'all';
+    const groupVal = matchGroupFilter ? matchGroupFilter.value       : 'all';
+    const venueVal = matchVenueFilter ? matchVenueFilter.value       : 'all';
+    const teamVal  = matchTeamFilter  ? matchTeamFilter.value.trim() : '';
 
     let filtered = applyMatchFilters(WC_MATCHES, dateVal, groupVal, teamVal);
     if (venueVal !== 'all') filtered = filtered.filter(m => m.venue === venueVal);
@@ -518,7 +518,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     filtered.forEach(match => {
       const dm     = buildDisplayMatch(match);
       const status = (match.status || 'scheduled').toLowerCase();
-      const isLive = status === 'live' || status === 'ht';
+      const isLive     = status === 'live' || status === 'ht';
       const isFinished = status === 'finished';
 
       let scoreColContent;
@@ -535,21 +535,19 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
               data-match-id="${match.id}" data-side="away" value="${av}" placeholder="-"
               aria-label="${dm.away.name} score">
           </div>
-          <div class="admin-controls">
-            <select class="status-select admin-status" data-match-id="${match.id}" aria-label="Match status">
-              <option value="scheduled" ${status === 'scheduled' ? 'selected' : ''}>Scheduled</option>
-              <option value="live"      ${status === 'live'      ? 'selected' : ''}>Live</option>
-              <option value="ht"        ${status === 'ht'        ? 'selected' : ''}>Half Time</option>
-              <option value="finished"  ${status === 'finished'  ? 'selected' : ''}>Finished</option>
-            </select>
-            <button class="btn btn-sm btn-primary save-score-btn" data-match-id="${match.id}">Save</button>
-          </div>`;
+          <select class="score-input admin-status" data-match-id="${match.id}" aria-label="Match status" style="width:auto;height:auto;font-size:var(--text-xs);margin-top:var(--space-1)">
+            <option value="scheduled" ${status === 'scheduled' ? 'selected' : ''}>Scheduled</option>
+            <option value="live"      ${status === 'live'      ? 'selected' : ''}>Live</option>
+            <option value="ht"        ${status === 'ht'        ? 'selected' : ''}>Half Time</option>
+            <option value="finished"  ${status === 'finished'  ? 'selected' : ''}>Finished</option>
+          </select>
+          <button class="btn-save save-score-btn" data-match-id="${match.id}" style="margin-top:var(--space-1)">Save</button>`;
       } else if (isFinished || isLive) {
-        const hs = (match.homeScore !== undefined && match.homeScore !== null) ? match.homeScore : '?';
+        const hs  = (match.homeScore !== undefined && match.homeScore !== null) ? match.homeScore : '?';
         const as_ = (match.awayScore !== undefined && match.awayScore !== null) ? match.awayScore : '?';
-        scoreColContent = `<div class="score-display">${hs} <span class="score-sep">:</span> ${as_}</div>`;
+        scoreColContent = `<div class="score-final${isLive ? ' score-live' : ''}">${hs}<span class="score-sep"> : </span>${as_}</div>`;
       } else {
-        scoreColContent = `<div class="score-display muted">vs</div>`;
+        scoreColContent = `<div class="score-final score-pending">vs</div>`;
       }
 
       const groupLabel = match.group ? 'Group ' + match.group : (match.stage || '');
@@ -588,7 +586,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 
   // ─── Render Predictions ───────────────────────────────────────────────────────
   function renderPredictions() {
-    const container  = document.getElementById('predictions-list');
+    const container   = document.getElementById('predictions-list');
     const predFilters = document.getElementById('pred-filters');
     if (!container) return;
 
@@ -601,8 +599,8 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     if (predictPrompt) predictPrompt.hidden = true;
     if (predFilters)   predFilters.hidden   = false;
 
-    const dateVal  = predDateFilter  ? predDateFilter.value  : 'all';
-    const groupVal = predGroupFilter ? predGroupFilter.value : 'all';
+    const dateVal  = predDateFilter  ? predDateFilter.value        : 'all';
+    const groupVal = predGroupFilter ? predGroupFilter.value       : 'all';
     const teamVal  = predTeamFilter  ? predTeamFilter.value.trim() : '';
 
     const filtered = applyMatchFilters(getAllMatches(), dateVal, groupVal, teamVal);
@@ -616,10 +614,10 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 
     filtered.forEach(match => {
       const dm = buildDisplayMatch(match);
-      const status = (match.status || 'scheduled').toLowerCase();
+      const status     = (match.status || 'scheduled').toLowerCase();
       const isLive     = status === 'live' || status === 'ht';
       const isFinished = status === 'finished';
-      const pred   = userPredictions[match.id];
+      const pred    = userPredictions[match.id];
       const hasPred = pred && pred.homeScorePred !== undefined && pred.awayScorePred !== undefined;
 
       const scoreColHTML = `
@@ -633,9 +631,8 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
             ${isFinished ? 'disabled title="Match has finished"' : ''}>
         </div>
         ${isFinished
-          ? '<div class="pred-result-badge ' + (hasPred ? 'pred-saved' : 'pred-missed') + '">' +
-            (hasPred ? '&#x2713; Picked' : '&#x2715; No pick') + '</div>'
-          : '<button class="btn btn-sm btn-ghost save-pred-btn" data-match-id="' + match.id + '">Save</button>'
+          ? `<div class="card-result-badge ${hasPred ? 'pred-saved' : 'pred-missed'}">${hasPred ? '&#x2713; Picked' : '&#x2715; No pick'}</div>`
+          : `<button class="btn-save pred-btn save-pred-btn" data-match-id="${match.id}">Save</button>`
         }`;
 
       const groupLabel = match.group ? 'Group ' + match.group : (match.stage || '');
@@ -706,10 +703,10 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 
       stageMatches.forEach(match => {
         const dm = buildDisplayMatch(match);
-        const status = (match.status || 'scheduled').toLowerCase();
+        const status     = (match.status || 'scheduled').toLowerCase();
         const isLive     = status === 'live' || status === 'ht';
         const isFinished = status === 'finished';
-        const pred = userPredictions[match.id];
+        const pred    = userPredictions[match.id];
         const hasPred = pred && pred.homeScorePred !== undefined && pred.awayScorePred !== undefined;
 
         const scoreColHTML = `
@@ -723,9 +720,8 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
               ${isFinished ? 'disabled title="Match has finished"' : ''}>
           </div>
           ${isFinished
-            ? '<div class="pred-result-badge ' + (hasPred ? 'pred-saved' : 'pred-missed') + '">' +
-              (hasPred ? '&#x2713; Picked' : '&#x2715; No pick') + '</div>'
-            : '<button class="btn btn-sm btn-ghost save-pred-btn" data-match-id="' + match.id + '">Save</button>'
+            ? `<div class="card-result-badge ${hasPred ? 'pred-saved' : 'pred-missed'}">${hasPred ? '&#x2713; Picked' : '&#x2715; No pick'}</div>`
+            : `<button class="btn-save pred-btn save-pred-btn" data-match-id="${match.id}">Save</button>`
           }`;
 
         const card = document.createElement('div');
@@ -786,35 +782,26 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       })).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
 
       const card = document.createElement('div');
-      card.className = 'group-card';
+      card.className = 'standings-card';
       card.innerHTML = `
-        <div class="group-card-header">Group ${group.id}</div>
+        <div class="standings-header">Group ${group.id}</div>
         <table class="standings-table">
           <thead>
             <tr>
-              <th class="col-team">Team</th>
-              <th class="col-num">P</th>
-              <th class="col-num">W</th>
-              <th class="col-num">D</th>
-              <th class="col-num">L</th>
-              <th class="col-num">GF</th>
-              <th class="col-num">GA</th>
-              <th class="col-num">GD</th>
-              <th class="col-num">Pts</th>
+              <th>Team</th>
+              <th>P</th><th>W</th><th>D</th><th>L</th>
+              <th>GF</th><th>GA</th><th>GD</th><th>Pts</th>
             </tr>
           </thead>
           <tbody>
             ${teams.map((t, i) => `
-              <tr class="${i < 2 ? 'qualify-direct' : i === 2 ? 'qualify-third' : ''}">
-                <td class="col-team"><span class="team-flag">${t.flag}</span>${t.name}</td>
-                <td class="col-num">${t.w + t.d + t.l}</td>
-                <td class="col-num">${t.w}</td>
-                <td class="col-num">${t.d}</td>
-                <td class="col-num">${t.l}</td>
-                <td class="col-num">${t.gf}</td>
-                <td class="col-num">${t.ga}</td>
-                <td class="col-num">${t.gd >= 0 ? '+' + t.gd : t.gd}</td>
-                <td class="col-num pts-col">${t.pts}</td>
+              <tr class="${i < 2 ? 'qualified' : ''}">
+                <td><span class="team-flag">${t.flag}</span> ${t.name}</td>
+                <td>${t.w + t.d + t.l}</td>
+                <td>${t.w}</td><td>${t.d}</td><td>${t.l}</td>
+                <td>${t.gf}</td><td>${t.ga}</td>
+                <td>${t.gd >= 0 ? '+' + t.gd : t.gd}</td>
+                <td class="pts">${t.pts}</td>
               </tr>`).join('')}
           </tbody>
         </table>`;
@@ -844,13 +831,10 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       if (match.homeScore === undefined || match.homeScore === null ||
           match.awayScore === undefined || match.awayScore === null) return;
       total++;
-      const predResult = pred.homeScorePred > pred.awayScorePred ? 'H'
-        : pred.homeScorePred < pred.awayScorePred ? 'A' : 'D';
-      const actualResult = match.homeScore > match.awayScore ? 'H'
-        : match.homeScore < match.awayScore ? 'A' : 'D';
+      const predResult   = pred.homeScorePred > pred.awayScorePred ? 'H' : pred.homeScorePred < pred.awayScorePred ? 'A' : 'D';
+      const actualResult = match.homeScore > match.awayScore ? 'H' : match.homeScore < match.awayScore ? 'A' : 'D';
       if (pred.homeScorePred === match.homeScore && pred.awayScorePred === match.awayScore) {
-        correctExact++;
-        correctResult++;
+        correctExact++; correctResult++;
       } else if (predResult === actualResult) {
         correctResult++;
       }

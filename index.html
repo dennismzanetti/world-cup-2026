@@ -110,20 +110,22 @@
           <p class="page-subtitle">Dates, venues, TV &amp; streaming info &mdash; enter results as they happen</p>
         </div>
         <div class="matches-filter">
-          <label for="date-filter">Date:</label>
-          <select id="date-filter">
+          <label for="match-date-filter">Date:</label>
+          <select id="match-date-filter">
             <option value="all">All Dates</option>
           </select>
-          <label for="group-filter">Stage:</label>
-          <select id="group-filter">
+          <label for="match-group-filter">Stage:</label>
+          <select id="match-group-filter">
             <option value="all">All Matches</option>
           </select>
-          <label for="venue-filter">Venue:</label>
-          <select id="venue-filter">
+          <label for="match-venue-filter">Venue:</label>
+          <select id="match-venue-filter">
             <option value="all">All Venues</option>
           </select>
+          <label for="match-team-filter" class="sr-only">Team:</label>
+          <input id="match-team-filter" type="search" placeholder="Search team&hellip;" autocomplete="off" class="filter-search-input">
         </div>
-        <div class="matches-list" id="matches-list"></div>
+        <div id="matches-list"></div>
       </div>
     </section>
 
@@ -144,12 +146,10 @@
 
         <!-- My Predictions panel -->
         <div class="sub-tab-panel active" id="subtab-my-picks" role="tabpanel">
-          <!-- Auth prompt (signed out) -->
           <div id="predictions-auth-prompt" class="auth-prompt" hidden>
             <p>Sign in to save and track your predictions across devices.</p>
             <button class="btn btn-primary" id="predict-signin-btn">Sign In to Predict</button>
           </div>
-          <!-- Filters (signed in only) -->
           <div class="matches-filter" id="pred-filters" hidden>
             <label for="pred-date-filter">Date:</label>
             <select id="pred-date-filter">
@@ -160,15 +160,9 @@
               <option value="all">All Matches</option>
             </select>
             <label for="pred-team-filter">Team:</label>
-            <input
-              id="pred-team-filter"
-              type="search"
-              placeholder="Search team"
-              autocomplete="off"
-              class="filter-search-input"
-            />
+            <input id="pred-team-filter" type="search" placeholder="Search team&hellip;" autocomplete="off" class="filter-search-input">
           </div>
-          <div class="predictions-list" id="predictions-list"></div>
+          <div id="predictions-list"></div>
         </div>
 
         <!-- Prediction Standings panel -->
@@ -177,7 +171,7 @@
             <p>Sign in to see your Prediction Standings.</p>
             <button class="btn btn-primary pred-standings-signin-btn">Sign In</button>
           </div>
-          <div class="standings-grid" id="pred-standings-grid"></div>
+          <div id="pred-standings-container"></div>
         </div>
 
         <!-- Knockout Bracket panel -->
