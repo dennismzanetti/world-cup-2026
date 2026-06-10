@@ -200,14 +200,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     }
 
     if (!firstAuthFire) {
-      const local = WC_MATCHES.find(
-        m => m.homeScore !== undefined && m.homeScore !== null
-      );
-      if (local) {
-        renderAll();
-      } else {
-        renderAll();
-      }
+      renderAll();
     }
     firstAuthFire = false;
   });
@@ -341,6 +334,35 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     return { pts, gf, ga, gd: gf - ga, w, d, l };
   }
 
+  // ─── Shared helper: build a standings card (used by Groups & Standings tabs) ──
+  function buildStandingsCard(groupId, teams) {
+    const card = document.createElement('div');
+    card.className = 'standings-card';
+    card.innerHTML = `
+      <div class="standings-header">Group ${groupId}</div>
+      <table class="standings-table">
+        <thead>
+          <tr>
+            <th>Team</th>
+            <th>P</th><th>W</th><th>D</th><th>L</th>
+            <th>GF</th><th>GA</th><th>GD</th><th>Pts</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${teams.map((t, i) => `
+            <tr class="${i < 2 ? 'qualified' : ''}">
+              <td><span class="team-flag">${t.flag}</span> ${t.name}</td>
+              <td>${t.w + t.d + t.l}</td>
+              <td>${t.w}</td><td>${t.d}</td><td>${t.l}</td>
+              <td>${t.gf}</td><td>${t.ga}</td>
+              <td>${t.gd >= 0 ? '+' + t.gd : t.gd}</td>
+              <td class="pts">${t.pts}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+    return card;
+  }
+
   // ─── Match Card HTML — aligned with style.css class names ────────────────────
   function matchCardHTML(dm, scoreColContent, groupOrStage) {
     const dateStr = dm.date      ? formatDate(dm.date) : '';
@@ -393,42 +415,20 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   }
 
   // ─── Render Groups ────────────────────────────────────────────────────────────
+  // Uses shared buildStandingsCard() so Groups tab looks identical to Standings tab.
   function renderGroups() {
     const container = document.getElementById('groups-grid');
     if (!container) return;
     container.innerHTML = '';
+    // Reuse .standings-grid class for identical layout
+    container.className = 'standings-grid';
     WC_GROUPS.forEach(group => {
       const groupMatches = WC_MATCHES.filter(m => m.group === group.id);
       const teams = group.teams.map(t => ({
         ...t,
         ...calcActualPoints(groupMatches, t.name)
       })).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
-
-      const card = document.createElement('div');
-      card.className = 'group-card';
-      card.innerHTML = `
-        <div class="group-header">Group ${group.id}</div>
-        <table class="group-table">
-          <thead>
-            <tr>
-              <th>Team</th>
-              <th>P</th><th>W</th><th>D</th><th>L</th>
-              <th>GF</th><th>GA</th><th>GD</th><th>Pts</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${teams.map((t, i) => `
-              <tr class="${i < 2 ? 'qualified' : ''}">
-                <td><span class="team-flag">${t.flag}</span> ${t.name}</td>
-                <td>${t.w + t.d + t.l}</td>
-                <td>${t.w}</td><td>${t.d}</td><td>${t.l}</td>
-                <td>${t.gf}</td><td>${t.ga}</td>
-                <td>${t.gd >= 0 ? '+' + t.gd : t.gd}</td>
-                <td class="pts">${t.pts}</td>
-              </tr>`).join('')}
-          </tbody>
-        </table>`;
-      container.appendChild(card);
+      container.appendChild(buildStandingsCard(group.id, teams));
     });
   }
 
@@ -669,32 +669,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
         ...t,
         ...calcActualPoints(groupMatches, t.name)
       })).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
-
-      const card = document.createElement('div');
-      card.className = 'standings-card';
-      card.innerHTML = `
-        <div class="standings-header">Group ${group.id}</div>
-        <table class="standings-table">
-          <thead>
-            <tr>
-              <th>Team</th>
-              <th>P</th><th>W</th><th>D</th><th>L</th>
-              <th>GF</th><th>GA</th><th>GD</th><th>Pts</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${teams.map((t, i) => `
-              <tr class="${i < 2 ? 'qualified' : ''}">
-                <td><span class="team-flag">${t.flag}</span> ${t.name}</td>
-                <td>${t.w + t.d + t.l}</td>
-                <td>${t.w}</td><td>${t.d}</td><td>${t.l}</td>
-                <td>${t.gf}</td><td>${t.ga}</td>
-                <td>${t.gd >= 0 ? '+' + t.gd : t.gd}</td>
-                <td class="pts">${t.pts}</td>
-              </tr>`).join('')}
-          </tbody>
-        </table>`;
-      container.appendChild(card);
+      container.appendChild(buildStandingsCard(group.id, teams));
     });
   }
 
@@ -793,32 +768,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
         ...t,
         ...calcPredPoints(groupMatches, t.name)
       })).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
-
-      const card = document.createElement('div');
-      card.className = 'standings-card';
-      card.innerHTML = `
-        <div class="standings-header">Group ${group.id}</div>
-        <table class="standings-table">
-          <thead>
-            <tr>
-              <th>Team</th>
-              <th>P</th><th>W</th><th>D</th><th>L</th>
-              <th>GF</th><th>GA</th><th>GD</th><th>Pts</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${teams.map((t, i) => `
-              <tr class="${i < 2 ? 'qualified' : ''}">
-                <td><span class="team-flag">${t.flag}</span> ${t.name}</td>
-                <td>${t.w + t.d + t.l}</td>
-                <td>${t.w}</td><td>${t.d}</td><td>${t.l}</td>
-                <td>${t.gf}</td><td>${t.ga}</td>
-                <td>${t.gd >= 0 ? '+' + t.gd : t.gd}</td>
-                <td class="pts">${t.pts}</td>
-              </tr>`).join('')}
-          </tbody>
-        </table>`;
-      grid.appendChild(card);
+      grid.appendChild(buildStandingsCard(group.id, teams));
     });
 
     container.appendChild(grid);
