@@ -40,9 +40,16 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
       btn.classList.toggle('active', active);
       btn.setAttribute('aria-selected', String(active));
     });
+    // Toggle both the `active` class (used by CSS for display) AND
+    // the `hidden` attribute so they stay in sync.
     document.querySelectorAll('.sub-tab-panel').forEach(panel => {
       const active = panel.id === `subtab-${id}`;
-      active ? panel.removeAttribute('hidden') : panel.setAttribute('hidden', '');
+      panel.classList.toggle('active', active);
+      if (active) {
+        panel.removeAttribute('hidden');
+      } else {
+        panel.setAttribute('hidden', '');
+      }
     });
     const predFilters = document.getElementById('pred-filters');
     if (predFilters) predFilters.hidden = (id !== 'my-picks');
