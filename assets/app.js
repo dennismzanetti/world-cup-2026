@@ -22,6 +22,16 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     'REPLACE_WITH_YOUR_FIREBASE_UID',
   ];
 
+  // ─── stageKeyToLabel: converts raw group/stage key to display label ──────────
+  // Defined first so it is available to populateStageSelect at init time.
+  // Group IDs are single/double uppercase letters (A–L); knockout stages are
+  // already human-readable strings like 'Round of 32'.
+  function stageKeyToLabel(key) {
+    if (!key) return '';
+    if (/^[A-Za-z]{1,2}$/.test(key)) return 'Group ' + key.toUpperCase();
+    return key;
+  }
+
   // ─── State ───────────────────────────────────────────────────────────────────
   let currentUser = null;
   let authResolved = false;
@@ -237,7 +247,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     stages.forEach(s => {
       const opt = document.createElement('option');
       opt.value = s;
-      opt.textContent = s.length <= 2 ? 'Group ' + s : s;
+      opt.textContent = stageKeyToLabel(s);
       sel.appendChild(opt);
     });
   }
@@ -301,16 +311,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     if (!iso) return '';
     const [y, m, d] = iso.split('-').map(Number);
     return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  }
-
-  // ─── stageKeyToLabel: converts raw group/stage key to display label ──────────────
-  // Group IDs are single/double letters (A–L); knockout stages are full strings.
-  function stageKeyToLabel(key) {
-    if (!key) return '';
-    // Single or double uppercase letter = group ID
-    if (/^[A-Z]{1,2}$/.test(key)) return 'Group ' + key;
-    // Already a human-readable knockout stage string (e.g. 'Round of 32')
-    return key;
   }
 
   // ─── Resolve TBD teams from group standings ───────────────────────────────────
