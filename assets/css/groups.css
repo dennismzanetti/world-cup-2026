@@ -1,11 +1,14 @@
 /* ============================================================
    GROUPS TAB
    Group cards grid shown on the Groups view.
+   app.js renderGroups() emits: .group-card, .group-header,
+   .group-table, and shares .team-flag / .qualified / .pts
+   with standings.css.
    ============================================================ */
 
 .groups-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(480px, 100%), 1fr));
   gap: var(--space-5);
 }
 
@@ -17,30 +20,46 @@
   overflow: hidden;
 }
 
-.group-card-header {
+/* Header bar — matches .standings-header style */
+.group-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: var(--space-3) var(--space-4);
   background: var(--color-accent); color: #fff;
-}
-
-.group-name {
   font-family: var(--font-display);
-  font-size: var(--text-lg);
-  letter-spacing: 0.05em;
+  font-size: var(--text-lg); letter-spacing: 0.05em;
 }
 
-.group-count { font-size: var(--text-xs); opacity: 0.75; }
+/* Table — reuses same rules as .standings-table */
+.group-table { width: 100%; border-collapse: collapse; }
 
-.group-teams { padding: var(--space-2) 0; }
-
-.group-team-row {
-  display: flex; align-items: center; gap: var(--space-3);
-  padding: var(--space-2) var(--space-4);
+.group-table th,
+.group-table td {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm); text-align: left;
   border-bottom: 1px solid var(--color-divider);
-  font-size: var(--text-sm);
 }
-.group-team-row:last-child { border-bottom: none; }
 
-.team-flag  { font-size: 1.25rem; width: 1.75rem; text-align: center; }
-.team-name  { flex: 1; font-weight: 500; }
-.team-pts   { font-weight: 700; color: var(--color-primary); font-size: var(--text-sm); min-width: 2rem; text-align: right; }
+.group-table th {
+  background: var(--color-surface-2);
+  font-weight: 600; color: var(--color-text-muted);
+  font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.06em;
+}
+
+.group-table td:not(:first-child):not(:nth-child(2)) { text-align: center; font-variant-numeric: tabular-nums; }
+.group-table th:not(:first-child):not(:nth-child(2)) { text-align: center; }
+
+.group-table tr.qualified td { color: var(--color-text); }
+.group-table tr.qualified td:first-child::before {
+  content: '';
+  display: inline-block; width: 6px; height: 6px;
+  border-radius: 50%; background: var(--color-success);
+  margin-right: var(--space-1); vertical-align: middle;
+}
+.group-table td.pts { font-weight: 700; color: var(--color-primary); }
+.group-table tr:last-child td { border-bottom: none; }
+
+/* ---- Responsive ---- */
+@media (max-width: 600px) {
+  .group-table th,
+  .group-table td { padding: var(--space-1) var(--space-2); }
+}
