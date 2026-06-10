@@ -473,11 +473,16 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   };
   const KNOCKOUT_STAGES = ['R32', 'R16', 'QF', 'SF', '3P', 'F'];
 
-  /** Populate a <select> with date options derived from WC_MATCHES.
+  /** Returns all matches: group stage + knockout fixtures combined. */
+  function getAllMatches() {
+    return WC_MATCHES.concat(WC_KNOCKOUT_FIXTURES);
+  }
+
+  /** Populate a <select> with date options derived from all matches (group + knockout).
    *  Skips population if the element already has more than 1 option. */
   function populateDateSelect(el) {
     if (!el || el.options.length > 1) return;
-    const allDates = [...new Set(WC_MATCHES.map(m => m.date).filter(Boolean))].sort();
+    const allDates = [...new Set(getAllMatches().map(m => m.date).filter(Boolean))].sort();
     allDates.forEach(d => {
       const opt = document.createElement('option');
       opt.value = d;
@@ -506,10 +511,10 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     });
   }
 
-  /** Populate a <select> with venue options derived from WC_MATCHES. */
+  /** Populate a <select> with venue options derived from all matches (group + knockout). */
   function populateVenueSelect(el) {
     if (!el || el.options.length > 1) return;
-    const allVenues = [...new Set(WC_MATCHES.map(m => m.venue).filter(Boolean))].sort();
+    const allVenues = [...new Set(getAllMatches().map(m => m.venue).filter(Boolean))].sort();
     allVenues.forEach(v => {
       const opt = document.createElement('option');
       opt.value = v; opt.textContent = v;
@@ -639,7 +644,8 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     if (authPrompt)  authPrompt.hidden  = true;
 
     const { date, group, team } = getPredFilters();
-    let filtered = applyMatchFilters(WC_MATCHES, { group, date });
+    // Use getAllMatches() so knockout rounds are included in the filtered list
+    let filtered = applyMatchFilters(getAllMatches(), { group, date });
 
     // Apply display-match resolution (team name substitution) before team text filter
     // so filtering by e.g. "Mexico" also matches resolved knockout slots.
@@ -682,7 +688,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
             ${isFinished ? 'disabled title="Match has finished"' : ''}>
         </div>
         ${isFinished
-          ? `<div class="pred-result-badge ${hasPred ? 'pred-saved' : 'pred-missed'}">` +
+          ? `<div class="pred-result-badge ${hasPred ? 'pred-saved' : 'pred-missed'}>` +
             `${hasPred ? '&#x2713; Picked' : '&#x2715; No pick'}</div>`
           : `<button class="btn btn-sm btn-ghost save-pred-btn" data-match-id="${match.id}">Save</button>`
         }`;
@@ -800,7 +806,8 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 
     container.innerHTML = '';
     stages.forEach(({ key, label }) => {
-      const stageMatches = WC_MATCHES.filter(m => m.stage === key);
+      // Source from WC_KNOCKOUT_FIXTURES using the full stage label string
+      const stageMatches = WC_KNOCKOUT_FIXTURES.filter(m => m.stage === STAGE_LABELS[key]);
       if (!stageMatches.length) return;
 
       const section = document.createElement('div');
