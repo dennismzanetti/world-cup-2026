@@ -144,6 +144,7 @@
         <!-- Sub-tab bar -->
         <div class="sub-tabs" role="tablist" aria-label="Predictions sub-tabs">
           <button class="sub-tab active" data-subtab="my-picks" role="tab" aria-selected="true" aria-controls="subtab-my-picks">My Predictions</button>
+          <button class="sub-tab" data-subtab="pred-group-standings" role="tab" aria-selected="false" aria-controls="subtab-pred-group-standings">Group Standings</button>
           <button class="sub-tab" data-subtab="pred-standings" role="tab" aria-selected="false" aria-controls="subtab-pred-standings">Prediction Accuracy</button>
           <button class="sub-tab" data-subtab="pred-bracket" role="tab" aria-selected="false" aria-controls="subtab-pred-bracket">Knockout Bracket</button>
         </div>
@@ -167,6 +168,15 @@
             <input id="pred-team-filter" type="search" placeholder="Search team&hellip;" autocomplete="off" class="filter-search-input">
           </div>
           <div id="predictions-list"></div>
+        </div>
+
+        <!-- Group Standings panel -->
+        <div class="sub-tab-panel" id="subtab-pred-group-standings" role="tabpanel" hidden>
+          <div id="pred-group-standings-auth-prompt" class="auth-prompt" hidden>
+            <p>Sign in to see your predicted group standings.</p>
+            <button class="btn btn-primary pred-standings-signin-btn">Sign In</button>
+          </div>
+          <div id="pred-group-standings-container"></div>
         </div>
 
         <!-- Prediction Accuracy panel -->
