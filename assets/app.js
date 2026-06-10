@@ -1,1 +1,653 @@
-Ly8gV29ybGQgQ3VwIDIwMjYgQXBwIOKAlCBGaXJlYmFzZS1jb25uZWN0ZWQKaW1wb3J0IHsgV0NfR1JPVVBTLCBXQ19NQVRDSEVTLCBXQ19LTk9DS09VVF9GSVhUVVJFUyB9IGZyb20gJy4vZGF0YS5qcyc7CmltcG9ydCB7IGF1dGggfSBmcm9tICcuL2ZpcmViYXNlLmpzJzsKaW1wb3J0IHsgc2lnblVwLCBzaWduSW4sIGxvZ091dCwgd2F0Y2hBdXRoIH0gZnJvbSAnLi9hdXRoLmpzJzsKaW1wb3J0IHsgd2F0Y2hNYXRjaGVzLCBzYXZlUHJlZGljdGlvbiwgZ2V0VXNlclByZWRpY3Rpb25zIH0gZnJvbSAnLi9kYi5qcyc7CgooZnVuY3Rpb24gKCkgewogICd1c2Ugc3RyaWN0JzsKCiAgLy8g4pSA4pSA4pSAIENvbnN0YW50cyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKICBjb25zdCBTVEFHRV9MQUJFTFMgPSB7CiAgICBSMzI6ICdSb3VuZCBvZiAzMicsCiAgICBSMTY6ICdSb3VuZCBvZiAxNicsCiAgICBRRjogICdRdWFydGVyZmluYWxzJywKICAgIFNGOiAgJ1NlbWlmaW5hbHMnLAogICAgJzNQJzogJ1RoaXJkIFBsYWNlJywKICAgIEY6ICAgJ0ZpbmFsJywKICB9OwoKICAvLyBSZXBsYWNlIHdpdGggcmVhbCBhZG1pbiBGaXJlYmFzZSBVSURzIHRvIGVuYWJsZSB0aGUgc2NvcmUtZW50cnkgVUkKICBjb25zdCBBRE1JTl9VSURTID0gWwogICAgJ1JFUExBQ0VfV0lUSF9ZT1VSX0ZJUkVCQVNFX1VJRCcsCiAgXTsKCiAgLy8g4pSA4pSA4pSAIHN0YWdlS2V5VG9MYWJlbCDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKICBmdW5jdGlvbiBzdGFnZUtleVRvTGFiZWwoa2V5KSB7CiAgICBpZiAoIWtleSkgcmV0dXJuICcnOwogICAgaWYgKC9eW0EtWmEtel17MSwyfSQvLnRlc3Qoa2V5KSkgcmV0dXJuICdHcm91cCAnICsga2V5LnRvVXBwZXJDYXNlKCk7CiAgICByZXR1cm4ga2V5OwogIH0KCiAgLy8g4pSA4pSA4pSAIFN0YXRlIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAogIGxldCBjdXJyZW50VXNlciA9IG51bGw7CiAgbGV0IGF1dGhSZXNvbHZlZCA9IGZhbHNlOwogIGxldCBmaXJzdEF1dGhGaXJlID0gdHJ1ZTsKICBsZXQgdXNlclByZWRpY3Rpb25zID0ge307CiAgbGV0IGF1dGhNb2RlID0gJ3NpZ25pbic7CiAgbGV0IHVuc3Vic2NyaWJlTWF0Y2hlcyA9IG51bGw7CiAgbGV0IGFjdGl2ZVByZWRTdWJ0YWIgPSAnbXktcGlja3MnOwoKICAvLyBCcmFja2V0IHBpY2tzOiB7IG1hdGNoSWQ6ICdob21lJyB8ICdhd2F5JyB9CiAgbGV0IGJyYWNrZXRQaWNrcyA9IHt9OwoKICAvLyDilIDilIDilIAgVGhlbWUg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgY29uc3QgdGhlbWVUb2dnbGUgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKCdbZGF0YS10aGVtZS10b2dnbGVdJyk7CiAgY29uc3QgaHRtbCA9IGRvY3VtZW50LmRvY3VtZW50RWxlbWVudDsKICBmdW5jdGlvbiBzZXRUaGVtZSh0KSB7CiAgICBodG1sLnNldEF0dHJpYnV0ZSgnZGF0YS10aGVtZScsIHQpOwogICAgaWYgKHRoZW1lVG9nZ2xlKSB7CiAgICAgIHRoZW1lVG9nZ2xlLnNldEF0dHJpYnV0ZSgnYXJpYS1sYWJlbCcsICdTd2l0Y2ggdG8gJyArICh0ID09PSAnZGFyaycgPyAnbGlnaHQnIDogJ2RhcmsnKSArICcgbW9kZScpOwogICAgICB0aGVtZVRvZ2dsZS5pbm5lckhUTUwgPSB0ID09PSAnZGFyaycKICAgICAgICA/ICc8c3ZnIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSI1Ii8+PHBhdGggZD0iTTEyIDF2Mk0xMiAyMXYyTTQuMjIgNC4yMmwxLjQyIDEuNDJNMTguMzYgMTguMzZsMS40MiAxLjQyTTEgMTJoMk0yMSAxMmgyTTQuMjIgMTkuNzhsMS40Mi0xLjQyTTE4LjM2IDUuNjRsMS40Mi0xLjQyIi8+PC9zdmc+JwogICAgICAgIDogJzxzdmcgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iY3VycmVudENvbG9yIiBzdHJva2Utd2lkdGg9IjIiPjxwYXRoIGQ9Ik0yMSAxMi43OUE5IDkgMCAxIDEgMTEuMjEgMyA3IDcgMCAwIDAgMjEgMTIuNzl6Ii8+PC9zdmc+JzsKICAgIH0KICB9CiAgbGV0IGN1cnJlbnRUaGVtZSA9ICdkYXJrJzsKICBzZXRUaGVtZShjdXJyZW50VGhlbWUpOwogIGlmICh0aGVtZVRvZ2dsZSkgewogICAgdGhlbWVUb2dnbGUuYWRkRXZlbnRMaXN0ZW5lcignY2xpY2snLCAoKSA9PiB7CiAgICAgIGN1cnJlbnRUaGVtZSA9IGN1cnJlbnRUaGVtZSA9PT0gJ2RhcmsnID8gJ2xpZ2h0JyA6ICdkYXJrJzsKICAgICAgc2V0VGhlbWUoY3VycmVudFRoZW1lKTsKICAgIH0pOwogIH0KCiAgLy8g4pSA4pSA4pSAIE5hdmlnYXRpb24g4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgY29uc3QgbmF2QnRucyA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoJy5uYXYtYnRuJyk7CiAgY29uc3Qgdmlld3MgICA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoJy52aWV3Jyk7CiAgbmF2QnRucy5mb3JFYWNoKGJ0biA9PiB7CiAgICBidG4uYWRkRXZlbnRMaXN0ZW5lcignY2xpY2snLCAoKSA9PiB7CiAgICAgIG5hdkJ0bnMuZm9yRWFjaChiID0+IGIuY2xhc3NMaXN0LnJlbW92ZSgnYWN0aXZlJykpOwogICAgICB2aWV3cy5mb3JFYWNoKHYgPT4gdi5jbGFzc0xpc3QucmVtb3ZlKCdhY3RpdmUnKSk7CiAgICAgIGJ0bi5jbGFzc0xpc3QuYWRkKCdhY3RpdmUnKTsKICAgICAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3ZpZXctJyArIGJ0bi5kYXRhc2V0LnZpZXcpLmNsYXNzTGlzdC5hZGQoJ2FjdGl2ZScpOwogICAgICByZW5kZXJBbGwoKTsKICAgIH0pOwogIH0pOwoKICAvLyDilIDilIDilIAgUHJlZGljdGlvbnMgU3ViLVRhYnMg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgZG9jdW1lbnQucXVlcnlTZWxlY3RvckFsbCgnLnN1Yi10YWInKS5mb3JFYWNoKHRhYiA9PiB7CiAgICB0YWIuYWRkRXZlbnRMaXN0ZW5lcignY2xpY2snLCAoKSA9PiB7CiAgICAgIGFjdGl2ZVByZWRTdWJ0YWIgPSB0YWIuZGF0YXNldC5zdWJ0YWI7CiAgICAgIGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoJy5zdWItdGFiJykuZm9yRWFjaCh0ID0+IHsKICAgICAgICB0LmNsYXNzTGlzdC50b2dnbGUoJ2FjdGl2ZScsIHQgPT09IHRhYik7CiAgICAgICAgdC5zZXRBdHRyaWJ1dGUoJ2FyaWEtc2VsZWN0ZWQnLCB0ID09PSB0YWIgPyAndHJ1ZScgOiAnZmFsc2UnKTsKICAgICAgfSk7CiAgICAgIGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoJy5zdWItdGFiLXBhbmVsJykuZm9yRWFjaChwID0+IHsKICAgICAgICBjb25zdCBpc0FjdGl2ZSA9IHAuaWQgPT09ICdzdWJ0YWItJyArIGFjdGl2ZVByZWRTdWJ0YWI7CiAgICAgICAgcC5jbGFzc0xpc3QudG9nZ2xlKCdhY3RpdmUnLCBpc0FjdGl2ZSk7CiAgICAgICAgcC5oaWRkZW4gPSAhaXNBY3RpdmU7CiAgICAgIH0pOwogICAgICBpZiAoYWN0aXZlUHJlZFN1YnRhYiA9PT0gJ215LXBpY2tzJykgICAgICAgICAgICByZW5kZXJQcmVkaWN0aW9ucygpOwogICAgICBpZiAoYWN0aXZlUHJlZFN1YnRhYiA9PT0gJ3ByZWQtYnJhY2tldCcpICAgICAgICByZW5kZXJLbm9ja291dEJyYWNrZXQoKTsKICAgICAgaWYgKGFjdGl2ZVByZWRTdWJ0YWIgPT09ICdwcmVkLXN0YW5kaW5ncycpICAgICAgcmVuZGVyUHJlZFN0YW5kaW5ncygpOwogICAgICBpZiAoYWN0aXZlUHJlZFN1YnRhYiA9PT0gJ3ByZWQtZ3JvdXAtc3RhbmRpbmdzJykgcmVuZGVyUHJlZEdyb3VwU3RhbmRpbmdzKCk7CiAgICB9KTsKICB9KTsKCiAgLy8g4pSA4pSA4pSAIEF1dGggU3RhdGUg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgY29uc3QgYXV0aEJ0biAgICAgICAgPSBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnYXV0aC1idG4nKTsKICBjb25zdCBhdXRoTW9kYWwgICAgICA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdhdXRoLW1vZGFsJyk7CiAgY29uc3QgYXV0aEJhY2tkcm9wICAgPSBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnYXV0aC1iYWNrZHJvcCcpOwogIGNvbnN0IGF1dGhDbG9zZSAgICAgID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2F1dGgtY2xvc2UnKTsKICBjb25zdCBhdXRoRm9ybSAgICAgICA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdhdXRoLWZvcm0nKTsKICBjb25zdCBhdXRoU3VibWl0ICAgICA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdhdXRoLXN1Ym1pdCcpOwogIGNvbnN0IGF1dGhTd2l0Y2ggICAgID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2F1dGgtc3dpdGNoJyk7CiAgY29uc3QgYXV0aEVycm9yICAgICAgPSBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnYXV0aC1lcnJvcicpOwogIGNvbnN0IGF1dGhUaXRsZSAgICAgID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2F1dGgtdGl0bGUnKTsKICBjb25zdCBhdXRoU3ViICAgICAgICA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdhdXRoLXN1YicpOwogIGNvbnN0IGF1dGhOYW1lR3JvdXAgID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2F1dGgtbmFtZScpOwogIGNvbnN0IGF1dGhOYW1lSW5wdXQgID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2F1dGgtbmFtZS1pbnB1dCcpOwogIGNvbnN0IHVzZXJCYXIgICAgICAgID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3VzZXItYmFyJyk7CiAgY29uc3QgdXNlckdyZWV0aW5nICAgPSBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgndXNlci1ncmVldGluZycpOwogIGNvbnN0IHNpZ25PdXRCdG4gICAgID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3NpZ24tb3V0LWJ0bicpOwogIGNvbnN0IHByZWRpY3RTaWduaW5CdG4gPSBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgncHJlZGljdC1zaWduaW4tYnRuJyk7CiAgY29uc3QgcHJlZFN0YW5kaW5nc0F1dGhQcm9tcHQgPSBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgncHJlZC1zdGFuZGluZ3MtYXV0aC1wcm9tcHQnKTsKCiAgZnVuY3Rpb24gb3Blbk1vZGFsKCkgewogICAgYXV0aE1vZGFsLmhpZGRlbiA9IGZhbHNlOwogICAgYXV0aEJhY2tkcm9wLmhpZGRlbiA9IGZhbHNlOwogICAgZG9jdW1lbnQuYm9keS5zdHlsZS5vdmVyZmxvdyA9ICdoaWRkZW4nOwogICAgc2V0VGltZW91dCgoKSA9PiB7CiAgICAgIGF1dGhNb2RhbC5jbGFzc0xpc3QuYWRkKCdvcGVuJyk7CiAgICAgIGF1dGhCYWNrZHJvcC5jbGFzc0xpc3QuYWRkKCdvcGVuJyk7CiAgICB9LCAxMCk7CiAgfQogIGZ1bmN0aW9uIGNsb3NlTW9kYWwoKSB7CiAgICBhdXRoTW9kYWwuY2xhc3NMaXN0LnJlbW92ZSgnb3BlbicpOwogICAgYXV0aEJhY2tkcm9wLmNsYXNzTGlzdC5yZW1vdmUoJ29wZW4nKTsKICAgIHNldFRpbWVvdXQoKCkgPT4gewogICAgICBhdXRoTW9kYWwuaGlkZGVuID0gdHJ1ZTsKICAgICAgYXV0aEJhY2tkcm9wLmhpZGRlbiA9IHRydWU7CiAgICAgIGRvY3VtZW50LmJvZHkuc3R5bGUub3ZlcmZsb3cgPSAnJzsKICAgIH0sIDI1MCk7CiAgfQoKICBmdW5jdGlvbiBzZXRBdXRoTW9kZShtb2RlKSB7CiAgICBhdXRoTW9kZSA9IG1vZGU7CiAgICBpZiAobW9kZSA9PT0gJ3NpZ251cCcpIHsKICAgICAgYXV0aFRpdGxlLnRleHRDb250ZW50ID0gJ0NyZWF0ZSBBY2NvdW50JzsKICAgICAgYXV0aFN1Yi50ZXh0Q29udGVudCA9ICdTaWduIHVwIHRvIHNhdmUgeW91ciBwcmVkaWN0aW9ucy4nOwogICAgICBhdXRoU3VibWl0LnRleHRDb250ZW50ID0gJ0NyZWF0ZSBBY2NvdW50JzsKICAgICAgYXV0aFN3aXRjaC50ZXh0Q29udGVudCA9ICdBbHJlYWR5IGhhdmUgYW4gYWNjb3VudD8gU2lnbiBpbic7CiAgICAgIGF1dGhOYW1lR3JvdXAuc3R5bGUuZGlzcGxheSA9ICdibG9jayc7CiAgICB9IGVsc2UgewogICAgICBhdXRoVGl0bGUudGV4dENvbnRlbnQgPSAnU2lnbiBJbic7CiAgICAgIGF1dGhTdWIudGV4dENvbnRlbnQgPSAnU2lnbiBpbiB0byBzYXZlIHlvdXIgcHJlZGljdGlvbnMuJzsKICAgICAgYXV0aFN1Ym1pdC50ZXh0Q29udGVudCA9ICdTaWduIEluJzsKICAgICAgYXV0aFN3aXRjaC50ZXh0Q29udGVudCA9ICJEb24ndCBoYXZlIGFuIGFjY291bnQ/IFNpZ24gdXAiOwogICAgICBhdXRoTmFtZUdyb3VwLnN0eWxlLmRpc3BsYXkgPSAnbm9uZSc7CiAgICB9CiAgICBhdXRoRXJyb3IudGV4dENvbnRlbnQgPSAnJzsKICB9CgogIGF1dGhCdG4uYWRkRXZlbnRMaXN0ZW5lcignY2xpY2snLCBvcGVuTW9kYWwpOwogIGF1dGhDbG9zZS5hZGRFdmVudExpc3RlbmVyKCdjbGljaycsIGNsb3NlTW9kYWwpOwogIGF1dGhCYWNrZHJvcC5hZGRFdmVudExpc3RlbmVyKCdjbGljaycsIGNsb3NlTW9kYWwpOwogIGF1dGhTd2l0Y2guYWRkRXZlbnRMaXN0ZW5lcignY2xpY2snLCAoKSA9PiBzZXRBdXRoTW9kZShhdXRoTW9kZSA9PT0gJ3NpZ25pbicgPyAnc2lnbnVwJyA6ICdzaWduaW4nKSk7CiAgaWYgKHByZWRpY3RTaWduaW5CdG4pIHByZWRpY3RTaWduaW5CdG4uYWRkRXZlbnRMaXN0ZW5lcignY2xpY2snLCBvcGVuTW9kYWwpOwogIGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoJy5wcmVkLXN0YW5kaW5ncy1zaWduaW4tYnRuJykuZm9yRWFjaChiID0+IGIuYWRkRXZlbnRMaXN0ZW5lcignY2xpY2snLCBvcGVuTW9kYWwpKTsKCiAgYXV0aEZvcm0uYWRkRXZlbnRMaXN0ZW5lcignc3VibWl0JywgYXN5bmMgZSA9PiB7CiAgICBlLnByZXZlbnREZWZhdWx0KCk7CiAgICBhdXRoRXJyb3IudGV4dENvbnRlbnQgPSAnJzsKICAgIGNvbnN0IGVtYWlsID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2F1dGgtZW1haWwnKS52YWx1ZS50cmltKCk7CiAgICBjb25zdCBwYXNzd29yZCA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdhdXRoLXBhc3N3b3JkJykudmFsdWU7CiAgICBhdXRoU3VibWl0LmRpc2FibGVkID0gdHJ1ZTsKICAgIHRyeSB7CiAgICAgIGlmIChhdXRoTW9kZSA9PT0gJ3NpZ251cCcpIHsKICAgICAgICBjb25zdCBuYW1lID0gYXV0aE5hbWVJbnB1dC52YWx1ZS50cmltKCk7CiAgICAgICAgaWYgKCFuYW1lKSB7IGF1dGhFcnJvci50ZXh0Q29udGVudCA9ICdQbGVhc2UgZW50ZXIgeW91ciBuYW1lLic7IHJldHVybjsgfQogICAgICAgIGF3YWl0IHNpZ25VcChlbWFpbCwgcGFzc3dvcmQsIG5hbWUpOwogICAgICB9IGVsc2UgewogICAgICAgIGF3YWl0IHNpZ25Jbihlb
+// World Cup 2026 App — Firebase-connected
+import { WC_GROUPS, WC_MATCHES, WC_KNOCKOUT_FIXTURES } from './data.js';
+import { auth } from './firebase.js';
+import { signUp, signIn, logOut, watchAuth } from './auth.js';
+import { watchMatches, savePrediction, getUserPredictions } from './db.js';
+
+(function () {
+  'use strict';
+
+  // ─── Constants ──────────────────────────────────────────────────────────────
+  const STAGE_LABELS = {
+    R32: 'Round of 32',
+    R16: 'Round of 16',
+    QF:  'Quarterfinals',
+    SF:  'Semifinals',
+    '3P': 'Third Place',
+    F:   'Final',
+  };
+
+  // Replace with real admin Firebase UIDs to enable the score-entry UI
+  const ADMIN_UIDS = [
+    'REPLACE_WITH_YOUR_FIREBASE_UID',
+  ];
+
+  // ─── stageKeyToLabel ────────────────────────────────────────────────────────
+  function stageKeyToLabel(key) {
+    if (!key) return '';
+    if (/^[A-Za-z]{1,2}$/.test(key)) return 'Group ' + key.toUpperCase();
+    return key;
+  }
+
+  // ─── State ──────────────────────────────────────────────────────────────────
+  let currentUser = null;
+  let authResolved = false;
+  let firstAuthFire = true;
+  let userPredictions = {};
+  let authMode = 'signin';
+  let unsubscribeMatches = null;
+  let activepredSubtab = 'my-picks';
+
+  // Bracket picks: { matchId: 'home' | 'away' }
+  let bracketPicks = {};
+
+  // ─── Theme ──────────────────────────────────────────────────────────────────
+  const themeToggle = document.querySelector('[data-theme-toggle]');
+  const html = document.documentElement;
+  function setTheme(t) {
+    html.setAttribute('data-theme', t);
+    if (themeToggle) {
+      themeToggle.setAttribute('aria-label', 'Switch to ' + (t === 'dark' ? 'light' : 'dark') + ' mode');
+      themeToggle.innerHTML = t === 'dark'
+        ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>'
+        : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+    }
+  }
+  let currentTheme = 'dark';
+  setTheme(currentTheme);
+  if (themeToggle) {
+    themeToggle.addEventListener('click', () => {
+      currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      setTheme(currentTheme);
+    });
+  }
+
+  // ─── Navigation ─────────────────────────────────────────────────────────────
+  const navBtns = document.querySelectorAll('.nav-btn');
+  const views   = document.querySelectorAll('.view');
+  navBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      navBtns.forEach(b => b.classList.remove('active'));
+      views.forEach(v => v.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('view-' + btn.dataset.view).classList.add('active');
+      renderAll();
+    });
+  });
+
+  // ─── Predictions Sub-Tabs ───────────────────────────────────────────────────
+  document.querySelectorAll('.sub-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      activepredSubtab = tab.dataset.subtab;
+      document.querySelectorAll('.sub-tab').forEach(t => {
+        t.classList.toggle('active', t === tab);
+        t.setAttribute('aria-selected', t === tab ? 'true' : 'false');
+      });
+      document.querySelectorAll('.sub-tab-panel').forEach(p => {
+        const isActive = p.id === 'subtab-' + activepredSubtab;
+        p.classList.toggle('active', isActive);
+        p.hidden = !isActive;
+      });
+      if (activepredSubtab === 'my-picks')             renderPredictions();
+      if (activepredSubtab === 'pred-bracket')         renderKnockoutBracket();
+      if (activepredSubtab === 'pred-standings')       renderPredStandings();
+      if (activepredSubtab === 'pred-group-standings') renderPredGroupStandings();
+    });
+  });
+
+  // ─── Auth State ─────────────────────────────────────────────────────────────
+  const authBtn        = document.getElementById('auth-btn');
+  const authModal      = document.getElementById('auth-modal');
+  const authBackdrop   = document.getElementById('auth-backdrop');
+  const authClose      = document.getElementById('auth-close');
+  const authForm       = document.getElementById('auth-form');
+  const authSubmit     = document.getElementById('auth-submit');
+  const authSwitch     = document.getElementById('auth-switch');
+  const authError      = document.getElementById('auth-error');
+  const authTitle      = document.getElementById('auth-title');
+  const authSub        = document.getElementById('auth-sub');
+  const authNameGroup  = document.getElementById('auth-name');
+  const authNameInput  = document.getElementById('auth-name-input');
+  const userBar        = document.getElementById('user-bar');
+  const userGreeting   = document.getElementById('user-greeting');
+  const signOutBtn     = document.getElementById('sign-out-btn');
+  const predictSigninBtn = document.getElementById('predict-signin-btn');
+  const predStandingsAuthPrompt = document.getElementById('pred-standings-auth-prompt');
+
+  function openModal() {
+    authModal.hidden = false;
+    authBackdrop.hidden = false;
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => {
+      authModal.classList.add('open');
+      authBackdrop.classList.add('open');
+    }, 10);
+  }
+  function closeModal() {
+    authModal.classList.remove('open');
+    authBackdrop.classList.remove('open');
+    setTimeout(() => {
+      authModal.hidden = true;
+      authBackdrop.hidden = true;
+      document.body.style.overflow = '';
+    }, 250);
+  }
+
+  function setAuthMode(mode) {
+    authMode = mode;
+    if (mode === 'signup') {
+      authTitle.textContent = 'Create Account';
+      authSub.textContent = 'Sign up to save your predictions.';
+      authSubmit.textContent = 'Create Account';
+      authSwitch.textContent = 'Already have an account? Sign in';
+      authNameGroup.style.display = 'block';
+    } else {
+      authTitle.textContent = 'Sign In';
+      authSub.textContent = 'Sign in to save your predictions.';
+      authSubmit.textContent = 'Sign In';
+      authSwitch.textContent = "Don't have an account? Sign up";
+      authNameGroup.style.display = 'none';
+    }
+    authError.textContent = '';
+  }
+
+  authBtn.addEventListener('click', openModal);
+  authClose.addEventListener('click', closeModal);
+  authBackdrop.addEventListener('click', closeModal);
+  authSwitch.addEventListener('click', () => setAuthMode(authMode === 'signin' ? 'signup' : 'signin'));
+  if (predictSigninBtn) predictSigninBtn.addEventListener('click', openModal);
+  document.querySelectorAll('.pred-standings-signin-btn').forEach(b => b.addEventListener('click', openModal));
+
+  authForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    authError.textContent = '';
+    const email = document.getElementById('auth-email').value.trim();
+    const password = document.getElementById('auth-password').value;
+    authSubmit.disabled = true;
+    try {
+      if (authMode === 'signup') {
+        const name = authNameInput.value.trim();
+        if (!name) { authError.textContent = 'Please enter your name.'; return; }
+        await signUp(email, password, name);
+      } else {
+        await signIn(email, password);
+      }
+      closeModal();
+    } catch (err) {
+      authError.textContent = err.message || 'Authentication failed.';
+    } finally {
+      authSubmit.disabled = false;
+    }
+  });
+
+  signOutBtn.addEventListener('click', async () => {
+    await logOut();
+  });
+
+  // ─── Watch Auth ─────────────────────────────────────────────────────────────
+  watchAuth(async (user) => {
+    currentUser = user;
+    authResolved = true;
+
+    if (user) {
+      authBtn.hidden = true;
+      userBar.hidden = false;
+      userGreeting.textContent = 'Hi, ' + (user.displayName || user.email);
+      userPredictions = await getUserPredictions(user.uid);
+    } else {
+      authBtn.hidden = false;
+      userBar.hidden = true;
+      userPredictions = {};
+    }
+
+    if (firstAuthFire) {
+      firstAuthFire = false;
+      startMatchListener();
+    } else {
+      renderAll();
+    }
+  });
+
+  // ─── Match Listener ──────────────────────────────────────────────────────────
+  function startMatchListener() {
+    if (unsubscribeMatches) unsubscribeMatches();
+    unsubscribeMatches = watchMatches((matches) => {
+      // Merge live match data into WC_MATCHES
+      matches.forEach(m => {
+        const match = WC_MATCHES.find(wm => wm.id === m.id);
+        if (match) {
+          match.homeScore = m.homeScore;
+          match.awayScore = m.awayScore;
+          match.status    = m.status;
+        }
+      });
+      renderAll();
+    });
+  }
+
+  // ─── Render All ─────────────────────────────────────────────────────────────
+  function renderAll() {
+    const activeView = document.querySelector('.view.active');
+    if (!activeView) return;
+    const viewId = activeView.id;
+    if (viewId === 'view-schedule')    renderSchedule();
+    if (viewId === 'view-standings')   renderStandings();
+    if (viewId === 'view-predictions') {
+      renderPredictions();
+      renderKnockoutBracket();
+      renderPredStandings();
+      renderPredGroupStandings();
+    }
+  }
+
+  // ─── Schedule ───────────────────────────────────────────────────────────────
+  function renderSchedule() {
+    const container = document.getElementById('schedule-container');
+    if (!container) return;
+
+    const isAdmin = currentUser && ADMIN_UIDS.includes(currentUser.uid);
+
+    // Group matches by stage
+    const byStage = {};
+    WC_MATCHES.forEach(m => {
+      const key = m.stage || 'Group';
+      if (!byStage[key]) byStage[key] = [];
+      byStage[key].push(m);
+    });
+
+    let html = '';
+    Object.entries(byStage).forEach(([stage, matches]) => {
+      html += `<div class="stage-section">
+        <h2 class="stage-heading">${stageKeyToLabel(stage)}</h2>
+        <div class="match-list">`;
+      matches.forEach(m => {
+        const hasResult = m.homeScore !== undefined && m.homeScore !== null;
+        const scoreHtml = hasResult
+          ? `<span class="score">${m.homeScore} – ${m.awayScore}</span>`
+          : `<span class="score tbd">vs</span>`;
+        const adminHtml = isAdmin ? `
+          <div class="score-entry" data-match="${m.id}">
+            <input type="number" class="score-input home-score" placeholder="H" min="0" max="20" value="${hasResult ? m.homeScore : ''}">
+            <span>–</span>
+            <input type="number" class="score-input away-score" placeholder="A" min="0" max="20" value="${hasResult ? m.awayScore : ''}">
+            <button class="save-score-btn" data-match="${m.id}">Save</button>
+          </div>` : '';
+        html += `
+          <div class="match-card ${hasResult ? 'has-result' : ''}">
+            <div class="match-meta">${m.date || ''} · ${stageKeyToLabel(m.stage || m.group || '')}</div>
+            <div class="match-teams">
+              <span class="team home">${m.homeFlag || ''} ${m.home}</span>
+              ${scoreHtml}
+              <span class="team away">${m.away} ${m.awayFlag || ''}</span>
+            </div>
+            ${adminHtml}
+          </div>`;
+      });
+      html += `</div></div>`;
+    });
+
+    container.innerHTML = html;
+
+    // Admin save listeners
+    if (isAdmin) {
+      container.querySelectorAll('.save-score-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const matchId = btn.dataset.match;
+          const entry = container.querySelector(`.score-entry[data-match="${matchId}"]`);
+          const home = parseInt(entry.querySelector('.home-score').value);
+          const away = parseInt(entry.querySelector('.away-score').value);
+          if (isNaN(home) || isNaN(away)) return;
+          btn.disabled = true;
+          btn.textContent = 'Saving…';
+          try {
+            await savePrediction(currentUser.uid, matchId, { homeScore: home, awayScore: away, isResult: true });
+            btn.textContent = 'Saved!';
+          } catch (e) {
+            btn.textContent = 'Error';
+          } finally {
+            setTimeout(() => { btn.disabled = false; btn.textContent = 'Save'; }, 1500);
+          }
+        });
+      });
+    }
+  }
+
+  // ─── Standings ──────────────────────────────────────────────────────────────
+  function calcActualPoints(matches, teamName) {
+    let pts = 0, w = 0, d = 0, l = 0, gf = 0, ga = 0;
+    matches.forEach(m => {
+      if (m.homeScore === undefined || m.homeScore === null) return;
+      const isHome = m.home === teamName;
+      const isAway = m.away === teamName;
+      if (!isHome && !isAway) return;
+      const tg = isHome ? m.homeScore : m.awayScore;
+      const og = isHome ? m.awayScore : m.homeScore;
+      gf += tg; ga += og;
+      if (tg > og) { pts += 3; w++; }
+      else if (tg === og) { pts += 1; d++; }
+      else { l++; }
+    });
+    return { pts, w, d, l, gf, ga, gd: gf - ga };
+  }
+
+  function renderStandings() {
+    const container = document.getElementById('standings-container');
+    if (!container) return;
+
+    let html = '';
+    WC_GROUPS.forEach(group => {
+      const groupMatches = WC_MATCHES.filter(m => m.group === group.id);
+      const teams = group.teams.map(t => ({
+        ...t,
+        ...calcActualPoints(groupMatches, t.name)
+      })).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+
+      html += `<div class="group-table">
+        <h3>Group ${group.id}</h3>
+        <table>
+          <thead><tr><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th></tr></thead>
+          <tbody>`;
+      teams.forEach((t, i) => {
+        const qual = i < 2 ? 'qualified' : '';
+        html += `<tr class="${qual}">
+          <td>${t.flag || ''} ${t.name}</td>
+          <td>${t.w + t.d + t.l}</td><td>${t.w}</td><td>${t.d}</td><td>${t.l}</td>
+          <td>${t.gf}</td><td>${t.ga}</td><td>${t.gd}</td><td>${t.pts}</td>
+        </tr>`;
+      });
+      html += `</tbody></table></div>`;
+    });
+
+    container.innerHTML = html;
+  }
+
+  // ─── Predictions ────────────────────────────────────────────────────────────
+  function calcPredPoints(matches, teamName) {
+    let pts = 0, w = 0, d = 0, l = 0, gf = 0, ga = 0;
+    matches.forEach(m => {
+      const pred = userPredictions[m.id];
+      if (!pred || pred.homeScorePred === undefined) return;
+      const isHome = m.home === teamName;
+      const isAway = m.away === teamName;
+      if (!isHome && !isAway) return;
+      const tg = isHome ? pred.homeScorePred : pred.awayScorePred;
+      const og = isHome ? pred.awayScorePred : pred.homeScorePred;
+      gf += tg; ga += og;
+      if (tg > og) { pts += 3; w++; }
+      else if (tg === og) { pts += 1; d++; }
+      else { l++; }
+    });
+    return { pts, w, d, l, gf, ga, gd: gf - ga };
+  }
+
+  function renderPredictions() {
+    const container = document.getElementById('predictions-container');
+    if (!container) return;
+
+    if (!currentUser) {
+      container.innerHTML = `<div class="auth-prompt">
+        <p>Sign in to save your match predictions.</p>
+        <button class="btn btn-primary" id="predict-signin-btn">Sign In</button>
+      </div>`;
+      const btn = container.querySelector('#predict-signin-btn');
+      if (btn) btn.addEventListener('click', openModal);
+      return;
+    }
+
+    const byGroup = {};
+    WC_MATCHES.forEach(m => {
+      if (!m.group) return;
+      if (!byGroup[m.group]) byGroup[m.group] = [];
+      byGroup[m.group].push(m);
+    });
+
+    let html = '';
+    Object.entries(byGroup).forEach(([group, matches]) => {
+      html += `<div class="pred-group"><h3>Group ${group}</h3><div class="pred-match-list">`;
+      matches.forEach(m => {
+        const pred = userPredictions[m.id] || {};
+        const hVal = pred.homeScorePred !== undefined ? pred.homeScorePred : '';
+        const aVal = pred.awayScorePred !== undefined ? pred.awayScorePred : '';
+        const saved = pred.homeScorePred !== undefined;
+        html += `
+          <div class="pred-match-card ${saved ? 'saved' : ''}" data-match="${m.id}">
+            <div class="pred-match-meta">${m.date || ''}</div>
+            <div class="pred-match-row">
+              <span class="pred-team home">${m.homeFlag || ''} ${m.home}</span>
+              <input type="number" class="pred-input home-pred" min="0" max="20" value="${hVal}" placeholder="0">
+              <span class="pred-sep">–</span>
+              <input type="number" class="pred-input away-pred" min="0" max="20" value="${aVal}" placeholder="0">
+              <span class="pred-team away">${m.away} ${m.awayFlag || ''}</span>
+            </div>
+            <button class="pred-save-btn" data-match="${m.id}">${saved ? 'Update' : 'Save'}</button>
+          </div>`;
+      });
+      html += `</div></div>`;
+    });
+
+    container.innerHTML = html;
+
+    container.querySelectorAll('.pred-save-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const matchId = btn.dataset.match;
+        const card = container.querySelector(`.pred-match-card[data-match="${matchId}"]`);
+        const home = parseInt(card.querySelector('.home-pred').value);
+        const away = parseInt(card.querySelector('.away-pred').value);
+        if (isNaN(home) || isNaN(away)) return;
+        btn.disabled = true;
+        btn.textContent = 'Saving…';
+        try {
+          await savePrediction(currentUser.uid, matchId, { homeScorePred: home, awayScorePred: away });
+          userPredictions[matchId] = { ...userPredictions[matchId], homeScorePred: home, awayScorePred: away };
+          btn.textContent = 'Saved!';
+          card.classList.add('saved');
+          setTimeout(() => { btn.textContent = 'Update'; btn.disabled = false; }, 1000);
+          renderKnockoutBracket();
+        } catch (e) {
+          btn.textContent = 'Error';
+          btn.disabled = false;
+        }
+      });
+    });
+  }
+
+  // ─── Predicted Group Standings ───────────────────────────────────────────────
+  function renderPredGroupStandings() {
+    const container = document.getElementById('pred-group-standings-container');
+    if (!container) return;
+
+    if (!currentUser) {
+      container.innerHTML = `<div class="auth-prompt">
+        <p>Sign in to view your predicted group standings.</p>
+        <button class="btn btn-primary pred-standings-signin-btn">Sign In</button>
+      </div>`;
+      container.querySelectorAll('.pred-standings-signin-btn').forEach(b => b.addEventListener('click', openModal));
+      return;
+    }
+
+    let html = '';
+    WC_GROUPS.forEach(group => {
+      const groupMatches = WC_MATCHES.filter(m => m.group === group.id);
+      const teams = group.teams.map(t => ({
+        ...t,
+        ...calcPredPoints(groupMatches, t.name)
+      })).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+
+      html += `<div class="group-table">
+        <h3>Group ${group.id}</h3>
+        <table>
+          <thead><tr><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th></tr></thead>
+          <tbody>`;
+      teams.forEach((t, i) => {
+        const qual = i < 2 ? 'qualified' : '';
+        html += `<tr class="${qual}">
+          <td>${t.flag || ''} ${t.name}</td>
+          <td>${t.w + t.d + t.l}</td><td>${t.w}</td><td>${t.d}</td><td>${t.l}</td>
+          <td>${t.gf}</td><td>${t.ga}</td><td>${t.gd}</td><td>${t.pts}</td>
+        </tr>`;
+      });
+      html += `</tbody></table></div>`;
+    });
+
+    container.innerHTML = html;
+  }
+
+  // ─── Knockout Bracket ────────────────────────────────────────────────────────
+
+  // Get actual group finisher from recorded match results
+  function getActualGroupFinisher(groupId, pos) {
+    const group = WC_GROUPS.find(g => g.id === groupId);
+    if (!group) return null;
+    const groupMatches = WC_MATCHES.filter(m => m.group === groupId);
+    const allDone = groupMatches.length > 0 &&
+      groupMatches.every(m => m.homeScore !== undefined && m.homeScore !== null);
+    if (!allDone) return null;
+    const teams = group.teams.map(t => ({
+      ...t,
+      ...calcActualPoints(groupMatches, t.name)
+    })).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+    if (teams[pos]) return { name: teams[pos].name, flag: teams[pos].flag };
+    return null;
+  }
+
+  // Get the predicted group winner (pos=0) or runner-up (pos=1) from user's
+  // score predictions. Returns null if the user hasn't predicted at least one
+  // match in this group yet — otherwise all teams tie at 0 pts and the sort
+  // order is arbitrary, showing a misleading team in the bracket.
+  function getPredictedGroupFinisher(groupId, pos) {
+    const group = WC_GROUPS.find(g => g.id === groupId);
+    if (!group) return null;
+    const groupMatches = WC_MATCHES.filter(m => m.group === groupId);
+    const hasPredictions = groupMatches.some(m => {
+      const pred = userPredictions[m.id];
+      return pred && pred.homeScorePred !== undefined && pred.awayScorePred !== undefined;
+    });
+    if (!hasPredictions) return null;
+    const teams = group.teams.map(t => ({
+      ...t,
+      ...calcPredPoints(groupMatches, t.name)
+    })).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+    if (teams[pos]) return { name: teams[pos].name, flag: teams[pos].flag };
+    return null;
+  }
+
+  function resolveKnockoutTeam(source) {
+    if (!source) return null;
+    if (source.type === 'group') {
+      return getActualGroupFinisher(source.groupId, source.pos)
+          || getPredictedGroupFinisher(source.groupId, source.pos)
+          || null;
+    }
+    if (source.type === 'winner') {
+      const match = WC_KNOCKOUT_FIXTURES.find(f => f.id === source.matchId);
+      if (!match) return null;
+      const pick = bracketPicks[source.matchId];
+      if (!pick) return null;
+      const homeTeam = resolveKnockoutTeam(match.home);
+      const awayTeam = resolveKnockoutTeam(match.away);
+      return pick === 'home' ? homeTeam : awayTeam;
+    }
+    return null;
+  }
+
+  function teamLabel(source, resolved) {
+    if (resolved) return `${resolved.flag || ''} ${resolved.name}`;
+    if (!source) return '?';
+    if (source.type === 'group') return `${source.pos === 0 ? '1' : '2'}${source.groupId}`;
+    if (source.type === 'winner') return `W${source.matchId}`;
+    return '?';
+  }
+
+  function renderKnockoutBracket() {
+    const container = document.getElementById('pred-bracket-container');
+    if (!container) return;
+
+    if (!currentUser) {
+      container.innerHTML = `<div class="auth-prompt">
+        <p>Sign in to view your predicted bracket.</p>
+        <button class="btn btn-primary pred-standings-signin-btn">Sign In</button>
+      </div>`;
+      container.querySelectorAll('.pred-standings-signin-btn').forEach(b => b.addEventListener('click', openModal));
+      return;
+    }
+
+    const stages = [...new Set(WC_KNOCKOUT_FIXTURES.map(f => f.stage))];
+    let html = '<div class="bracket-scroll"><div class="bracket-stages">';
+
+    stages.forEach(stage => {
+      const fixtures = WC_KNOCKOUT_FIXTURES.filter(f => f.stage === stage);
+      html += `<div class="bracket-stage">
+        <div class="bracket-stage-label">${STAGE_LABELS[stage] || stage}</div>
+        <div class="bracket-matches">`;
+
+      fixtures.forEach(fixture => {
+        const homeResolved = resolveKnockoutTeam(fixture.home);
+        const awayResolved = resolveKnockoutTeam(fixture.away);
+        const homeLabel = teamLabel(fixture.home, homeResolved);
+        const awayLabel = teamLabel(fixture.away, awayResolved);
+        const pick = bracketPicks[fixture.id];
+        const homePicked = pick === 'home';
+        const awayPicked = pick === 'away';
+        const canPick = !!(homeResolved && awayResolved);
+
+        html += `
+          <div class="bracket-match" data-fixture="${fixture.id}">
+            <div class="bracket-team ${homePicked ? 'picked' : ''} ${canPick ? 'pickable' : 'unknown'}"
+                 data-fixture="${fixture.id}" data-side="home">
+              ${homeLabel}
+            </div>
+            <div class="bracket-team ${awayPicked ? 'picked' : ''} ${canPick ? 'pickable' : 'unknown'}"
+                 data-fixture="${fixture.id}" data-side="away">
+              ${awayLabel}
+            </div>
+          </div>`;
+      });
+
+      html += `</div></div>`;
+    });
+
+    html += '</div></div>';
+    container.innerHTML = html;
+
+    // Pick listeners
+    container.querySelectorAll('.bracket-team.pickable').forEach(el => {
+      el.addEventListener('click', () => {
+        const fixtureId = el.dataset.fixture;
+        const side = el.dataset.side;
+        bracketPicks[fixtureId] = side;
+        renderKnockoutBracket();
+      });
+    });
+  }
+
+  // ─── Pred Standings ─────────────────────────────────────────────────────────
+  function renderPredStandings() {
+    const container = document.getElementById('pred-standings-container');
+    if (!container) return;
+
+    if (!currentUser) {
+      container.innerHTML = `<div class="auth-prompt">
+        <p>Sign in to view your predicted standings.</p>
+        <button class="btn btn-primary pred-standings-signin-btn">Sign In</button>
+      </div>`;
+      container.querySelectorAll('.pred-standings-signin-btn').forEach(b => b.addEventListener('click', openModal));
+      return;
+    }
+
+    container.innerHTML = '<p class="muted">Predicted overall standings coming soon.</p>';
+  }
+
+  // ─── Init ────────────────────────────────────────────────────────────────────
+  function init() {
+    renderSchedule();
+    renderStandings();
+  }
+
+  init();
+
+  // expose for testing
+  window._wc = {
+    getMatches() { return [...WC_MATCHES]; }
+  }
+
+})();
