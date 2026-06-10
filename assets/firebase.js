@@ -1,6 +1,6 @@
 // firebase.js — initializes Firebase app, exports auth and db
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getAuth, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -18,11 +18,10 @@ export const auth = getAuth(app);
 // Explicitly target the 'wc2026' named database (not the default)
 export const db = getFirestore(app, 'wc2026');
 
-// Use sessionStorage-backed persistence instead of IndexedDB (the default).
-// IndexedDB is blocked in sandboxed iframes (GitHub Pages preview proxy),
-// which causes Firebase to always fire onAuthStateChanged with null on page
-// load, making every signed-in user appear signed out.
-// sessionStorage works in sandboxed iframes and persists for the tab lifetime.
-setPersistence(auth, browserSessionPersistence).catch(err =>
-  console.warn('[Firebase] Could not set session persistence:', err)
+// Use localStorage-backed persistence so auth state survives tab closes
+// and page reloads on GitHub Pages. The previous sessionStorage workaround
+// was only needed for sandboxed iframe previews; on the live site it caused
+// users to be signed out on every page load, making Sign In appear broken.
+setPersistence(auth, browserLocalPersistence).catch(err =>
+  console.warn('[Firebase] Could not set local persistence:', err)
 );
