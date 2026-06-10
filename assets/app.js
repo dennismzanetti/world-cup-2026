@@ -17,7 +17,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     F:   'Final',
   };
 
-  // Replace with real admin Firebase UIDs to enable the score-entry UI
   const ADMIN_UIDS = [
     'REPLACE_WITH_YOUR_FIREBASE_UID',
   ];
@@ -37,8 +36,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   let authMode = 'signin';
   let unsubscribeMatches = null;
   let activePredSubtab = 'my-picks';
-
-  // Bracket picks: { matchId: 'home' | 'away' }
   let bracketPicks = {};
 
   // ─── Theme ───────────────────────────────────────────────────────────────────
@@ -88,14 +85,14 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
         p.classList.toggle('active', isActive);
         p.hidden = !isActive;
       });
-      if (activePredSubtab === 'my-picks')            renderPredictions();
-      if (activePredSubtab === 'pred-bracket')        renderKnockoutBracket();
-      if (activePredSubtab === 'pred-standings')      renderPredStandings();
+      if (activePredSubtab === 'my-picks')             renderPredictions();
+      if (activePredSubtab === 'pred-bracket')         renderKnockoutBracket();
+      if (activePredSubtab === 'pred-standings')       renderPredStandings();
       if (activePredSubtab === 'pred-group-standings') renderPredGroupStandings();
     });
   });
 
-  // ─── Auth State ──────────────────────────────────────────────────────────────
+  // ─── Auth ──────────────────────────────────────────────────────────────────
   const authBtn        = document.getElementById('auth-btn');
   const authModal      = document.getElementById('auth-modal');
   const authBackdrop   = document.getElementById('auth-backdrop');
@@ -112,7 +109,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   const userGreeting   = document.getElementById('user-greeting');
   const signOutBtn     = document.getElementById('sign-out-btn');
   const predictSigninBtn = document.getElementById('predict-signin-btn');
-  const predStandingsAuthPrompt = document.getElementById('pred-standings-auth-prompt');
 
   function openModal() {
     authModal.hidden = false;
@@ -156,7 +152,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   authBackdrop.addEventListener('click', closeModal);
   authSwitch.addEventListener('click', () => setAuthMode(authMode === 'signin' ? 'signup' : 'signin'));
   if (predictSigninBtn) predictSigninBtn.addEventListener('click', openModal);
-
   document.querySelectorAll('.pred-standings-signin-btn').forEach(btn => {
     btn.addEventListener('click', openModal);
   });
@@ -187,17 +182,13 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   watchAuth(async (user) => {
     currentUser = user;
     authResolved = true;
-
     if (user) {
       authBtn.textContent = 'Account';
       authBtn.setAttribute('aria-label', 'Account');
       if (userBar) userBar.hidden = false;
       if (userGreeting) userGreeting.textContent = 'Hello, ' + (user.displayName || user.email);
-
-      // Load bracket picks from localStorage
       const savedPicks = localStorage.getItem('bracketPicks_' + user.uid);
       bracketPicks = savedPicks ? JSON.parse(savedPicks) : {};
-
       try {
         const preds = await getUserPredictions(user.uid);
         userPredictions = {};
@@ -213,12 +204,11 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       userPredictions = {};
       bracketPicks = {};
     }
-
     renderAll();
     firstAuthFire = false;
   });
 
-  // ─── Firestore Live Match Updates ─────────────────────────────────────────────
+  // ─── Firestore Live Match Updates ────────────────────────────────────────────
   unsubscribeMatches = watchMatches((updatedMatches) => {
     updatedMatches.forEach(um => {
       const idx = WC_MATCHES.findIndex(m => m.id === um.id);
@@ -232,55 +222,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     renderAll();
   });
 
-  // ─── Date/Group/Venue Filter Helpers ─────────────────────────────────────────
-  function populateDateSelect(sel, matches) {
-    if (!sel) return;
-    const dates = [...new Set(matches.map(m => m.date).filter(Boolean))].sort();
-    sel.innerHTML = '<option value="all">All Dates</option>';
-    dates.forEach(d => {
-      const opt = document.createElement('option');
-      opt.value = d;
-      opt.textContent = formatDate(d);
-      sel.appendChild(opt);
-    });
-  }
-
-  function populateStageSelect(sel, matches, allLabel) {
-    if (!sel) return;
-    const stages = [...new Set(matches.map(m => m.group || m.stage).filter(Boolean))];
-    sel.innerHTML = `<option value="all">${allLabel}</option>`;
-    stages.forEach(s => {
-      const opt = document.createElement('option');
-      opt.value = s;
-      opt.textContent = stageKeyToLabel(s);
-      sel.appendChild(opt);
-    });
-  }
-
-  function populateVenueSelect(sel, matches) {
-    if (!sel) return;
-    const venues = [...new Set(matches.map(m => m.venue).filter(Boolean))].sort();
-    sel.innerHTML = '<option value="all">All Venues</option>';
-    venues.forEach(v => {
-      const opt = document.createElement('option');
-      opt.value = v;
-      opt.textContent = v;
-      sel.appendChild(opt);
-    });
-  }
-
-  function populateTeamSelect(sel, matches) {
-    if (!sel) return;
-    const teams = [...new Set(matches.flatMap(m => [m.home, m.away]).filter(Boolean))].sort();
-    sel.innerHTML = '<option value="all">All Teams</option>';
-    teams.forEach(t => {
-      const opt = document.createElement('option');
-      opt.value = t;
-      opt.textContent = t;
-      sel.appendChild(opt);
-    });
-  }
-
+  // ─── Helpers ─────────────────────────────────────────────────────────────────
   function formatDate(d) {
     if (!d) return '';
     const dt = new Date(d + 'T12:00:00Z');
@@ -292,131 +234,18 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     const activeView = document.querySelector('.view.active');
     if (!activeView) return;
     const viewId = activeView.id;
-    if (viewId === 'view-schedule')    renderSchedule();
+    if (viewId === 'view-groups')      renderGroups();
+    if (viewId === 'view-matches')     renderMatches();
     if (viewId === 'view-standings')   renderStandings();
     if (viewId === 'view-predictions') {
-      if (activePredSubtab === 'my-picks')            renderPredictions();
-      if (activePredSubtab === 'pred-bracket')        renderKnockoutBracket();
-      if (activePredSubtab === 'pred-standings')      renderPredStandings();
+      if (activePredSubtab === 'my-picks')             renderPredictions();
+      if (activePredSubtab === 'pred-bracket')         renderKnockoutBracket();
+      if (activePredSubtab === 'pred-standings')       renderPredStandings();
       if (activePredSubtab === 'pred-group-standings') renderPredGroupStandings();
     }
   }
 
-  // ─── Schedule ────────────────────────────────────────────────────────────────
-  let schedFilters = { date: 'all', stage: 'all', venue: 'all', team: 'all' };
-
-  function renderSchedule() {
-    const container = document.getElementById('schedule-container');
-    if (!container) return;
-
-    const isAdmin = currentUser && ADMIN_UIDS.includes(currentUser.uid);
-
-    // Build filter bar once
-    const existingFilters = document.getElementById('sched-filter-bar');
-    if (!existingFilters) {
-      const bar = document.createElement('div');
-      bar.id = 'sched-filter-bar';
-      bar.className = 'filter-bar';
-      bar.innerHTML = `
-        <select id="sched-date-sel"></select>
-        <select id="sched-stage-sel"></select>
-        <select id="sched-venue-sel"></select>
-        <select id="sched-team-sel"></select>`;
-      container.parentElement.insertBefore(bar, container);
-
-      populateDateSelect(bar.querySelector('#sched-date-sel'), WC_MATCHES);
-      populateStageSelect(bar.querySelector('#sched-stage-sel'), WC_MATCHES, 'All Groups/Stages');
-      populateVenueSelect(bar.querySelector('#sched-venue-sel'), WC_MATCHES);
-      populateTeamSelect(bar.querySelector('#sched-team-sel'), WC_MATCHES);
-
-      bar.addEventListener('change', e => {
-        if (e.target.id === 'sched-date-sel')  schedFilters.date  = e.target.value;
-        if (e.target.id === 'sched-stage-sel') schedFilters.stage = e.target.value;
-        if (e.target.id === 'sched-venue-sel') schedFilters.venue = e.target.value;
-        if (e.target.id === 'sched-team-sel')  schedFilters.team  = e.target.value;
-        renderSchedule();
-      });
-    }
-
-    // Filter matches
-    let matches = WC_MATCHES.slice();
-    if (schedFilters.date  !== 'all') matches = matches.filter(m => m.date  === schedFilters.date);
-    if (schedFilters.stage !== 'all') matches = matches.filter(m => (m.group || m.stage) === schedFilters.stage);
-    if (schedFilters.venue !== 'all') matches = matches.filter(m => m.venue === schedFilters.venue);
-    if (schedFilters.team  !== 'all') matches = matches.filter(m => m.home === schedFilters.team || m.away === schedFilters.team);
-
-    if (matches.length === 0) {
-      container.innerHTML = '<p class="muted" style="padding:var(--space-8) 0">No matches match your filters.</p>';
-      return;
-    }
-
-    // Group by stage
-    const byStage = {};
-    matches.forEach(m => {
-      const key = m.stage || m.group || 'Group';
-      if (!byStage[key]) byStage[key] = [];
-      byStage[key].push(m);
-    });
-
-    let html = '';
-    Object.entries(byStage).forEach(([stage, stageMatches]) => {
-      html += `<div class="stage-section">
-        <h2 class="stage-heading">${stageKeyToLabel(stage)}</h2>
-        <div class="match-list">`;
-      stageMatches.forEach(m => {
-        const hasResult = m.homeScore !== undefined && m.homeScore !== null;
-        const scoreHtml = hasResult
-          ? `<span class="score">${m.homeScore} – ${m.awayScore}</span>`
-          : `<span class="score tbd">vs</span>`;
-        const adminHtml = isAdmin ? `
-          <div class="score-entry" data-match="${m.id}">
-            <input type="number" class="score-input home-score" placeholder="H" min="0" max="20" value="${hasResult ? m.homeScore : ''}">
-            <span>–</span>
-            <input type="number" class="score-input away-score" placeholder="A" min="0" max="20" value="${hasResult ? m.awayScore : ''}">
-            <button class="save-score-btn" data-match="${m.id}">Save</button>
-          </div>` : '';
-        const venueLine = m.venue ? `<span class="match-venue">${m.venue}</span>` : '';
-        html += `
-          <div class="match-card ${hasResult ? 'has-result' : ''}">
-            <div class="match-meta">${m.date ? formatDate(m.date) : ''}${m.date && m.time ? ' · ' : ''}${m.time || ''}${venueLine ? ' · ' : ''}${venueLine} · ${stageKeyToLabel(m.stage || m.group || '')}</div>
-            <div class="match-teams">
-              <span class="team home">${m.homeFlag || ''} ${m.home}</span>
-              ${scoreHtml}
-              <span class="team away">${m.away} ${m.awayFlag || ''}</span>
-            </div>
-            ${adminHtml}
-          </div>`;
-      });
-      html += `</div></div>`;
-    });
-
-    container.innerHTML = html;
-
-    // Admin save listeners
-    if (isAdmin) {
-      container.querySelectorAll('.save-score-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const matchId = btn.dataset.match;
-          const entry = container.querySelector(`.score-entry[data-match="${matchId}"]`);
-          const home = parseInt(entry.querySelector('.home-score').value);
-          const away = parseInt(entry.querySelector('.away-score').value);
-          if (isNaN(home) || isNaN(away)) return;
-          btn.disabled = true;
-          btn.textContent = 'Saving…';
-          try {
-            await savePrediction(currentUser.uid, matchId, { homeScore: home, awayScore: away, isResult: true });
-            btn.textContent = 'Saved!';
-          } catch (e) {
-            btn.textContent = 'Error';
-          } finally {
-            setTimeout(() => { btn.disabled = false; btn.textContent = 'Save'; }, 1500);
-          }
-        });
-      });
-    }
-  }
-
-  // ─── Standings ───────────────────────────────────────────────────────────────
+  // ─── Groups ──────────────────────────────────────────────────────────────────
   function calcActualPoints(matches, teamName) {
     let pts = 0, w = 0, d = 0, l = 0, gf = 0, ga = 0;
     matches.forEach(m => {
@@ -434,10 +263,9 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     return { pts, w, d, l, gf, ga, gd: gf - ga };
   }
 
-  function renderStandings() {
-    const container = document.getElementById('standings-container');
+  function renderGroups() {
+    const container = document.getElementById('groups-grid');
     if (!container) return;
-
     let html = '';
     WC_GROUPS.forEach(group => {
       const groupMatches = WC_MATCHES.filter(m => m.group === group.id);
@@ -445,23 +273,121 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
         ...t,
         ...calcActualPoints(groupMatches, t.name)
       })).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
-
-      html += `<div class="group-table">
-        <h3>Group ${group.id}</h3>
-        <table>
-          <thead><tr><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th></tr></thead>
-          <tbody>`;
+      html += `<div class="group-table"><h3>Group ${group.id}</h3><table><thead><tr><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th></tr></thead><tbody>`;
       teams.forEach((t, i) => {
-        const qual = i < 2 ? 'qualified' : '';
-        html += `<tr class="${qual}">
-          <td>${t.flag || ''} ${t.name}</td>
-          <td>${t.w + t.d + t.l}</td><td>${t.w}</td><td>${t.d}</td><td>${t.l}</td>
-          <td>${t.gf}</td><td>${t.ga}</td><td>${t.gd}</td><td>${t.pts}</td>
-        </tr>`;
+        html += `<tr class="${i < 2 ? 'qualified' : ''}"><td>${t.flag || ''} ${t.name}</td><td>${t.w+t.d+t.l}</td><td>${t.w}</td><td>${t.d}</td><td>${t.l}</td><td>${t.gf}</td><td>${t.ga}</td><td>${t.gd}</td><td>${t.pts}</td></tr>`;
       });
       html += `</tbody></table></div>`;
     });
+    container.innerHTML = html;
+  }
 
+  // ─── Matches ─────────────────────────────────────────────────────────────────
+  let matchFilters = { date: 'all', group: 'all', venue: 'all', team: '' };
+
+  function renderMatches() {
+    const container = document.getElementById('matches-list');
+    if (!container) return;
+    const isAdmin = currentUser && ADMIN_UIDS.includes(currentUser.uid);
+
+    // Populate filter dropdowns once
+    const dateSel  = document.getElementById('match-date-filter');
+    const groupSel = document.getElementById('match-group-filter');
+    const venueSel = document.getElementById('match-venue-filter');
+    const teamInp  = document.getElementById('match-team-filter');
+
+    if (dateSel && dateSel.options.length <= 1) {
+      const dates = [...new Set(WC_MATCHES.map(m => m.date).filter(Boolean))].sort();
+      dates.forEach(d => { const o = document.createElement('option'); o.value = d; o.textContent = formatDate(d); dateSel.appendChild(o); });
+      dateSel.addEventListener('change', e => { matchFilters.date = e.target.value; renderMatches(); });
+    }
+    if (groupSel && groupSel.options.length <= 1) {
+      const stages = [...new Set(WC_MATCHES.map(m => m.group || m.stage).filter(Boolean))];
+      stages.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = stageKeyToLabel(s); groupSel.appendChild(o); });
+      groupSel.addEventListener('change', e => { matchFilters.group = e.target.value; renderMatches(); });
+    }
+    if (venueSel && venueSel.options.length <= 1) {
+      const venues = [...new Set(WC_MATCHES.map(m => m.venue).filter(Boolean))].sort();
+      venues.forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; venueSel.appendChild(o); });
+      venueSel.addEventListener('change', e => { matchFilters.venue = e.target.value; renderMatches(); });
+    }
+    if (teamInp && !teamInp._bound) {
+      teamInp._bound = true;
+      teamInp.addEventListener('input', e => { matchFilters.team = e.target.value; renderMatches(); });
+    }
+
+    // Apply filters
+    let matches = WC_MATCHES.slice();
+    if (matchFilters.date  !== 'all') matches = matches.filter(m => m.date === matchFilters.date);
+    if (matchFilters.group !== 'all') matches = matches.filter(m => (m.group || m.stage) === matchFilters.group);
+    if (matchFilters.venue !== 'all') matches = matches.filter(m => m.venue === matchFilters.venue);
+    if (matchFilters.team.trim()) {
+      const t = matchFilters.team.trim().toLowerCase();
+      matches = matches.filter(m => m.home.toLowerCase().includes(t) || m.away.toLowerCase().includes(t));
+    }
+
+    if (matches.length === 0) {
+      container.innerHTML = '<p class="muted" style="padding:var(--space-8) 0">No matches match your filters.</p>';
+      return;
+    }
+
+    const byStage = {};
+    matches.forEach(m => {
+      const key = m.stage || m.group || 'Group';
+      if (!byStage[key]) byStage[key] = [];
+      byStage[key].push(m);
+    });
+
+    let html = '';
+    Object.entries(byStage).forEach(([stage, stageMatches]) => {
+      html += `<div class="stage-section"><h2 class="stage-heading">${stageKeyToLabel(stage)}</h2><div class="match-list">`;
+      stageMatches.forEach(m => {
+        const hasResult = m.homeScore !== undefined && m.homeScore !== null;
+        const scoreHtml = hasResult
+          ? `<span class="score">${m.homeScore} – ${m.awayScore}</span>`
+          : `<span class="score tbd">vs</span>`;
+        const adminHtml = isAdmin ? `<div class="score-entry" data-match="${m.id}"><input type="number" class="score-input home-score" placeholder="H" min="0" max="20" value="${hasResult ? m.homeScore : ''}"><span>–</span><input type="number" class="score-input away-score" placeholder="A" min="0" max="20" value="${hasResult ? m.awayScore : ''}"><button class="save-score-btn" data-match="${m.id}">Save</button></div>` : '';
+        const venueLine = m.venue ? ` · ${m.venue}` : '';
+        html += `<div class="match-card ${hasResult ? 'has-result' : ''}"><div class="match-meta">${m.date ? formatDate(m.date) : ''}${m.time ? ' · ' + m.time : ''}${venueLine} · ${stageKeyToLabel(m.stage || m.group || '')}</div><div class="match-teams"><span class="team home">${m.homeFlag || ''} ${m.home}</span>${scoreHtml}<span class="team away">${m.away} ${m.awayFlag || ''}</span></div>${adminHtml}</div>`;
+      });
+      html += `</div></div>`;
+    });
+    container.innerHTML = html;
+
+    if (isAdmin) {
+      container.querySelectorAll('.save-score-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const matchId = btn.dataset.match;
+          const entry = container.querySelector(`.score-entry[data-match="${matchId}"]`);
+          const home = parseInt(entry.querySelector('.home-score').value);
+          const away = parseInt(entry.querySelector('.away-score').value);
+          if (isNaN(home) || isNaN(away)) return;
+          btn.disabled = true; btn.textContent = 'Saving…';
+          try {
+            await savePrediction(currentUser.uid, matchId, { homeScore: home, awayScore: away, isResult: true });
+            btn.textContent = 'Saved!';
+          } catch (e) { btn.textContent = 'Error'; }
+          finally { setTimeout(() => { btn.disabled = false; btn.textContent = 'Save'; }, 1500); }
+        });
+      });
+    }
+  }
+
+  // ─── Standings ───────────────────────────────────────────────────────────────
+  function renderStandings() {
+    const container = document.getElementById('standings-grid');
+    if (!container) return;
+    let html = '';
+    WC_GROUPS.forEach(group => {
+      const groupMatches = WC_MATCHES.filter(m => m.group === group.id);
+      const teams = group.teams.map(t => ({ ...t, ...calcActualPoints(groupMatches, t.name) }))
+        .sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+      html += `<div class="group-table"><h3>Group ${group.id}</h3><table><thead><tr><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th></tr></thead><tbody>`;
+      teams.forEach((t, i) => {
+        html += `<tr class="${i < 2 ? 'qualified' : ''}"><td>${t.flag || ''} ${t.name}</td><td>${t.w+t.d+t.l}</td><td>${t.w}</td><td>${t.d}</td><td>${t.l}</td><td>${t.gf}</td><td>${t.ga}</td><td>${t.gd}</td><td>${t.pts}</td></tr>`;
+      });
+      html += `</tbody></table></div>`;
+    });
     container.innerHTML = html;
   }
 
@@ -485,18 +411,19 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   }
 
   function renderPredictions() {
-    const container = document.getElementById('predictions-container');
+    const container = document.getElementById('predictions-list');
     if (!container) return;
+    const authPrompt = document.getElementById('predictions-auth-prompt');
+    const filterBar  = document.getElementById('pred-filters');
 
     if (!currentUser) {
-      container.innerHTML = `<div class="auth-prompt">
-        <p>Sign in to save your match predictions.</p>
-        <button class="btn btn-primary" id="predict-signin-btn">Sign In</button>
-      </div>`;
-      const btn = container.querySelector('#predict-signin-btn');
-      if (btn) btn.addEventListener('click', openModal);
+      if (authPrompt) authPrompt.hidden = false;
+      if (filterBar)  filterBar.hidden  = true;
+      container.innerHTML = '';
       return;
     }
+    if (authPrompt) authPrompt.hidden = true;
+    if (filterBar)  filterBar.hidden  = false;
 
     const byGroup = {};
     WC_MATCHES.forEach(m => {
@@ -513,22 +440,10 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
         const hVal = pred.homeScorePred !== undefined ? pred.homeScorePred : '';
         const aVal = pred.awayScorePred !== undefined ? pred.awayScorePred : '';
         const saved = pred.homeScorePred !== undefined;
-        html += `
-          <div class="pred-match-card ${saved ? 'saved' : ''}" data-match="${m.id}">
-            <div class="pred-match-meta">${m.date ? formatDate(m.date) : ''}</div>
-            <div class="pred-match-row">
-              <span class="pred-team home">${m.homeFlag || ''} ${m.home}</span>
-              <input type="number" class="pred-input home-pred" min="0" max="20" value="${hVal}" placeholder="0">
-              <span class="pred-sep">–</span>
-              <input type="number" class="pred-input away-pred" min="0" max="20" value="${aVal}" placeholder="0">
-              <span class="pred-team away">${m.away} ${m.awayFlag || ''}</span>
-            </div>
-            <button class="pred-save-btn" data-match="${m.id}">${saved ? 'Update' : 'Save'}</button>
-          </div>`;
+        html += `<div class="pred-match-card ${saved ? 'saved' : ''}" data-match="${m.id}"><div class="pred-match-meta">${m.date ? formatDate(m.date) : ''}</div><div class="pred-match-row"><span class="pred-team home">${m.homeFlag || ''} ${m.home}</span><input type="number" class="pred-input home-pred" min="0" max="20" value="${hVal}" placeholder="0"><span class="pred-sep">–</span><input type="number" class="pred-input away-pred" min="0" max="20" value="${aVal}" placeholder="0"><span class="pred-team away">${m.away} ${m.awayFlag || ''}</span></div><button class="pred-save-btn" data-match="${m.id}">${saved ? 'Update' : 'Save'}</button></div>`;
       });
       html += `</div></div>`;
     });
-
     container.innerHTML = html;
 
     container.querySelectorAll('.pred-save-btn').forEach(btn => {
@@ -538,8 +453,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
         const home = parseInt(card.querySelector('.home-pred').value);
         const away = parseInt(card.querySelector('.away-pred').value);
         if (isNaN(home) || isNaN(away)) return;
-        btn.disabled = true;
-        btn.textContent = 'Saving…';
+        btn.disabled = true; btn.textContent = 'Saving…';
         try {
           await savePrediction(currentUser.uid, matchId, { homeScorePred: home, awayScorePred: away });
           userPredictions[matchId] = { ...userPredictions[matchId], homeScorePred: home, awayScorePred: away };
@@ -547,58 +461,37 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
           card.classList.add('saved');
           setTimeout(() => { btn.textContent = 'Update'; btn.disabled = false; }, 1000);
           renderKnockoutBracket();
-        } catch (e) {
-          btn.textContent = 'Error';
-          btn.disabled = false;
-        }
+        } catch (e) { btn.textContent = 'Error'; btn.disabled = false; }
       });
     });
   }
 
-  // ─── Predicted Group Standings ────────────────────────────────────────────────
+  // ─── Predicted Group Standings ───────────────────────────────────────────────
   function renderPredGroupStandings() {
     const container = document.getElementById('pred-group-standings-container');
     if (!container) return;
-
+    const authPrompt = document.getElementById('pred-group-standings-auth-prompt');
     if (!currentUser) {
-      container.innerHTML = `<div class="auth-prompt">
-        <p>Sign in to view your predicted group standings.</p>
-        <button class="btn btn-primary pred-standings-signin-btn">Sign In</button>
-      </div>`;
-      container.querySelectorAll('.pred-standings-signin-btn').forEach(b => b.addEventListener('click', openModal));
+      if (authPrompt) authPrompt.hidden = false;
+      container.innerHTML = '';
       return;
     }
-
+    if (authPrompt) authPrompt.hidden = true;
     let html = '';
     WC_GROUPS.forEach(group => {
       const groupMatches = WC_MATCHES.filter(m => m.group === group.id);
-      const teams = group.teams.map(t => ({
-        ...t,
-        ...calcPredPoints(groupMatches, t.name)
-      })).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
-
-      html += `<div class="group-table">
-        <h3>Group ${group.id}</h3>
-        <table>
-          <thead><tr><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th></tr></thead>
-          <tbody>`;
+      const teams = group.teams.map(t => ({ ...t, ...calcPredPoints(groupMatches, t.name) }))
+        .sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+      html += `<div class="group-table"><h3>Group ${group.id}</h3><table><thead><tr><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th></tr></thead><tbody>`;
       teams.forEach((t, i) => {
-        const qual = i < 2 ? 'qualified' : '';
-        html += `<tr class="${qual}">
-          <td>${t.flag || ''} ${t.name}</td>
-          <td>${t.w + t.d + t.l}</td><td>${t.w}</td><td>${t.d}</td><td>${t.l}</td>
-          <td>${t.gf}</td><td>${t.ga}</td><td>${t.gd}</td><td>${t.pts}</td>
-        </tr>`;
+        html += `<tr class="${i < 2 ? 'qualified' : ''}"><td>${t.flag || ''} ${t.name}</td><td>${t.w+t.d+t.l}</td><td>${t.w}</td><td>${t.d}</td><td>${t.l}</td><td>${t.gf}</td><td>${t.ga}</td><td>${t.gd}</td><td>${t.pts}</td></tr>`;
       });
       html += `</tbody></table></div>`;
     });
-
     container.innerHTML = html;
   }
 
-  // ─── Knockout Bracket ─────────────────────────────────────────────────────────
-
-  // Get actual group finisher from recorded match results
+  // ─── Knockout Bracket ────────────────────────────────────────────────────────
   function getActualGroupFinisher(groupId, pos) {
     const group = WC_GROUPS.find(g => g.id === groupId);
     if (!group) return null;
@@ -606,18 +499,11 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     const allDone = groupMatches.length > 0 &&
       groupMatches.every(m => m.homeScore !== undefined && m.homeScore !== null);
     if (!allDone) return null;
-    const teams = group.teams.map(t => ({
-      ...t,
-      ...calcActualPoints(groupMatches, t.name)
-    })).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
-    if (teams[pos]) return { name: teams[pos].name, flag: teams[pos].flag };
-    return null;
+    const teams = group.teams.map(t => ({ ...t, ...calcActualPoints(groupMatches, t.name) }))
+      .sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+    return teams[pos] ? { name: teams[pos].name, flag: teams[pos].flag } : null;
   }
 
-  // Get the predicted group winner (pos=0) or runner-up (pos=1) from user's
-  // score predictions. Returns null if the user hasn't predicted at least one
-  // match in this group yet — otherwise all teams tie at 0 pts and the sort
-  // order is arbitrary, showing a misleading team in the bracket.
   function getPredictedGroupFinisher(groupId, pos) {
     const group = WC_GROUPS.find(g => g.id === groupId);
     if (!group) return null;
@@ -627,12 +513,9 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       return pred && pred.homeScorePred !== undefined && pred.awayScorePred !== undefined;
     });
     if (!hasPredictions) return null;
-    const teams = group.teams.map(t => ({
-      ...t,
-      ...calcPredPoints(groupMatches, t.name)
-    })).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
-    if (teams[pos]) return { name: teams[pos].name, flag: teams[pos].flag }; 
-    return null;
+    const teams = group.teams.map(t => ({ ...t, ...calcPredPoints(groupMatches, t.name) }))
+      .sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+    return teams[pos] ? { name: teams[pos].name, flag: teams[pos].flag } : null;
   }
 
   function resolveKnockoutTeam(source) {
@@ -655,14 +538,10 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   }
 
   function clearDownstreamPicks(fixtureId) {
-    // Find any fixtures that depend on the winner of fixtureId and clear them recursively
     WC_KNOCKOUT_FIXTURES.forEach(f => {
-      const dependsHome = f.home && f.home.type === 'winner' && f.home.matchId === fixtureId;
-      const dependsAway = f.away && f.away.type === 'winner' && f.away.matchId === fixtureId;
-      if (dependsHome || dependsAway) {
-        delete bracketPicks[f.id];
-        clearDownstreamPicks(f.id);
-      }
+      const dep = (f.home && f.home.type === 'winner' && f.home.matchId === fixtureId) ||
+                  (f.away && f.away.type === 'winner' && f.away.matchId === fixtureId);
+      if (dep) { delete bracketPicks[f.id]; clearDownstreamPicks(f.id); }
     });
   }
 
@@ -676,143 +555,75 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 
   function saveBracketPicks() {
     if (currentUser) {
-      try {
-        localStorage.setItem('bracketPicks_' + currentUser.uid, JSON.stringify(bracketPicks));
-      } catch (e) { /* storage blocked in some iframes */ }
+      try { localStorage.setItem('bracketPicks_' + currentUser.uid, JSON.stringify(bracketPicks)); }
+      catch (e) { /* blocked in some iframes */ }
     }
   }
 
   function renderKnockoutBracket() {
     const container = document.getElementById('pred-bracket-container');
     if (!container) return;
-
     if (!currentUser) {
-      container.innerHTML = `<div class="auth-prompt">
-        <p>Sign in to view your predicted bracket.</p>
-        <button class="btn btn-primary pred-standings-signin-btn">Sign In</button>
-      </div>`;
+      container.innerHTML = `<div class="auth-prompt"><p>Sign in to view your predicted bracket.</p><button class="btn btn-primary pred-standings-signin-btn">Sign In</button></div>`;
       container.querySelectorAll('.pred-standings-signin-btn').forEach(b => b.addEventListener('click', openModal));
       return;
     }
-
-    // Progress bar
-    const totalSlots = WC_KNOCKOUT_FIXTURES.length;
+    const totalSlots  = WC_KNOCKOUT_FIXTURES.length;
     const filledSlots = WC_KNOCKOUT_FIXTURES.filter(f => bracketPicks[f.id]).length;
     const pct = totalSlots ? Math.round((filledSlots / totalSlots) * 100) : 0;
-
     const stages = [...new Set(WC_KNOCKOUT_FIXTURES.map(f => f.stage))];
-    let html = `
-      <div class="bracket-progress">
-        <div class="bracket-progress-label">${filledSlots} / ${totalSlots} picks made</div>
-        <div class="bracket-progress-bar"><div class="bracket-progress-fill" style="width:${pct}%"></div></div>
-      </div>
-      <div class="bracket-controls">
-        <button class="btn btn-ghost btn-sm" id="bracket-seed-btn">Seed from Results</button>
-        <button class="btn btn-ghost btn-sm" id="bracket-reset-btn">Reset All</button>
-      </div>
-      <div class="bracket-scroll"><div class="bracket-stages">`;
-
+    let html = `<div class="bracket-progress"><div class="bracket-progress-label">${filledSlots} / ${totalSlots} picks made</div><div class="bracket-progress-bar"><div class="bracket-progress-fill" style="width:${pct}%"></div></div></div><div class="bracket-controls"><button class="btn btn-ghost btn-sm" id="bracket-seed-btn">Seed from Results</button><button class="btn btn-ghost btn-sm" id="bracket-reset-btn">Reset All</button></div><div class="bracket-scroll"><div class="bracket-stages">`;
     stages.forEach(stage => {
       const fixtures = WC_KNOCKOUT_FIXTURES.filter(f => f.stage === stage);
-      html += `<div class="bracket-stage">
-        <div class="bracket-stage-header">
-          <span class="bracket-stage-label">${STAGE_LABELS[stage] || stage}</span>
-          <button class="btn btn-ghost btn-xs bracket-stage-reset" data-stage="${stage}">Reset</button>
-        </div>
-        <div class="bracket-matches">`;
-
+      html += `<div class="bracket-stage"><div class="bracket-stage-header"><span class="bracket-stage-label">${STAGE_LABELS[stage] || stage}</span><button class="btn btn-ghost btn-xs bracket-stage-reset" data-stage="${stage}">Reset</button></div><div class="bracket-matches">`;
       fixtures.forEach(fixture => {
         const homeResolved = resolveKnockoutTeam(fixture.home);
         const awayResolved = resolveKnockoutTeam(fixture.away);
         const homeLabel = teamLabel(fixture.home, homeResolved);
         const awayLabel = teamLabel(fixture.away, awayResolved);
         const pick = bracketPicks[fixture.id];
-        const homePicked = pick === 'home';
-        const awayPicked = pick === 'away';
         const canPick = !!(homeResolved && awayResolved);
-
-        html += `
-          <div class="bracket-match" data-fixture="${fixture.id}">
-            <div class="bracket-team ${homePicked ? 'picked' : ''} ${canPick ? 'pickable' : 'unknown'}"
-                 data-fixture="${fixture.id}" data-side="home">
-              ${homeLabel}
-            </div>
-            <div class="bracket-team ${awayPicked ? 'picked' : ''} ${canPick ? 'pickable' : 'unknown'}"
-                 data-fixture="${fixture.id}" data-side="away">
-              ${awayLabel}
-            </div>
-          </div>`;
+        html += `<div class="bracket-match" data-fixture="${fixture.id}"><div class="bracket-team ${pick==='home'?'picked':''} ${canPick?'pickable':'unknown'}" data-fixture="${fixture.id}" data-side="home">${homeLabel}</div><div class="bracket-team ${pick==='away'?'picked':''} ${canPick?'pickable':'unknown'}" data-fixture="${fixture.id}" data-side="away">${awayLabel}</div></div>`;
       });
-
       html += `</div></div>`;
     });
-
-    // Champion display
     const finalFixture = WC_KNOCKOUT_FIXTURES.find(f => f.stage === 'F');
     const champion = finalFixture ? resolveKnockoutTeam({ type: 'winner', matchId: finalFixture.id }) : null;
     html += `</div>`;
     if (champion) {
-      html += `<div class="bracket-champion">
-        <span class="champion-trophy">🏆</span>
-        <span class="champion-label">Champion</span>
-        <span class="champion-team">${champion.flag || ''} ${champion.name}</span>
-      </div>`;
+      html += `<div class="bracket-champion"><span class="champion-trophy">🏆</span><span class="champion-label">Champion</span><span class="champion-team">${champion.flag || ''} ${champion.name}</span></div>`;
     }
     html += `</div>`;
-
     container.innerHTML = html;
 
-    // Pick listeners
     container.querySelectorAll('.bracket-team.pickable').forEach(el => {
       el.addEventListener('click', () => {
         const fixtureId = el.dataset.fixture;
         const side = el.dataset.side;
-        if (bracketPicks[fixtureId] !== side) {
-          clearDownstreamPicks(fixtureId);
-        }
+        if (bracketPicks[fixtureId] !== side) clearDownstreamPicks(fixtureId);
         bracketPicks[fixtureId] = side;
         saveBracketPicks();
         renderKnockoutBracket();
       });
     });
-
-    // Reset all
     const resetBtn = container.querySelector('#bracket-reset-btn');
-    if (resetBtn) {
-      resetBtn.addEventListener('click', () => {
-        bracketPicks = {};
-        saveBracketPicks();
-        renderKnockoutBracket();
-      });
-    }
-
-    // Reset per stage
+    if (resetBtn) resetBtn.addEventListener('click', () => { bracketPicks = {}; saveBracketPicks(); renderKnockoutBracket(); });
     container.querySelectorAll('.bracket-stage-reset').forEach(btn => {
       btn.addEventListener('click', () => {
         const stage = btn.dataset.stage;
-        WC_KNOCKOUT_FIXTURES.filter(f => f.stage === stage).forEach(f => {
-          delete bracketPicks[f.id];
-          clearDownstreamPicks(f.id);
-        });
-        saveBracketPicks();
-        renderKnockoutBracket();
+        WC_KNOCKOUT_FIXTURES.filter(f => f.stage === stage).forEach(f => { delete bracketPicks[f.id]; clearDownstreamPicks(f.id); });
+        saveBracketPicks(); renderKnockoutBracket();
       });
     });
-
-    // Seed from results
     const seedBtn = container.querySelector('#bracket-seed-btn');
     if (seedBtn) {
       seedBtn.addEventListener('click', () => {
         WC_KNOCKOUT_FIXTURES.forEach(fixture => {
-          const homeResolved = resolveKnockoutTeam(fixture.home);
-          const awayResolved = resolveKnockoutTeam(fixture.away);
-          if (homeResolved && awayResolved && !bracketPicks[fixture.id]) {
-            // Default: pick home team as placeholder
-            bracketPicks[fixture.id] = 'home';
-          }
+          const hr = resolveKnockoutTeam(fixture.home);
+          const ar = resolveKnockoutTeam(fixture.away);
+          if (hr && ar && !bracketPicks[fixture.id]) bracketPicks[fixture.id] = 'home';
         });
-        saveBracketPicks();
-        renderKnockoutBracket();
+        saveBracketPicks(); renderKnockoutBracket();
       });
     }
   }
@@ -821,32 +632,24 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   function renderPredStandings() {
     const container = document.getElementById('pred-standings-container');
     if (!container) return;
-
+    const authPrompt = document.getElementById('pred-standings-auth-prompt');
     if (!currentUser) {
-      container.innerHTML = `<div class="auth-prompt">
-        <p>Sign in to view your predicted standings.</p>
-        <button class="btn btn-primary pred-standings-signin-btn">Sign In</button>
-      </div>`;
-      container.querySelectorAll('.pred-standings-signin-btn').forEach(b => b.addEventListener('click', openModal));
+      if (authPrompt) authPrompt.hidden = false;
+      container.innerHTML = '';
       return;
     }
-
+    if (authPrompt) authPrompt.hidden = true;
     container.innerHTML = '<p class="muted">Predicted overall standings coming soon.</p>';
   }
 
-  // ─── Init ─────────────────────────────────────────────────────────────────────
+  // ─── Init ────────────────────────────────────────────────────────────────────
   function init() {
-    renderSchedule();
+    renderGroups();
+    renderMatches();
     renderStandings();
   }
-
   init();
 
-  // expose for testing
-  window._wc = {
-    getAllMatches() {
-      return [...WC_MATCHES];
-    }
-  }
+  window._wc = { getAllMatches() { return [...WC_MATCHES]; } };
 
 })();
