@@ -13,7 +13,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   let userPredictions = {};
   let authMode = 'signin';
   let unsubscribeMatches = null;
-  let activePredSubtab = 'my-picks'; // tracks which predictions sub-tab is showing
+  let activePredSubtab = 'my-picks';
 
   // ─── Theme ───────────────────────────────────────────────────────────────────
   const themeToggle = document.querySelector('[data-theme-toggle]');
@@ -118,7 +118,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   if (authSwitch)    authSwitch.addEventListener('click', () => setAuthMode(authMode === 'signin' ? 'signup' : 'signin'));
   if (signOutBtn)    signOutBtn.addEventListener('click', () => logOut());
 
-  // Wire sign-in button on prediction standings auth prompt
   document.querySelectorAll('.pred-standings-signin-btn').forEach(btn => {
     btn.addEventListener('click', () => { setAuthMode('signin'); openAuthModal(); });
   });
@@ -172,10 +171,8 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       return;
     }
     firstAuthFire = false;
-
     currentUser = user;
     authResolved = true;
-
     if (user) {
       if (authBtn)      authBtn.hidden = true;
       if (userBar)      userBar.hidden = false;
@@ -261,7 +258,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   }
 
   // ─── Points Calculation ───────────────────────────────────────────────────────
-  // scoreFn(match) must return { home, away } score integers or null if no score
   function calcPointsFromScores(matches, teamName, scoreFn) {
     let pts = 0, w = 0, d = 0, l = 0, gf = 0, ga = 0;
     matches.forEach(m => {
@@ -279,7 +275,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     return { pts, played: w + d + l, w, d, l, gf, ga, gd: gf - ga };
   }
 
-  // Legacy wrapper — uses actual match scores (for Groups / Standings views)
   function calcPoints(matches, teamName) {
     return calcPointsFromScores(matches, teamName, m => {
       if (m.homeScore === null || m.homeScore === undefined ||
@@ -288,7 +283,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     });
   }
 
-  // Prediction-based standings — uses userPredictions scores
   function calcPredictionPoints(matches, teamName) {
     return calcPointsFromScores(matches, teamName, m => {
       const pred = userPredictions[m.id];
@@ -447,17 +441,14 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     if (!container) return;
     container.innerHTML = '';
 
-    // Knockout stage names that can appear in the group/stage filter
     const KNOCKOUT_STAGES = ['Round of 32', 'Round of 16', 'Quarterfinals', 'Semifinals', 'Third Place', 'Final'];
 
     let filtered = WC_MATCHES.slice();
 
     if (groupFilter !== 'all') {
       if (KNOCKOUT_STAGES.includes(groupFilter)) {
-        // Filter by knockout stage
         filtered = filtered.filter(m => m.stage === groupFilter);
       } else {
-        // Filter by group letter (group-stage matches only)
         filtered = filtered.filter(m => m.group === groupFilter);
       }
     }
@@ -496,7 +487,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   const predTeamFilterEl  = document.getElementById('pred-team-filter');
   const predFiltersBar    = document.getElementById('pred-filters');
 
-  // Populate group + knockout stage options eagerly on boot
   if (predGroupFilterEl) {
     WC_GROUPS.forEach(g => {
       const opt = document.createElement('option');
@@ -675,8 +665,8 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
           );
           userPredictions[matchId] = { matchId, homeScorePred, awayScorePred };
           btn.textContent = 'Saved \u2713';
-          // Immediately refresh the Prediction Standings table
           renderPredictionStandings();
+          renderKnockoutBracket();
           setTimeout(() => { btn.textContent = 'Predict'; btn.disabled = false; }, 1500);
         } catch (err) {
           console.error('[Predict] save failed', matchId, err);
@@ -697,19 +687,16 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     if (!container) return;
 
     if (!authResolved || !currentUser) {
-      if (predStandingsAuthPrompt) predStandingsAuthPrompt.hidden = !authResolved || !!currentUser ? true : false;
-      container.innerHTML = '';
-      // Show auth prompt only when resolved + signed out
       if (predStandingsAuthPrompt) {
         predStandingsAuthPrompt.hidden = !(authResolved && !currentUser);
       }
+      container.innerHTML = '';
       return;
     }
 
     if (predStandingsAuthPrompt) predStandingsAuthPrompt.hidden = true;
     container.innerHTML = '';
 
-    // Check if the user has made any predictions at all
     const predCount = Object.keys(userPredictions).length;
     if (predCount === 0) {
       container.innerHTML = `
@@ -721,7 +708,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 
     WC_GROUPS.forEach(group => {
       const groupMatches = WC_MATCHES.filter(m => m.group === group.id);
-      // Only render this group card if the user has predicted at least one match in it
       const hasPreds = groupMatches.some(m => userPredictions[m.id]);
       if (!hasPreds) return;
 
@@ -760,13 +746,132 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       container.appendChild(card);
     });
 
-    // If no groups were rendered (user has predictions but none map to a group)
     if (container.childElementCount === 0) {
       container.innerHTML = `
         <div class="empty-filter-msg" style="grid-column:1/-1">
           No group-stage predictions yet — predictions for knockout matches don't appear here.
         </div>`;
     }
+  }
+
+  // ─── Get Predicted Qualifiers ─────────────────────────────────────────────────
+  // Returns array of { groupId, first, second } for every group that has
+  // at least one predicted match. first/second are team objects with flag+name.
+  function getPredictedQualifiers() {
+    return WC_GROUPS.map(group => {
+      const groupMatches = WC_MATCHES.filter(m => m.group === group.id);
+      const hasPreds = groupMatches.some(m => userPredictions[m.id]);
+      if (!hasPreds) return { groupId: group.id, first: null, second: null };
+
+      const sorted = group.teams
+        .map(t => ({ ...t, ...calcPredictionPoints(groupMatches, t.name) }))
+        .sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+
+      return {
+        groupId: group.id,
+        first:  sorted[0] || null,
+        second: sorted[1] || null,
+      };
+    });
+  }
+
+  // ─── Render Knockout Bracket (Predicted) ──────────────────────────────────────
+  function renderKnockoutBracket() {
+    const container = document.getElementById('pred-bracket-container');
+    if (!container) return;
+
+    if (!authResolved || !currentUser) {
+      container.innerHTML = `
+        <div class="auth-prompt">
+          <p>Sign in to see your Predicted Knockout Bracket.</p>
+          <button class="btn btn-primary pred-standings-signin-btn">Sign In</button>
+        </div>`;
+      // Re-wire sign-in buttons
+      container.querySelectorAll('.pred-standings-signin-btn').forEach(btn => {
+        btn.addEventListener('click', () => { setAuthMode('signin'); openAuthModal(); });
+      });
+      return;
+    }
+
+    const q = getPredictedQualifiers();
+    // Build a lookup: groupId -> { first, second }
+    const byGroup = {};
+    q.forEach(g => { byGroup[g.groupId] = g; });
+
+    // Helper: render a team slot
+    function slotHTML(team, groupId, position) {
+      if (team) {
+        return `<div class="bracket-slot bracket-slot-filled">
+          <span class="bracket-flag">${team.flag}</span>
+          <span class="bracket-name">${team.name}</span>
+          <span class="bracket-pts">${team.pts}pts</span>
+        </div>`;
+      }
+      return `<div class="bracket-slot bracket-slot-tbd">
+        <span class="bracket-tbd-label">TBD</span>
+        <span class="bracket-tbd-group">${position} · Group ${groupId}</span>
+      </div>`;
+    }
+
+    // 2026 World Cup R32 pairing structure
+    // 24 group qualifiers (top 2 from each of 12 groups) + 8 best 3rd-place teams
+    // Standard bracket: 1A v 2B, 1C v 2D, 1E v 2F, 1G v 2H,
+    //                   1B v 2A, 1D v 2C, 1F v 2E, 1H v 2G,
+    //  then best 3rd-place teams fill remaining 8 slots (shown as TBD)
+    const r32Pairs = [
+      { a: { g: 'A', p: 'first'  }, b: { g: 'B', p: 'second' }, label: 'Match 1' },
+      { a: { g: 'C', p: 'first'  }, b: { g: 'D', p: 'second' }, label: 'Match 2' },
+      { a: { g: 'E', p: 'first'  }, b: { g: 'F', p: 'second' }, label: 'Match 3' },
+      { a: { g: 'G', p: 'first'  }, b: { g: 'H', p: 'second' }, label: 'Match 4' },
+      { a: { g: 'I', p: 'first'  }, b: { g: 'J', p: 'second' }, label: 'Match 5' },
+      { a: { g: 'K', p: 'first'  }, b: { g: 'L', p: 'second' }, label: 'Match 6' },
+      { a: { g: 'B', p: 'first'  }, b: { g: 'A', p: 'second' }, label: 'Match 7' },
+      { a: { g: 'D', p: 'first'  }, b: { g: 'C', p: 'second' }, label: 'Match 8' },
+      { a: { g: 'F', p: 'first'  }, b: { g: 'E', p: 'second' }, label: 'Match 9' },
+      { a: { g: 'H', p: 'first'  }, b: { g: 'G', p: 'second' }, label: 'Match 10' },
+      { a: { g: 'J', p: 'first'  }, b: { g: 'I', p: 'second' }, label: 'Match 11' },
+      { a: { g: 'L', p: 'first'  }, b: { g: 'K', p: 'second' }, label: 'Match 12' },
+      // Best 3rd-place slots (always TBD until actual results)
+      { a: null, b: null, label: 'Match 13', tbd: true },
+      { a: null, b: null, label: 'Match 14', tbd: true },
+      { a: null, b: null, label: 'Match 15', tbd: true },
+      { a: null, b: null, label: 'Match 16', tbd: true },
+    ];
+
+    const anyPreds = Object.keys(userPredictions).length > 0;
+    if (!anyPreds) {
+      container.innerHTML = `
+        <div class="empty-filter-msg">
+          No predictions yet — make your picks on the My Predictions tab.<br>
+          Your predicted group winners and runners-up will appear here.
+        </div>`;
+      return;
+    }
+
+    const pairsHTML = r32Pairs.map(pair => {
+      if (pair.tbd) {
+        return `<div class="bracket-matchup">
+          <div class="bracket-match-label">${pair.label} <span class="bracket-round-tag">Best 3rd</span></div>
+          <div class="bracket-slot bracket-slot-tbd"><span class="bracket-tbd-label">TBD</span><span class="bracket-tbd-group">Best 3rd-place</span></div>
+          <div class="bracket-vs">vs</div>
+          <div class="bracket-slot bracket-slot-tbd"><span class="bracket-tbd-label">TBD</span><span class="bracket-tbd-group">Best 3rd-place</span></div>
+        </div>`;
+      }
+      const teamA = byGroup[pair.a.g]?.[pair.a.p] || null;
+      const teamB = byGroup[pair.b.g]?.[pair.b.p] || null;
+      return `<div class="bracket-matchup">
+        <div class="bracket-match-label">${pair.label} <span class="bracket-round-tag">Round of 32</span></div>
+        ${slotHTML(teamA, pair.a.g, pair.a.p === 'first' ? '1st' : '2nd')}
+        <div class="bracket-vs">vs</div>
+        ${slotHTML(teamB, pair.b.g, pair.b.p === 'first' ? '1st' : '2nd')}
+      </div>`;
+    }).join('');
+
+    container.innerHTML = `
+      <div class="bracket-intro">
+        <p>Based on your predicted group standings. Groups with no predictions show <strong>TBD</strong>.</p>
+      </div>
+      <div class="bracket-grid">${pairsHTML}</div>`;
   }
 
   // ─── Render Standings ─────────────────────────────────────────────────────────
@@ -813,13 +918,11 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   const dateFilterEl  = document.getElementById('date-filter');
 
   if (groupFilterEl) {
-    // Group-stage options
     WC_GROUPS.forEach(g => {
       const opt = document.createElement('option');
       opt.value = g.id; opt.textContent = 'Group ' + g.id;
       groupFilterEl.appendChild(opt);
     });
-    // Separator + knockout stage options
     const sep = document.createElement('option');
     sep.disabled = true; sep.textContent = '── Knockout ──';
     groupFilterEl.appendChild(sep);
@@ -862,6 +965,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     if (activeView === 'predictions') {
       if (activePredSubtab === 'my-picks')       renderPredictions();
       if (activePredSubtab === 'pred-standings') renderPredictionStandings();
+      if (activePredSubtab === 'pred-bracket')   renderKnockoutBracket();
     }
   }
 
