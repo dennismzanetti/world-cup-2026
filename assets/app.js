@@ -78,323 +78,247 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
         p.classList.toggle('active', isActive);
         p.hidden = !isActive;
       });
-      renderAll();
+      if (activePredSubtab === 'my-picks')            renderPredictions();
+      if (activePredSubtab === 'pred-bracket')        renderKnockoutBracket();
+      if (activePredSubtab === 'pred-standings')      renderPredStandings();
+      if (activePredSubtab === 'pred-group-standings') renderPredGroupStandings();
     });
   });
 
-  // ─── Auth Modal ──────────────────────────────────────────────────────────────
-  const authModal     = document.getElementById('auth-modal');
-  const authBackdrop  = document.getElementById('auth-backdrop');
-  const authForm      = document.getElementById('auth-form');
-  const authTitle     = document.getElementById('auth-title');
-  const authSub       = document.getElementById('auth-sub');
-  const authSubmit    = document.getElementById('auth-submit');
-  const authSwitch    = document.getElementById('auth-switch');
-  const authClose     = document.getElementById('auth-close');
-  const authError     = document.getElementById('auth-error');
-  const authNameWrap  = document.getElementById('auth-name');
-  const authNameInput = document.getElementById('auth-name-input');
-  const authNameLabel = document.getElementById('name-label');
-  const authBtn       = document.getElementById('auth-btn');
-  const userBar       = document.getElementById('user-bar');
-  const userGreeting  = document.getElementById('user-greeting');
-  const signOutBtn    = document.getElementById('sign-out-btn');
-  const predictSignin = document.getElementById('predict-signin-btn');
-  const predictPrompt = document.getElementById('predictions-auth-prompt');
+  // ─── Auth State ──────────────────────────────────────────────────────────────
+  const authBtn        = document.getElementById('auth-btn');
+  const authModal      = document.getElementById('auth-modal');
+  const authBackdrop   = document.getElementById('auth-backdrop');
+  const authClose      = document.getElementById('auth-close');
+  const authForm       = document.getElementById('auth-form');
+  const authSubmit     = document.getElementById('auth-submit');
+  const authSwitch     = document.getElementById('auth-switch');
+  const authError      = document.getElementById('auth-error');
+  const authTitle      = document.getElementById('auth-title');
+  const authSub        = document.getElementById('auth-sub');
+  const authNameGroup  = document.getElementById('auth-name');
+  const authNameInput  = document.getElementById('auth-name-input');
+  const userBar        = document.getElementById('user-bar');
+  const userGreeting   = document.getElementById('user-greeting');
+  const signOutBtn     = document.getElementById('sign-out-btn');
+  const predictSigninBtn = document.getElementById('predict-signin-btn');
   const predStandingsAuthPrompt = document.getElementById('pred-standings-auth-prompt');
 
-  function openAuthModal() {
+  function openModal() {
     authModal.hidden = false;
     authBackdrop.hidden = false;
-    authError.textContent = '';
-    document.getElementById('auth-email').value = '';
-    document.getElementById('auth-password').value = '';
-    if (authNameInput) authNameInput.value = '';
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => {
+      authModal.classList.add('open');
+      authBackdrop.classList.add('open');
+    }, 10);
   }
-  function closeAuthModal() {
-    authModal.hidden = true;
-    authBackdrop.hidden = true;
+  function closeModal() {
+    authModal.classList.remove('open');
+    authBackdrop.classList.remove('open');
+    setTimeout(() => {
+      authModal.hidden = true;
+      authBackdrop.hidden = true;
+      document.body.style.overflow = '';
+    }, 250);
   }
+
   function setAuthMode(mode) {
     authMode = mode;
-    const isSignup = mode === 'signup';
-    authTitle.textContent  = isSignup ? 'Create Account' : 'Sign In';
-    authSub.textContent    = isSignup ? 'Sign up to save and track your predictions.' : 'Sign in to save your predictions.';
-    authSubmit.textContent = isSignup ? 'Sign Up' : 'Sign In';
-    authSwitch.textContent = isSignup ? 'Already have an account? Sign in' : "Don't have an account? Sign up";
-    if (authNameWrap)  authNameWrap.style.display  = isSignup ? 'block' : 'none';
-    if (authNameLabel) authNameLabel.style.display = isSignup ? 'block' : 'none';
+    if (mode === 'signup') {
+      authTitle.textContent = 'Create Account';
+      authSub.textContent = 'Sign up to save your predictions.';
+      authSubmit.textContent = 'Create Account';
+      authSwitch.textContent = 'Already have an account? Sign in';
+      authNameGroup.style.display = 'block';
+    } else {
+      authTitle.textContent = 'Sign In';
+      authSub.textContent = 'Sign in to save your predictions.';
+      authSubmit.textContent = 'Sign In';
+      authSwitch.textContent = "Don't have an account? Sign up";
+      authNameGroup.style.display = 'none';
+    }
     authError.textContent = '';
   }
 
-  if (authBtn)       authBtn.addEventListener('click', () => { setAuthMode('signin'); openAuthModal(); });
-  if (predictSignin) predictSignin.addEventListener('click', () => { setAuthMode('signin'); openAuthModal(); });
-  if (authClose)     authClose.addEventListener('click', closeAuthModal);
-  if (authBackdrop)  authBackdrop.addEventListener('click', closeAuthModal);
-  if (authSwitch)    authSwitch.addEventListener('click', () => setAuthMode(authMode === 'signin' ? 'signup' : 'signin'));
-  if (signOutBtn)    signOutBtn.addEventListener('click', () => logOut());
+  authBtn.addEventListener('click', openModal);
+  authClose.addEventListener('click', closeModal);
+  authBackdrop.addEventListener('click', closeModal);
+  authSwitch.addEventListener('click', () => setAuthMode(authMode === 'signin' ? 'signup' : 'signin'));
+  if (predictSigninBtn) predictSigninBtn.addEventListener('click', openModal);
 
   document.querySelectorAll('.pred-standings-signin-btn').forEach(btn => {
-    btn.addEventListener('click', () => { setAuthMode('signin'); openAuthModal(); });
+    btn.addEventListener('click', openModal);
   });
 
-  if (authForm) {
-    authForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      authError.textContent = '';
-      const email    = document.getElementById('auth-email').value.trim();
-      const password = document.getElementById('auth-password').value;
-      const name     = authNameInput ? authNameInput.value.trim() : '';
-      authSubmit.disabled = true;
-      authSubmit.textContent = authMode === 'signup' ? 'Creating...' : 'Signing in...';
-      try {
-        authMode === 'signup' ? await signUp(email, password, name) : await signIn(email, password);
-        closeAuthModal();
-      } catch (err) {
-        console.error('[Auth error]', err.code, err.message);
-        authError.textContent = friendlyAuthError(err.code);
-      } finally {
-        authSubmit.disabled = false;
-        authSubmit.textContent = authMode === 'signup' ? 'Sign Up' : 'Sign In';
+  authForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    authError.textContent = '';
+    const email = document.getElementById('auth-email').value.trim();
+    const password = document.getElementById('auth-password').value;
+    authSubmit.disabled = true;
+    try {
+      if (authMode === 'signup') {
+        const displayName = authNameInput.value.trim() || email.split('@')[0];
+        await signUp(email, password, displayName);
+      } else {
+        await signIn(email, password);
       }
-    });
-  }
-
-  function friendlyAuthError(code) {
-    const map = {
-      'auth/user-not-found':         'No account found with that email.',
-      'auth/wrong-password':         'Incorrect password.',
-      'auth/email-already-in-use':   'An account already exists for that email.',
-      'auth/invalid-email':          'Please enter a valid email address.',
-      'auth/weak-password':          'Password must be at least 6 characters.',
-      'auth/too-many-requests':      'Too many attempts. Please wait and try again.',
-      'auth/invalid-credential':     'Invalid email or password.',
-      'auth/operation-not-allowed':  'Email sign-in is not enabled. Contact the app admin.',
-      'auth/network-request-failed': 'Network error — check your connection and try again.',
-      'auth/missing-password':       'Please enter a password.',
-      'auth/missing-email':          'Please enter your email address.',
-      'auth/popup-blocked':          'A popup was blocked by your browser.',
-      'auth/user-disabled':          'This account has been disabled.',
-      'auth/requires-recent-login':  'Please sign out and sign in again to continue.',
-    };
-    return map[code] || `Something went wrong (${code || 'unknown'}). Please try again.`;
-  }
-
-  // ─── Auth State Observer ─────────────────────────────────────────────────────
-  watchAuth(async (user) => {
-    if (firstAuthFire && user === null) {
-      firstAuthFire = false;
-      return;
+      closeModal();
+    } catch (err) {
+      authError.textContent = err.message || 'Authentication failed.';
+    } finally {
+      authSubmit.disabled = false;
     }
-    firstAuthFire = false;
+  });
+
+  if (signOutBtn) signOutBtn.addEventListener('click', async () => { await logOut(); });
+
+  watchAuth(async (user) => {
     currentUser = user;
     authResolved = true;
+
     if (user) {
-      if (authBtn)      authBtn.hidden = true;
-      if (userBar)      userBar.hidden = false;
-      if (userGreeting) userGreeting.textContent = 'Hi, ' + (user.displayName || user.email);
+      authBtn.textContent = 'Account';
+      authBtn.setAttribute('aria-label', 'Account');
+      if (userBar) userBar.hidden = false;
+      if (userGreeting) userGreeting.textContent = 'Hello, ' + (user.displayName || user.email);
+
       try {
         const preds = await getUserPredictions(user.uid);
         userPredictions = {};
         preds.forEach(p => { userPredictions[p.matchId] = p; });
       } catch (err) {
-        console.warn('Could not load predictions:', err);
+        console.error('Error loading predictions:', err);
+        userPredictions = {};
       }
     } else {
-      if (authBtn)  { authBtn.hidden = false; authBtn.textContent = 'Sign In'; }
-      if (userBar)  userBar.hidden = true;
+      authBtn.textContent = 'Sign In';
+      authBtn.setAttribute('aria-label', 'Sign in');
+      if (userBar) userBar.hidden = true;
       userPredictions = {};
     }
+
+    if (!firstAuthFire) {
+      const local = WC_MATCHES.find(
+        m => m.homeScore !== undefined && m.homeScore !== null
+      );
+      if (local) {
+        renderAll();
+      } else {
+        renderAll();
+      }
+    }
+    firstAuthFire = false;
+  });
+
+  // ─── Firestore Live Match Updates ─────────────────────────────────────────────
+  unsubscribeMatches = watchMatches((updatedMatches) => {
+    updatedMatches.forEach(um => {
+      const idx = WC_MATCHES.findIndex(m => m.id === um.id);
+      if (idx !== -1) {
+        WC_MATCHES[idx] = { ...WC_MATCHES[idx], ...um };
+      } else {
+        const kidx = WC_KNOCKOUT_FIXTURES.findIndex(m => m.id === um.id);
+        if (kidx !== -1) WC_KNOCKOUT_FIXTURES[kidx] = { ...WC_KNOCKOUT_FIXTURES[kidx], ...um };
+      }
+    });
     renderAll();
   });
 
-  // ─── Live Firestore Match Listener ───────────────────────────────────────────
-  function startMatchListener() {
-    if (unsubscribeMatches) unsubscribeMatches();
-    unsubscribeMatches = watchMatches((liveMatches) => {
-      liveMatches.forEach(fm => {
-        const local = WC_MATCHES.find(
-          m => m.home.name === fm.homeTeam && m.away.name === fm.awayTeam
-        );
-        if (local) {
-          if (fm.homeScore !== undefined && fm.homeScore !== null) local.homeScore = fm.homeScore;
-          if (fm.awayScore !== undefined && fm.awayScore !== null) local.awayScore = fm.awayScore;
-          if (fm.status)    local.status    = fm.status;
-          if (fm.minute)    local.minute    = fm.minute;
-          if (fm.date)      local.date      = fm.date;
-          if (fm.timeLocal) local.timeLocal = fm.timeLocal;
-          if (fm.timezone)  local.tz        = fm.timezone.replace('America/', '').split('/')[0];
-        }
-      });
-      renderAll();
-    });
-  }
-  startMatchListener();
-
-  // ─── getAllMatches ────────────────────────────────────────────────────────────
-  function getAllMatches() {
-    return WC_MATCHES.concat(WC_KNOCKOUT_FIXTURES);
-  }
-
-  // ─── Shared Filter Utilities ─────────────────────────────────────────────────
-  function getUniqueDates(matches) {
-    const seen = new Set();
-    matches.forEach(m => { if (m.date) seen.add(m.date); });
-    return [...seen].sort();
-  }
-
-  function getUniqueStages(matches) {
-    const seen = new Set();
-    matches.forEach(m => {
-      if (m.group) seen.add('Group ' + m.group);
-      else if (m.stage) seen.add(m.stage);
-    });
-    const stageOrder = Object.values(STAGE_LABELS);
-    return [...seen].sort((a, b) => {
-      const aIsGroup = a.startsWith('Group');
-      const bIsGroup = b.startsWith('Group');
-      if (aIsGroup && bIsGroup) return a.localeCompare(b);
-      if (aIsGroup) return -1;
-      if (bIsGroup) return 1;
-      return stageOrder.indexOf(a) - stageOrder.indexOf(b);
-    });
-  }
-
-  function populateDateSelect(selectEl, matches) {
-    if (!selectEl) return;
-    const prev = selectEl.value;
-    selectEl.innerHTML = '<option value="all">All Dates</option>';
-    getUniqueDates(matches).forEach(d => {
+  // ─── Date/Group/Venue Filter Helpers ─────────────────────────────────────────
+  function populateDateSelect(sel, matches) {
+    if (!sel) return;
+    const dates = [...new Set(matches.map(m => m.date).filter(Boolean))].sort();
+    sel.innerHTML = '<option value="all">All Dates</option>';
+    dates.forEach(d => {
       const opt = document.createElement('option');
       opt.value = d;
       opt.textContent = formatDate(d);
-      selectEl.appendChild(opt);
+      sel.appendChild(opt);
     });
-    if ([...selectEl.options].some(o => o.value === prev)) selectEl.value = prev;
   }
 
-  function populateStageSelect(selectEl, matches, allLabel = 'All Matches') {
-    if (!selectEl) return;
-    const prev = selectEl.value;
-    selectEl.innerHTML = `<option value="all">${allLabel}</option>`;
-    getUniqueStages(matches).forEach(s => {
+  function populateStageSelect(sel, matches, allLabel) {
+    if (!sel) return;
+    const stages = [...new Set(matches.map(m => m.group || m.stage).filter(Boolean))];
+    sel.innerHTML = `<option value="all">${allLabel}</option>`;
+    stages.forEach(s => {
       const opt = document.createElement('option');
       opt.value = s;
-      opt.textContent = s;
-      selectEl.appendChild(opt);
+      opt.textContent = s.startsWith('Group') ? s : (STAGE_LABELS[s] || s);
+      sel.appendChild(opt);
     });
-    if ([...selectEl.options].some(o => o.value === prev)) selectEl.value = prev;
   }
 
-  function populateVenueSelect(selectEl, matches) {
-    if (!selectEl) return;
-    const prev = selectEl.value;
-    selectEl.innerHTML = '<option value="all">All Venues</option>';
-    const seen = new Set();
-    matches.forEach(m => { if (m.venue) seen.add(m.venue); });
-    [...seen].sort().forEach(v => {
+  function populateVenueSelect(sel, matches) {
+    if (!sel) return;
+    const venues = [...new Set(matches.map(m => m.venue).filter(Boolean))].sort();
+    sel.innerHTML = '<option value="all">All Venues</option>';
+    venues.forEach(v => {
       const opt = document.createElement('option');
       opt.value = v;
       opt.textContent = v;
-      selectEl.appendChild(opt);
+      sel.appendChild(opt);
     });
-    if ([...selectEl.options].some(o => o.value === prev)) selectEl.value = prev;
   }
 
-  function applyMatchFilters(matches, date, stage, team) {
+  function applyMatchFilters(matches, dateVal, groupVal, teamVal) {
     return matches.filter(m => {
-      if (date !== 'all' && m.date !== date) return false;
-      if (stage !== 'all') {
-        const matchStageLabel = m.group ? 'Group ' + m.group : (m.stage || '');
-        if (matchStageLabel !== stage) return false;
-      }
-      if (team) {
-        const q = team.toLowerCase();
-        const homeName = (m.home && m.home.name) ? m.home.name.toLowerCase() : '';
-        const awayName = (m.away && m.away.name) ? m.away.name.toLowerCase() : '';
-        if (!homeName.includes(q) && !awayName.includes(q)) return false;
+      if (dateVal && dateVal !== 'all' && m.date !== dateVal) return false;
+      if (groupVal && groupVal !== 'all' && (m.group || m.stage) !== groupVal) return false;
+      if (teamVal && teamVal.trim()) {
+        const t = teamVal.trim().toLowerCase();
+        if (!m.home.name.toLowerCase().includes(t) && !m.away.name.toLowerCase().includes(t)) return false;
       }
       return true;
     });
   }
 
-  // ─── Filters: Matches page ────────────────────────────────────────────────────
+  // ─── Filters Init ────────────────────────────────────────────────────────────
   const matchDateFilter  = document.getElementById('match-date-filter');
   const matchGroupFilter = document.getElementById('match-group-filter');
   const matchVenueFilter = document.getElementById('match-venue-filter');
   const matchTeamFilter  = document.getElementById('match-team-filter');
+  const predDateFilter   = document.getElementById('pred-date-filter');
+  const predGroupFilter  = document.getElementById('pred-group-filter');
+  const predTeamFilter   = document.getElementById('pred-team-filter');
 
-  // ─── Filters: Predictions page ───────────────────────────────────────────────
-  const predDateFilter  = document.getElementById('pred-date-filter');
-  const predGroupFilter = document.getElementById('pred-group-filter');
-  const predTeamFilter  = document.getElementById('pred-team-filter');
+  populateDateSelect(matchDateFilter, WC_MATCHES);
+  populateStageSelect(matchGroupFilter, WC_MATCHES, 'All Groups');
+  populateVenueSelect(matchVenueFilter, getAllMatches());
 
-  function initMatchFilters() {
-    populateDateSelect(matchDateFilter, WC_MATCHES);
-    populateStageSelect(matchGroupFilter, WC_MATCHES, 'All Groups');
-    populateVenueSelect(matchVenueFilter, getAllMatches());
-    if (matchDateFilter)  matchDateFilter.addEventListener('change',  renderMatches);
-    if (matchGroupFilter) matchGroupFilter.addEventListener('change', renderMatches);
-    if (matchVenueFilter) matchVenueFilter.addEventListener('change', renderMatches);
-    if (matchTeamFilter)  matchTeamFilter.addEventListener('input',   renderMatches);
+  if (matchDateFilter)  matchDateFilter.addEventListener('change',  renderMatches);
+  if (matchGroupFilter) matchGroupFilter.addEventListener('change', renderMatches);
+  if (matchVenueFilter) matchVenueFilter.addEventListener('change', renderMatches);
+  if (matchTeamFilter)  matchTeamFilter.addEventListener('input',   renderMatches);
+
+  populateDateSelect(predDateFilter, getAllMatches());
+  populateStageSelect(predGroupFilter, getAllMatches(), 'All Matches');
+
+  if (predDateFilter)  predDateFilter.addEventListener('change',  renderPredictions);
+  if (predGroupFilter) predGroupFilter.addEventListener('change', renderPredictions);
+  if (predTeamFilter)  predTeamFilter.addEventListener('input',   renderPredictions);
+
+  // ─── Utility ─────────────────────────────────────────────────────────────────
+  function formatDate(iso) {
+    if (!iso) return '';
+    const [y, m, d] = iso.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
-  function initPredFilters() {
-    if (!predDateFilter && !predGroupFilter && !predTeamFilter) return;
-    populateDateSelect(predDateFilter, getAllMatches());
-    populateStageSelect(predGroupFilter, getAllMatches(), 'All Matches');
-    if (predDateFilter)  predDateFilter.addEventListener('change',  renderPredictions);
-    if (predGroupFilter) predGroupFilter.addEventListener('change', renderPredictions);
-    if (predTeamFilter)  predTeamFilter.addEventListener('input',   renderPredictions);
-  }
-
-  initMatchFilters();
-  initPredFilters();
-
-  // ─── Helpers ─────────────────────────────────────────────────────────────────
-  function formatDate(dateStr) {
-    if (!dateStr) return '';
-    const [y, mo, d] = dateStr.split('-').map(Number);
-    return new Date(y, mo - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  }
-
-  function buildDisplayMatch(match) {
-    const isKnockout = !match.group;
-    const homeResolved = isKnockout ? resolveKnockoutTeam(match.home) : match.home;
-    const awayResolved = isKnockout ? resolveKnockoutTeam(match.away) : match.away;
-    return {
-      id:        match.id,
-      date:      match.date,
-      timeLocal: match.timeLocal,
-      tz:        match.tz,
-      venue:     match.venue,
-      group:     match.group,
-      stage:     match.stage,
-      status:    match.status,
-      minute:    match.minute,
-      homeScore: match.homeScore,
-      awayScore: match.awayScore,
-      home:      homeResolved,
-      away:      awayResolved,
-    };
-  }
-
-  function resolveKnockoutTeam(teamRef) {
-    if (!teamRef || teamRef.flag !== '?') return teamRef;
-    const name = teamRef.name || '';
-    const posMatch = name.match(/^(\d+)(?:st|nd|rd|th) Group ([A-L])$/i);
-    if (posMatch) {
-      const pos   = parseInt(posMatch[1], 10) - 1;
-      const grpId = posMatch[2].toUpperCase();
-      const group = WC_GROUPS.find(g => g.id === grpId);
-      if (group) {
-        const groupMatches = WC_MATCHES.filter(m => m.group === grpId);
-        const ranked = group.teams.map(t => ({
-          ...t,
-          ...calcActualPoints(groupMatches, t.name)
-        })).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
-        if (ranked[pos]) return { name: ranked[pos].name, flag: ranked[pos].flag };
-      }
+  // ─── Resolve TBD teams from group standings ───────────────────────────────────
+  function resolveTeam(teamRef) {
+    if (!teamRef || !teamRef.tbd) return teamRef;
+    const { grpId, pos } = teamRef.tbd;
+    const group = WC_GROUPS.find(g => g.id === grpId);
+    if (group) {
+      const groupMatches = WC_MATCHES.filter(m => m.group === grpId);
+      const ranked = group.teams.map(t => ({
+        ...t,
+        ...calcActualPoints(groupMatches, t.name)
+      })).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+      if (ranked[pos]) return { name: ranked[pos].name, flag: ranked[pos].flag };
     }
     return teamRef;
   }
@@ -443,12 +367,10 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
           <span class="team-flag">${dm.home.flag}</span>
           <span class="team-name">${dm.home.name}</span>
         </div>
-        <div class="card-score-col">
-          ${scoreColContent}
-        </div>
+        ${scoreColContent}
         <div class="card-team away-team">
-          <span class="team-name">${dm.away.name}</span>
           <span class="team-flag">${dm.away.flag}</span>
+          <span class="team-name">${dm.away.name}</span>
         </div>
       </div>
       ${metaParts.length ? `
@@ -463,9 +385,10 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   function renderAll() {
     renderGroups();
     renderMatches();
-    if (activePredSubtab === 'my-picks')       renderPredictions();
-    if (activePredSubtab === 'pred-bracket')   renderKnockoutBracket();
-    if (activePredSubtab === 'pred-standings') renderPredStandings();
+    if (activePredSubtab === 'my-picks')             renderPredictions();
+    if (activePredSubtab === 'pred-bracket')         renderKnockoutBracket();
+    if (activePredSubtab === 'pred-standings')       renderPredStandings();
+    if (activePredSubtab === 'pred-group-standings') renderPredGroupStandings();
     renderStandings();
   }
 
@@ -475,181 +398,223 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     if (!container) return;
     container.innerHTML = '';
     WC_GROUPS.forEach(group => {
+      const groupMatches = WC_MATCHES.filter(m => m.group === group.id);
+      const teams = group.teams.map(t => ({
+        ...t,
+        ...calcActualPoints(groupMatches, t.name)
+      })).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+
       const card = document.createElement('div');
       card.className = 'group-card';
       card.innerHTML = `
-        <div class="group-card-header">
-          <span class="group-name">Group ${group.id}</span>
-          <span class="group-count">${group.teams.length} teams</span>
-        </div>
-        <div class="group-teams">
-          ${group.teams.map(t => `
-            <div class="group-team-row">
-              <span class="team-flag">${t.flag}</span>
-              <span class="team-name">${t.name}</span>
-              <span class="team-pts">${t.pts !== undefined ? t.pts : 0} pts</span>
-            </div>`).join('')}
-        </div>`;
+        <div class="group-header">Group ${group.id}</div>
+        <table class="group-table">
+          <thead>
+            <tr>
+              <th>Team</th>
+              <th>P</th><th>W</th><th>D</th><th>L</th>
+              <th>GF</th><th>GA</th><th>GD</th><th>Pts</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${teams.map((t, i) => `
+              <tr class="${i < 2 ? 'qualified' : ''}">
+                <td><span class="team-flag">${t.flag}</span> ${t.name}</td>
+                <td>${t.w + t.d + t.l}</td>
+                <td>${t.w}</td><td>${t.d}</td><td>${t.l}</td>
+                <td>${t.gf}</td><td>${t.ga}</td>
+                <td>${t.gd >= 0 ? '+' + t.gd : t.gd}</td>
+                <td class="pts">${t.pts}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`;
       container.appendChild(card);
     });
   }
 
-  // ─── Render Matches ───────────────────────────────────────────────────────────
+  // ─── Render Matches ──────────────────────────────────────────────────────────
   function renderMatches() {
     const container = document.getElementById('matches-list');
     if (!container) return;
 
-    const dateVal  = matchDateFilter  ? matchDateFilter.value        : 'all';
-    const groupVal = matchGroupFilter ? matchGroupFilter.value       : 'all';
-    const venueVal = matchVenueFilter ? matchVenueFilter.value       : 'all';
-    const teamVal  = matchTeamFilter  ? matchTeamFilter.value.trim() : '';
+    const dateVal  = matchDateFilter  ? matchDateFilter.value  : 'all';
+    const groupVal = matchGroupFilter ? matchGroupFilter.value : 'all';
+    const venueVal = matchVenueFilter ? matchVenueFilter.value : 'all';
+    const teamVal  = matchTeamFilter  ? matchTeamFilter.value  : '';
 
     let filtered = applyMatchFilters(WC_MATCHES, dateVal, groupVal, teamVal);
-    if (venueVal !== 'all') filtered = filtered.filter(m => m.venue === venueVal);
+    if (venueVal && venueVal !== 'all') filtered = filtered.filter(m => m.venue === venueVal);
 
     container.innerHTML = '';
 
-    if (!filtered.length) {
-      container.innerHTML = '<div class="empty-filter-msg">No matches found for the selected filters.</div>';
+    const byDate = {};
+    filtered.forEach(m => {
+      const key = m.date || 'TBD';
+      if (!byDate[key]) byDate[key] = [];
+      byDate[key].push(m);
+    });
+
+    const sortedDates = Object.keys(byDate).sort();
+    if (sortedDates.length === 0) {
+      container.innerHTML = '<p class="empty-filter-msg">No matches found for the selected filters.</p>';
       return;
     }
 
-    const isAdmin = currentUser && ADMIN_UIDS.includes(currentUser.uid);
+    sortedDates.forEach(date => {
+      const divider = document.createElement('div');
+      divider.className = 'date-divider';
+      divider.textContent = date === 'TBD' ? 'Date TBD' : formatDate(date);
+      container.appendChild(divider);
 
-    filtered.forEach(match => {
-      const dm     = buildDisplayMatch(match);
-      const status = (match.status || 'scheduled').toLowerCase();
-      const isLive     = status === 'live' || status === 'ht';
-      const isFinished = status === 'finished';
+      byDate[date].forEach(m => {
+        const card = document.createElement('div');
+        card.className = 'match-card';
+        const isAdmin = currentUser && ADMIN_UIDS.includes(currentUser.uid);
+        const hasScore = m.homeScore !== undefined && m.homeScore !== null &&
+                         m.awayScore !== undefined && m.awayScore !== null;
 
-      let scoreColContent;
-      if (isAdmin) {
-        const hv = (match.homeScore !== undefined && match.homeScore !== null) ? match.homeScore : '';
-        const av = (match.awayScore !== undefined && match.awayScore !== null) ? match.awayScore : '';
-        scoreColContent = `
-          <div class="score-inputs-wrap">
-            <input type="number" min="0" max="99" class="score-input admin-score"
-              data-match-id="${match.id}" data-side="home" value="${hv}" placeholder="-"
-              aria-label="${dm.home.name} score">
-            <span class="score-sep">:</span>
-            <input type="number" min="0" max="99" class="score-input admin-score"
-              data-match-id="${match.id}" data-side="away" value="${av}" placeholder="-"
-              aria-label="${dm.away.name} score">
-          </div>
-          <select class="score-input admin-status" data-match-id="${match.id}" aria-label="Match status" style="width:auto;height:auto;font-size:var(--text-xs);margin-top:var(--space-1)">
-            <option value="scheduled" ${status === 'scheduled' ? 'selected' : ''}>Scheduled</option>
-            <option value="live"      ${status === 'live'      ? 'selected' : ''}>Live</option>
-            <option value="ht"        ${status === 'ht'        ? 'selected' : ''}>Half Time</option>
-            <option value="finished"  ${status === 'finished'  ? 'selected' : ''}>Finished</option>
-          </select>
-          <button class="btn-save save-score-btn" data-match-id="${match.id}" style="margin-top:var(--space-1)">Save</button>`;
-      } else if (isFinished || isLive) {
-        const hs  = (match.homeScore !== undefined && match.homeScore !== null) ? match.homeScore : '?';
-        const as_ = (match.awayScore !== undefined && match.awayScore !== null) ? match.awayScore : '?';
-        scoreColContent = `<div class="score-final${isLive ? ' score-live' : ''}">${hs}<span class="score-sep"> : </span>${as_}</div>`;
-      } else {
-        scoreColContent = `<div class="score-final score-pending">vs</div>`;
-      }
-
-      const groupLabel = match.group ? 'Group ' + match.group : (match.stage || '');
-      const card = document.createElement('div');
-      card.className = 'match-card' + (isLive ? ' match-card-live' : '');
-      card.innerHTML = matchCardHTML(dm, scoreColContent, groupLabel);
-
-      if (isAdmin) {
-        const saveBtn = card.querySelector('.save-score-btn');
-        if (saveBtn) {
-          saveBtn.addEventListener('click', async () => {
-            const homeInput   = card.querySelector('.admin-score[data-side="home"]');
-            const awayInput   = card.querySelector('.admin-score[data-side="away"]');
-            const statusInput = card.querySelector('.admin-status');
-            const homeScore = homeInput ? parseInt(homeInput.value, 10) : NaN;
-            const awayScore = awayInput ? parseInt(awayInput.value, 10) : NaN;
-            const newStatus = statusInput ? statusInput.value : 'scheduled';
-            if (isNaN(homeScore) || isNaN(awayScore)) { alert('Enter both scores.'); return; }
-            saveBtn.disabled = true; saveBtn.textContent = 'Saving...';
-            try {
-              const { saveMatchResult } = await import('./db.js');
-              await saveMatchResult(match.id, { homeScore, awayScore, status: newStatus,
-                homeTeam: match.home.name, awayTeam: match.away.name });
-              saveBtn.textContent = 'Saved!';
-            } catch (err) {
-              console.error('Save score error:', err); saveBtn.textContent = 'Error';
-            } finally {
-              setTimeout(() => { saveBtn.disabled = false; saveBtn.textContent = 'Save'; }, 2000);
-            }
-          });
+        let scoreCol;
+        if (hasScore) {
+          scoreCol = `<div class="card-score">${m.homeScore} – ${m.awayScore}</div>`;
+        } else if (isAdmin) {
+          scoreCol = `
+            <div class="card-score-input">
+              <input type="number" min="0" max="99" placeholder="0" class="score-input" id="home-${m.id}" value="" aria-label="Home score">
+              <span class="score-sep">–</span>
+              <input type="number" min="0" max="99" placeholder="0" class="score-input" id="away-${m.id}" value="" aria-label="Away score">
+              <button class="btn btn-xs btn-primary save-score-btn" data-match-id="${m.id}">Save</button>
+            </div>`;
+        } else {
+          scoreCol = `<div class="card-vs">vs</div>`;
         }
-      }
-      container.appendChild(card);
+
+        const broadcast = m.broadcast && m.broadcast.length
+          ? `<div class="broadcast-row">${m.broadcast.map(b => `<span class="broadcast-badge">${b}</span>`).join('')}</div>`
+          : '';
+
+        card.innerHTML = matchCardHTML(m, scoreCol, m.group || STAGE_LABELS[m.stage] || m.stage || '') + broadcast;
+
+        if (isAdmin && !hasScore) {
+          const btn = card.querySelector('.save-score-btn');
+          if (btn) {
+            btn.addEventListener('click', async () => {
+              const homeInput = card.querySelector(`#home-${m.id}`);
+              const awayInput = card.querySelector(`#away-${m.id}`);
+              const hs = parseInt(homeInput.value, 10);
+              const as_ = parseInt(awayInput.value, 10);
+              if (isNaN(hs) || isNaN(as_)) return;
+              btn.disabled = true; btn.textContent = 'Saving...';
+              try {
+                const { saveScore } = await import('./db.js');
+                await saveScore(m.id, hs, as_);
+                btn.textContent = 'Saved!';
+              } catch (err) {
+                console.error('Save score error:', err);
+                btn.textContent = 'Error';
+              } finally {
+                setTimeout(() => { btn.disabled = false; btn.textContent = 'Save'; }, 2000);
+              }
+            });
+          }
+        }
+
+        container.appendChild(card);
+      });
     });
   }
 
-  // ─── Render Predictions ───────────────────────────────────────────────────────
+  // ─── Render Predictions ──────────────────────────────────────────────────────
   function renderPredictions() {
-    const container   = document.getElementById('predictions-list');
-    const predFilters = document.getElementById('pred-filters');
+    const container  = document.getElementById('predictions-list');
+    const authPrompt = document.getElementById('predictions-auth-prompt');
+    const filters    = document.getElementById('pred-filters');
     if (!container) return;
 
     if (!authResolved || !currentUser) {
       container.innerHTML = '';
-      if (predictPrompt) predictPrompt.hidden = false;
-      if (predFilters)   predFilters.hidden   = true;
+      if (authPrompt) authPrompt.hidden = false;
+      if (filters)    filters.hidden    = true;
       return;
     }
-    if (predictPrompt) predictPrompt.hidden = true;
-    if (predFilters)   predFilters.hidden   = false;
+    if (authPrompt) authPrompt.hidden = true;
+    if (filters)    filters.hidden    = false;
 
-    const dateVal  = predDateFilter  ? predDateFilter.value        : 'all';
-    const groupVal = predGroupFilter ? predGroupFilter.value       : 'all';
-    const teamVal  = predTeamFilter  ? predTeamFilter.value.trim() : '';
+    const dateVal  = predDateFilter  ? predDateFilter.value  : 'all';
+    const groupVal = predGroupFilter ? predGroupFilter.value : 'all';
+    const teamVal  = predTeamFilter  ? predTeamFilter.value  : '';
 
-    const filtered = applyMatchFilters(getAllMatches(), dateVal, groupVal, teamVal);
+    const allMatches = getAllMatches();
+    const filtered   = applyMatchFilters(allMatches, dateVal, groupVal, teamVal);
 
     container.innerHTML = '';
 
-    if (!filtered.length) {
-      container.innerHTML = '<div class="empty-filter-msg">No matches found for the selected filters.</div>';
-      return;
-    }
+    const byStage = {};
+    filtered.forEach(m => {
+      const key = m.group || m.stage || 'Other';
+      if (!byStage[key]) byStage[key] = [];
+      byStage[key].push(m);
+    });
 
-    filtered.forEach(match => {
-      const dm = buildDisplayMatch(match);
-      const status     = (match.status || 'scheduled').toLowerCase();
-      const isLive     = status === 'live' || status === 'ht';
-      const isFinished = status === 'finished';
-      const pred    = userPredictions[match.id];
-      const hasPred = pred && pred.homeScorePred !== undefined && pred.awayScorePred !== undefined;
+    const stageOrder = [
+      ...WC_GROUPS.map(g => g.id),
+      'R32', 'R16', 'QF', 'SF', '3P', 'F'
+    ];
 
-      const scoreColHTML = `
-        <div class="score-inputs-wrap">
-          <input type="number" min="0" max="99" class="pred-input" data-match-id="${match.id}" data-side="home"
-            value="${hasPred ? pred.homeScorePred : ''}" placeholder="-" aria-label="${dm.home.name} predicted score"
-            ${isFinished ? 'disabled title="Match has finished"' : ''}>
-          <span class="score-sep">:</span>
-          <input type="number" min="0" max="99" class="pred-input" data-match-id="${match.id}" data-side="away"
-            value="${hasPred ? pred.awayScorePred : ''}" placeholder="-" aria-label="${dm.away.name} predicted score"
-            ${isFinished ? 'disabled title="Match has finished"' : ''}>
-        </div>
-        ${isFinished
-          ? `<div class="card-result-badge ${hasPred ? 'pred-saved' : 'pred-missed'}">${hasPred ? '&#x2713; Picked' : '&#x2715; No pick'}</div>`
-          : `<button class="btn-save pred-btn save-pred-btn" data-match-id="${match.id}">Save</button>`
-        }`;
+    let anyStage = false;
+    stageOrder.forEach(stageKey => {
+      if (!byStage[stageKey]) return;
+      anyStage = true;
 
-      const groupLabel = match.group ? 'Group ' + match.group : (match.stage || '');
-      const card = document.createElement('div');
-      card.className = 'match-card' + (isLive ? ' match-card-live' : '');
-      card.innerHTML = matchCardHTML(dm, scoreColHTML, groupLabel);
+      const section = document.createElement('div');
+      section.className = 'pred-section';
 
-      if (!isFinished) {
+      const heading = document.createElement('div');
+      heading.className = 'date-divider';
+      heading.textContent = stageKey.startsWith('Group') ? stageKey : (STAGE_LABELS[stageKey] || stageKey);
+      section.appendChild(heading);
+
+      byStage[stageKey].forEach(match => {
+        const dm     = { ...match, home: resolveTeam(match.home), away: resolveTeam(match.away) };
+        const pred   = userPredictions[match.id];
+        const hasPred = pred && pred.homeScorePred !== undefined;
+        const hasScore = match.homeScore !== undefined && match.homeScore !== null &&
+                         match.awayScore !== undefined && match.awayScore !== null;
+
+        let resultClass = '';
+        if (hasPred && hasScore) {
+          const predResult   = pred.homeScorePred > pred.awayScorePred ? 'H' : pred.homeScorePred < pred.awayScorePred ? 'A' : 'D';
+          const actualResult = match.homeScore > match.awayScore ? 'H' : match.homeScore < match.awayScore ? 'A' : 'D';
+          if (pred.homeScorePred === match.homeScore && pred.awayScorePred === match.awayScore) resultClass = 'pred-exact';
+          else if (predResult === actualResult) resultClass = 'pred-correct';
+          else resultClass = 'pred-wrong';
+        }
+
+        const card = document.createElement('div');
+        card.className = 'match-card pred-card' + (resultClass ? ' ' + resultClass : '');
+
+        const scoreCol = `
+          <div class="card-pred-score">
+            ${hasScore ? `<div class="actual-score">${match.homeScore}–${match.awayScore}</div>` : ''}
+            <div class="pred-inputs">
+              <input type="number" min="0" max="99" class="score-input pred-input" data-match="${match.id}" data-side="home"
+                value="${hasPred ? pred.homeScorePred : ''}" placeholder="0" aria-label="Predicted home score">
+              <span class="score-sep">–</span>
+              <input type="number" min="0" max="99" class="score-input pred-input" data-match="${match.id}" data-side="away"
+                value="${hasPred ? pred.awayScorePred : ''}" placeholder="0" aria-label="Predicted away score">
+            </div>
+            <button class="btn btn-xs btn-primary save-pred-btn" data-match-id="${match.id}">Save</button>
+          </div>`;
+
+        card.innerHTML = matchCardHTML(dm, scoreCol, stageKey.startsWith('Group') ? stageKey : (STAGE_LABELS[stageKey] || stageKey));
+
         const saveBtn = card.querySelector('.save-pred-btn');
         if (saveBtn) {
           saveBtn.addEventListener('click', async () => {
-            const homeInput = card.querySelector('.pred-input[data-side="home"]');
-            const awayInput = card.querySelector('.pred-input[data-side="away"]');
-            const homeScorePred = homeInput ? parseInt(homeInput.value, 10) : NaN;
-            const awayScorePred = awayInput ? parseInt(awayInput.value, 10) : NaN;
-            if (isNaN(homeScorePred) || isNaN(awayScorePred)) { console.warn('Invalid prediction input'); return; }
+            const homeInput = card.querySelector(`.pred-input[data-match="${match.id}"][data-side="home"]`);
+            const awayInput = card.querySelector(`.pred-input[data-match="${match.id}"][data-side="away"]`);
+            const homeScorePred = parseInt(homeInput.value, 10);
+            const awayScorePred = parseInt(awayInput.value, 10);
+            if (isNaN(homeScorePred) || isNaN(awayScorePred)) return;
             saveBtn.disabled = true; saveBtn.textContent = 'Saving...';
             try {
               await savePrediction(currentUser.uid, match.id, {
@@ -666,95 +631,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
             }
           });
         }
-      }
-      container.appendChild(card);
-    });
-  }
-
-  // ─── Render Knockout Bracket ──────────────────────────────────────────────────
-  function renderKnockoutBracket() {
-    const container = document.getElementById('pred-bracket-container');
-    if (!container) return;
-
-    if (!authResolved || !currentUser) {
-      container.innerHTML = '<div class="auth-prompt"><p>Sign in to view and fill in your knockout predictions.</p><button class="btn btn-primary pred-standings-signin-btn">Sign In to Predict</button></div>';
-      return;
-    }
-
-    const stages = [
-      { key: 'R32', label: STAGE_LABELS.R32 },
-      { key: 'R16', label: STAGE_LABELS.R16 },
-      { key: 'QF',  label: STAGE_LABELS.QF  },
-      { key: 'SF',  label: STAGE_LABELS.SF  },
-      { key: '3P',  label: STAGE_LABELS['3P'] },
-      { key: 'F',   label: STAGE_LABELS.F   },
-    ];
-
-    container.innerHTML = '';
-    let anyStage = false;
-
-    stages.forEach(({ key, label }) => {
-      const stageMatches = WC_KNOCKOUT_FIXTURES.filter(m => m.stage === STAGE_LABELS[key]);
-      if (!stageMatches.length) return;
-      anyStage = true;
-
-      const section = document.createElement('div');
-      section.className = 'ko-stage-section';
-      section.innerHTML = `<h3 class="ko-stage-title">${label}</h3>`;
-
-      stageMatches.forEach(match => {
-        const dm = buildDisplayMatch(match);
-        const status     = (match.status || 'scheduled').toLowerCase();
-        const isLive     = status === 'live' || status === 'ht';
-        const isFinished = status === 'finished';
-        const pred    = userPredictions[match.id];
-        const hasPred = pred && pred.homeScorePred !== undefined && pred.awayScorePred !== undefined;
-
-        const scoreColHTML = `
-          <div class="score-inputs-wrap">
-            <input type="number" min="0" max="99" class="pred-input" data-match-id="${match.id}" data-side="home"
-              value="${hasPred ? pred.homeScorePred : ''}" placeholder="-" aria-label="${dm.home.name} predicted score"
-              ${isFinished ? 'disabled title="Match has finished"' : ''}>
-            <span class="score-sep">:</span>
-            <input type="number" min="0" max="99" class="pred-input" data-match-id="${match.id}" data-side="away"
-              value="${hasPred ? pred.awayScorePred : ''}" placeholder="-" aria-label="${dm.away.name} predicted score"
-              ${isFinished ? 'disabled title="Match has finished"' : ''}>
-          </div>
-          ${isFinished
-            ? `<div class="card-result-badge ${hasPred ? 'pred-saved' : 'pred-missed'}">${hasPred ? '&#x2713; Picked' : '&#x2715; No pick'}</div>`
-            : `<button class="btn-save pred-btn save-pred-btn" data-match-id="${match.id}">Save</button>`
-          }`;
-
-        const card = document.createElement('div');
-        card.className = 'match-card' + (isLive ? ' match-card-live' : '');
-        card.innerHTML = matchCardHTML(dm, scoreColHTML, match.stage || label);
-
-        if (!isFinished) {
-          const saveBtn = card.querySelector('.save-pred-btn');
-          if (saveBtn) {
-            saveBtn.addEventListener('click', async () => {
-              const homeInput = card.querySelector('.pred-input[data-side="home"]');
-              const awayInput = card.querySelector('.pred-input[data-side="away"]');
-              const homeScorePred = homeInput ? parseInt(homeInput.value, 10) : NaN;
-              const awayScorePred = awayInput ? parseInt(awayInput.value, 10) : NaN;
-              if (isNaN(homeScorePred) || isNaN(awayScorePred)) return;
-              saveBtn.disabled = true; saveBtn.textContent = 'Saving...';
-              try {
-                await savePrediction(currentUser.uid, match.id, {
-                  homeTeam: match.home.name, awayTeam: match.away.name,
-                  homeScorePred, awayScorePred
-                });
-                userPredictions[match.id] = { matchId: match.id, homeScorePred, awayScorePred };
-                saveBtn.textContent = 'Saved!';
-              } catch (err) {
-                console.error('Save pred error:', err);
-                saveBtn.textContent = 'Error';
-              } finally {
-                setTimeout(() => { saveBtn.disabled = false; saveBtn.textContent = 'Save'; }, 2000);
-              }
-            });
-          }
-        }
         section.appendChild(card);
       });
 
@@ -768,6 +644,18 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
           <span style="font-size:var(--text-xs);opacity:0.7">Bracket populates after the group stage.</span>
         </div>`;
     }
+  }
+
+  // ─── Render Knockout Bracket (Placeholder) ───────────────────────────────────
+  function renderKnockoutBracket() {
+    const container = document.getElementById('pred-bracket-container');
+    if (!container) return;
+    if (!authResolved || !currentUser) {
+      container.innerHTML = `<div class="auth-prompt"><p>Sign in to view and fill in your knockout predictions.</p><button class="btn btn-primary pred-standings-signin-btn">Sign In to Predict</button></div>`;
+      container.querySelector('.pred-standings-signin-btn')?.addEventListener('click', openModal);
+      return;
+    }
+    container.innerHTML = `<p class="bracket-intro">Knockout bracket predictions coming soon — will auto-populate from your Group Standings predictions.</p>`;
   }
 
   // ─── Render Standings ─────────────────────────────────────────────────────────
@@ -810,7 +698,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     });
   }
 
-  // ─── Render Prediction Standings ──────────────────────────────────────────────
+  // ─── Render Prediction Accuracy ───────────────────────────────────────────────
   function renderPredStandings() {
     const container = document.getElementById('pred-standings-container');
     if (!container) return;
@@ -861,6 +749,84 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
           <div class="pred-stat-label">Accuracy</div>
         </div>
       </div>`;
+  }
+
+  // ─── Calc Predicted Points ────────────────────────────────────────────────────
+  function calcPredPoints(matches, teamName) {
+    let pts = 0, gf = 0, ga = 0, w = 0, d = 0, l = 0;
+    matches.forEach(m => {
+      const isHome = m.home.name === teamName;
+      const isAway = m.away.name === teamName;
+      if (!isHome && !isAway) return;
+      const pred = userPredictions[m.id];
+      if (!pred || pred.homeScorePred === undefined || pred.awayScorePred === undefined) return;
+      const ts = isHome ? pred.homeScorePred : pred.awayScorePred;
+      const os = isHome ? pred.awayScorePred : pred.homeScorePred;
+      gf += ts; ga += os;
+      if (ts > os)       { pts += 3; w++; }
+      else if (ts === os){ pts += 1; d++; }
+      else               { l++; }
+    });
+    return { pts, gf, ga, gd: gf - ga, w, d, l };
+  }
+
+  // ─── Render Predicted Group Standings ─────────────────────────────────────────
+  function renderPredGroupStandings() {
+    const container = document.getElementById('pred-group-standings-container');
+    if (!container) return;
+
+    const authPrompt = document.getElementById('pred-group-standings-auth-prompt');
+    if (!authResolved || !currentUser) {
+      container.innerHTML = '';
+      if (authPrompt) authPrompt.hidden = false;
+      return;
+    }
+    if (authPrompt) authPrompt.hidden = true;
+
+    container.innerHTML = '';
+    const grid = document.createElement('div');
+    grid.className = 'standings-grid';
+
+    WC_GROUPS.forEach(group => {
+      const groupMatches = WC_MATCHES.filter(m => m.group === group.id);
+      const teams = group.teams.map(t => ({
+        ...t,
+        ...calcPredPoints(groupMatches, t.name)
+      })).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+
+      const card = document.createElement('div');
+      card.className = 'standings-card';
+      card.innerHTML = `
+        <div class="standings-header">Group ${group.id}</div>
+        <table class="standings-table">
+          <thead>
+            <tr>
+              <th>Team</th>
+              <th>P</th><th>W</th><th>D</th><th>L</th>
+              <th>GF</th><th>GA</th><th>GD</th><th>Pts</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${teams.map((t, i) => `
+              <tr class="${i < 2 ? 'qualified' : ''}">
+                <td><span class="team-flag">${t.flag}</span> ${t.name}</td>
+                <td>${t.w + t.d + t.l}</td>
+                <td>${t.w}</td><td>${t.d}</td><td>${t.l}</td>
+                <td>${t.gf}</td><td>${t.ga}</td>
+                <td>${t.gd >= 0 ? '+' + t.gd : t.gd}</td>
+                <td class="pts">${t.pts}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`;
+      grid.appendChild(card);
+    });
+
+    container.appendChild(grid);
+  }
+
+  // ─── getAllMatches ────────────────────────────────────────────────────────────
+  function getAllMatches() {
+    return WC_MATCHES.concat(WC_KNOCKOUT_FIXTURES);
   }
 
 })();
