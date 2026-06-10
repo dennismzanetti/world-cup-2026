@@ -19,7 +19,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 
   // Replace with real admin Firebase UIDs to enable the score-entry UI
   const ADMIN_UIDS = [
-    'REPLACE_WITH_YOUR_FIREBASE_UID',
+    'rvR3HclRnhXAOd3rgk7sO0s3F7v1',
   ];
 
   // ─── stageKeyToLabel ─────────────────────────────────────────────────────────
@@ -665,13 +665,10 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 
   // ─── Bracket Helpers ─────────────────────────────────────────────────────────
 
-  // Get the actual group finisher (pos=0=winner, pos=1=runner-up) from real
-  // entered match results. Returns null if the group has incomplete results.
   function getActualGroupFinisher(groupId, pos) {
     const group = WC_GROUPS.find(g => g.id === groupId);
     if (!group) return null;
     const groupMatches = WC_MATCHES.filter(m => m.group === groupId);
-    // Only use actual results — require all 3 group matches per team to be complete
     const hasAllResults = groupMatches.every(m =>
       m.homeScore !== undefined && m.homeScore !== null &&
       m.awayScore !== undefined && m.awayScore !== null
@@ -685,8 +682,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     return null;
   }
 
-  // Get the predicted group winner (pos=0) or runner-up (pos=1) from user's
-  // score predictions. Falls back to the data.js placeholder label.
   function getPredictedGroupFinisher(groupId, pos) {
     const group = WC_GROUPS.find(g => g.id === groupId);
     if (!group) return null;
@@ -699,22 +694,14 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     return null;
   }
 
-  // Resolve a knockout fixture's home/away team using:
-  //  1. Actual results (type='group' → real standings if complete)
-  //  2. User's score predictions (type='group' → predicted standings)
-  //  3. bracketPicks cascade (type='winner' → picked winner of prior match)
-  //  4. Fallback to the placeholder name in data.js
   function resolveKnockoutTeam(source, fixture) {
     if (!source) return { name: '?', flag: '🏳️' };
 
     if (source.type === 'group') {
-      // Prefer actual results when the group is fully played
       const actual = getActualGroupFinisher(source.group, source.pos);
       if (actual) return actual;
-      // Fall back to user's predicted standings
       const predicted = getPredictedGroupFinisher(source.group, source.pos);
       if (predicted) return predicted;
-      // Last resort: placeholder label e.g. "1A"
       const posLabel = source.pos === 0 ? '1' : '2';
       return { name: posLabel + source.group, flag: '🏳️' };
     }
@@ -725,7 +712,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 
     if (source.type === 'winner') {
       const priorMatchId = source.matchId;
-      const pick = bracketPicks[priorMatchId]; // 'home' or 'away'
+      const pick = bracketPicks[priorMatchId];
       if (pick) {
         const priorFixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === priorMatchId);
         if (priorFixture) {
@@ -734,7 +721,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
           return pick === 'home' ? priorHome : priorAway;
         }
       }
-      // No pick yet — show placeholder
       return { name: fixture ? (fixture.home.name.startsWith('W ') ? fixture.home.name : '?') : '?', flag: '🏳️' };
     }
 
@@ -745,10 +731,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     return { name: '?', flag: '🏳️' };
   }
 
-  // Given a matchId pick ('home'/'away'), clear all downstream bracket picks
-  // that depended on this match's result.
   function clearDownstreamPicks(matchId) {
-    // Find all fixtures that source their team from this match
     const dependents = WC_KNOCKOUT_FIXTURES.filter(f =>
       (f.homeSource && f.homeSource.type === 'winner' && f.homeSource.matchId === matchId) ||
       (f.awaySource && f.awaySource.type === 'winner' && f.awaySource.matchId === matchId)
@@ -788,9 +771,8 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 
     container.innerHTML = '';
 
-    // Header row with progress info
     const totalPicks = Object.keys(bracketPicks).length;
-    const totalMatches = 31; // R32(16) + R16(8) + QF(4) + SF(2) + F(1)
+    const totalMatches = 31;
     const pct = Math.round((totalPicks / totalMatches) * 100);
 
     const header = document.createElement('div');
@@ -812,11 +794,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       renderKnockoutBracket();
     });
 
-    // "Seed from Results" — populate R32 team labels from actual standings
-    // when all group matches for a given group are complete. This doesn't make
-    // any bracket picks; it just ensures real team names show in the R32 slots
-    // by triggering a re-render (resolveKnockoutTeam already prefers actual
-    // results). Shows a brief confirmation with how many groups were seeded.
     header.querySelector('#bracket-seed-results').addEventListener('click', () => {
       let seededGroups = 0;
       WC_GROUPS.forEach(group => {
@@ -828,7 +805,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
         if (complete) seededGroups++;
       });
       renderKnockoutBracket();
-      // Brief toast-style feedback
       const btn = document.getElementById('bracket-seed-results');
       if (btn) {
         const orig = btn.textContent;
@@ -840,7 +816,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       }
     });
 
-    // Bracket scroll wrapper
     const scroll = document.createElement('div');
     scroll.className = 'bracket-scroll';
     container.appendChild(scroll);
@@ -864,7 +839,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       if (roundIdx > 0) {
         const resetBtn = roundHeader.querySelector('.bracket-reset-round');
         resetBtn && resetBtn.addEventListener('click', () => {
-          // Clear picks from this round onward
           const roundsToReset = rounds.slice(roundIdx);
           roundsToReset.forEach(r => r.ids.forEach(id => delete bracketPicks[id]));
           saveBracketPicks();
@@ -882,13 +856,12 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 
         const homeTeam = resolveKnockoutTeam(fixture.homeSource, fixture);
         const awayTeam = resolveKnockoutTeam(fixture.awaySource, fixture);
-        const pick = bracketPicks[matchId]; // 'home' | 'away' | undefined
+        const pick = bracketPicks[matchId];
 
         const matchEl = document.createElement('div');
         matchEl.className = 'bracket-match';
         matchEl.dataset.matchId = matchId;
 
-        // Determine if teams are TBD (not yet resolvable)
         const homeTBD = homeTeam.name === '?' || homeTeam.name.startsWith('Best 3rd') || homeTeam.name.startsWith('W ');
         const awayTBD = awayTeam.name === '?' || awayTeam.name.startsWith('Best 3rd') || awayTeam.name.startsWith('W ');
 
@@ -910,12 +883,10 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
           ${fixture.date ? `<div class="bracket-date">${formatDate(fixture.date)}</div>` : ''}
         `;
 
-        // Click handlers for team buttons
         matchEl.querySelectorAll('.bracket-team').forEach(btn => {
           btn.addEventListener('click', () => {
             const side = btn.dataset.side;
             if (bracketPicks[matchId] === side) {
-              // Toggle off — also clear downstream
               delete bracketPicks[matchId];
             } else {
               bracketPicks[matchId] = side;
@@ -932,7 +903,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       bracketEl.appendChild(col);
     });
 
-    // ── Champion display ──────────────────────────────────────────────────────
     const finalFixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === 'final');
     const finalPick = bracketPicks['final'];
     let champion = null;
