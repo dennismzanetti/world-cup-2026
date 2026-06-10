@@ -10,7 +10,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   let currentUser     = null;
   let authResolved    = false;
   let activeTab       = 'groups';
-  let activePredSubtab = 'pred-matches';
+  let activePredSubtab = 'my-picks';
   let userPredictions = {};
 
   // ─── Admin UIDs ───────────────────────────────────────────────────────────
@@ -31,11 +31,10 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     document.querySelectorAll('.sub-tab-panel').forEach(panel => {
       panel.hidden = panel.id !== `subtab-${id}`;
     });
-    // Show/hide the match filters only for the pred-matches sub-tab
     const predFilters = document.getElementById('pred-filters');
-    if (predFilters) predFilters.hidden = (id !== 'pred-matches');
+    if (predFilters) predFilters.hidden = (id !== 'my-picks');
 
-    if (id === 'pred-matches')           renderPredictions();
+    if (id === 'my-picks')               renderPredictions();
     if (id === 'pred-group-standings')   renderPredGroupStandings();
     if (id === 'pred-standings')         renderPredStandings();
     if (id === 'pred-bracket')           renderKnockoutBracket();
@@ -44,32 +43,32 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   // ─── Tab routing ──────────────────────────────────────────────────────────
   function switchTab(id) {
     activeTab = id;
-    document.querySelectorAll('.nav-tab').forEach(btn => {
-      const active = btn.dataset.tab === id;
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+      const active = btn.dataset.view === id;
       btn.classList.toggle('active', active);
       btn.setAttribute('aria-selected', active);
     });
-    document.querySelectorAll('.tab-panel').forEach(panel => {
-      panel.hidden = panel.id !== `tab-${id}`;
+    document.querySelectorAll('.view').forEach(panel => {
+      panel.classList.toggle('active', panel.id === `view-${id}`);
     });
     if (id === 'groups')      renderGroups();
     if (id === 'matches')     renderMatches();
     if (id === 'standings')   renderStandings();
-    if (id === 'predictions') {
-      switchPredSubtab(activePredSubtab);
-    }
+    if (id === 'predictions') switchPredSubtab(activePredSubtab);
   }
 
   // ─── Auth ─────────────────────────────────────────────────────────────────
   watchAuth(async (user) => {
     currentUser = user;
     authResolved = true;
-    const userInfo  = document.getElementById('user-info');
-    const signInBtn = document.getElementById('sign-in-btn');
+    const userInfo   = document.getElementById('user-greeting');
+    const signInBtn  = document.getElementById('auth-btn');
     const signOutBtn = document.getElementById('sign-out-btn');
+    const userBar    = document.getElementById('user-bar');
 
     if (user) {
       if (userInfo)   userInfo.textContent = user.email;
+      if (userBar)    userBar.hidden = false;
       if (signInBtn)  signInBtn.hidden = true;
       if (signOutBtn) signOutBtn.hidden = false;
 
@@ -82,6 +81,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       });
     } else {
       if (userInfo)   userInfo.textContent = '';
+      if (userBar)    userBar.hidden = true;
       if (signInBtn)  signInBtn.hidden = false;
       if (signOutBtn) signOutBtn.hidden = true;
       userPredictions = {};
@@ -97,53 +97,55 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   }
 
   // ─── Event Listeners ──────────────────────────────────────────────────────
-  document.querySelectorAll('.nav-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.view));
   });
   document.querySelectorAll('.sub-tab').forEach(btn => {
     btn.addEventListener('click', () => switchPredSubtab(btn.dataset.subtab));
   });
 
-  document.getElementById('sign-in-btn')?.addEventListener('click', openModal);
+  document.getElementById('auth-btn')?.addEventListener('click', openModal);
+  document.getElementById('predict-signin-btn')?.addEventListener('click', openModal);
   document.getElementById('sign-out-btn')?.addEventListener('click', () => logOut());
 
   document.querySelectorAll('.pred-standings-signin-btn').forEach(btn => {
     btn.addEventListener('click', openModal);
   });
 
-  document.getElementById('auth-modal-close')?.addEventListener('click', closeModal);
+  document.getElementById('auth-close')?.addEventListener('click', closeModal);
   document.getElementById('auth-modal')?.addEventListener('click', e => {
     if (e.target === e.currentTarget) closeModal();
   });
 
   const authForm = document.getElementById('auth-form');
+  let authFormMode = 'signin';
+
   authForm?.addEventListener('submit', async e => {
     e.preventDefault();
     const email    = document.getElementById('auth-email').value.trim();
     const password = document.getElementById('auth-password').value;
-    const isSignUp = document.getElementById('auth-mode').value === 'signup';
     const errEl    = document.getElementById('auth-error');
+    if (errEl) errEl.textContent = '';
     try {
-      if (isSignUp) await signUp(email, password);
-      else          await signIn(email, password);
+      if (authFormMode === 'signup') await signUp(email, password);
+      else                           await signIn(email, password);
       closeModal();
     } catch (err) {
       if (errEl) errEl.textContent = err.message;
     }
   });
 
-  document.getElementById('auth-toggle')?.addEventListener('click', () => {
-    const modeEl    = document.getElementById('auth-mode');
+  document.getElementById('auth-switch')?.addEventListener('click', () => {
     const submitBtn = document.getElementById('auth-submit');
-    const toggleBtn = document.getElementById('auth-toggle');
-    const titleEl   = document.getElementById('auth-modal-title');
-    if (modeEl.value === 'signin') {
-      modeEl.value = 'signup';
+    const toggleBtn = document.getElementById('auth-switch');
+    const titleEl   = document.getElementById('auth-title');
+    if (authFormMode === 'signin') {
+      authFormMode = 'signup';
       if (titleEl)   titleEl.textContent = 'Create Account';
       if (submitBtn) submitBtn.textContent = 'Sign Up';
       if (toggleBtn) toggleBtn.textContent = 'Already have an account? Sign In';
     } else {
-      modeEl.value = 'signin';
+      authFormMode = 'signin';
       if (titleEl)   titleEl.textContent = 'Sign In';
       if (submitBtn) submitBtn.textContent = 'Sign In';
       if (toggleBtn) toggleBtn.textContent = "Don't have an account? Sign Up";
@@ -151,9 +153,9 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   });
 
   // ─── Match filters (Matches tab) ──────────────────────────────────────────
-  document.getElementById('date-filter')?.addEventListener('change', renderMatches);
-  document.getElementById('group-filter')?.addEventListener('change', renderMatches);
-  document.getElementById('team-filter')?.addEventListener('input', renderMatches);
+  document.getElementById('match-date-filter')?.addEventListener('change', renderMatches);
+  document.getElementById('match-group-filter')?.addEventListener('change', renderMatches);
+  document.getElementById('match-team-filter')?.addEventListener('input', renderMatches);
 
   // ─── Pred Match filters ────────────────────────────────────────────────────
   document.getElementById('pred-date-filter')?.addEventListener('change', renderPredictions);
@@ -171,7 +173,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 
   // ─── Groups ───────────────────────────────────────────────────────────────
   function renderGroups() {
-    const container = document.getElementById('groups-container');
+    const container = document.getElementById('groups-grid');
     if (!container) return;
     container.innerHTML = '';
     WC_GROUPS.forEach(group => {
@@ -240,8 +242,8 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   };
 
   function populateMatchFilters() {
-    const dateSelect  = document.getElementById('date-filter');
-    const stageSelect = document.getElementById('group-filter');
+    const dateSelect  = document.getElementById('match-date-filter');
+    const stageSelect = document.getElementById('match-group-filter');
     if (!dateSelect || !stageSelect) return;
     const dates = [...new Set(WC_MATCHES.map(m => m.date).filter(Boolean))].sort();
     dateSelect.innerHTML = '<option value="">All Dates</option>' +
@@ -264,14 +266,14 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   }
 
   function renderMatches() {
-    const container = document.getElementById('matches-container');
+    const container = document.getElementById('matches-list');
     if (!container) return;
-    const dateVal  = document.getElementById('date-filter')?.value  || '';
-    const stageVal = document.getElementById('group-filter')?.value || '';
-    const teamVal  = (document.getElementById('team-filter')?.value || '').toLowerCase();
+    const dateVal  = document.getElementById('match-date-filter')?.value  || '';
+    const stageVal = document.getElementById('match-group-filter')?.value || '';
+    const teamVal  = (document.getElementById('match-team-filter')?.value || '').toLowerCase();
     let matches = WC_MATCHES.slice();
-    if (dateVal)  matches = matches.filter(m => m.date === dateVal);
-    if (stageVal) matches = matches.filter(m => (m.group || m.stage) === stageVal);
+    if (dateVal && dateVal !== 'all')  matches = matches.filter(m => m.date === dateVal);
+    if (stageVal && stageVal !== 'all') matches = matches.filter(m => (m.group || m.stage) === stageVal);
     if (teamVal)  matches = matches.filter(m =>
       m.home.toLowerCase().includes(teamVal) || m.away.toLowerCase().includes(teamVal));
     container.innerHTML = '';
@@ -358,7 +360,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 
   // ─── Standings ────────────────────────────────────────────────────────────
   function renderStandings() {
-    const container = document.getElementById('standings-container');
+    const container = document.getElementById('standings-grid');
     if (!container) return;
     container.innerHTML = '';
     WC_GROUPS.forEach(group => {
@@ -393,7 +395,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 
   // ─── Predictions ──────────────────────────────────────────────────────────
   function renderPredictions() {
-    const container = document.getElementById('predictions-container');
+    const container = document.getElementById('predictions-list');
     if (!container) return;
     const authPrompt = document.getElementById('predictions-auth-prompt');
     if (!currentUser) {
@@ -406,8 +408,8 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     const stageVal = document.getElementById('pred-group-filter')?.value || '';
     const teamVal  = (document.getElementById('pred-team-filter')?.value || '').toLowerCase();
     let matches = WC_MATCHES.filter(m => m.group || m.stage === 'R32');
-    if (dateVal)  matches = matches.filter(m => m.date === dateVal);
-    if (stageVal) matches = matches.filter(m => (m.group || m.stage) === stageVal);
+    if (dateVal && dateVal !== 'all')  matches = matches.filter(m => m.date === dateVal);
+    if (stageVal && stageVal !== 'all') matches = matches.filter(m => (m.group || m.stage) === stageVal);
     if (teamVal)  matches = matches.filter(m =>
       m.home.toLowerCase().includes(teamVal) || m.away.toLowerCase().includes(teamVal));
     container.innerHTML = '';
@@ -689,7 +691,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     }
   }
 
-  // ─── Pred Standings ──────────────────────────────────────────────────────────
+  // ─── Pred Standings ───────────────────────────────────────────────────────
   function renderPredStandings() {
     const container = document.getElementById('pred-standings-container');
     if (!container) return;
@@ -742,7 +744,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       </div>`;
   }
 
-  // ─── Init ────────────────────────────────────────────────────────────────────
+  // ─── Init ─────────────────────────────────────────────────────────────────
   function init() {
     populateMatchFilters();
     populatePredFilters();
