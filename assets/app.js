@@ -199,9 +199,8 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       userPredictions = {};
     }
 
-    if (!firstAuthFire) {
-      renderAll();
-    }
+    // Always re-render on auth state change (sign in, sign out, token refresh)
+    renderAll();
     firstAuthFire = false;
   });
 
@@ -292,6 +291,12 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   if (predDateFilter)  predDateFilter.addEventListener('change',  renderPredictions);
   if (predGroupFilter) predGroupFilter.addEventListener('change', renderPredictions);
   if (predTeamFilter)  predTeamFilter.addEventListener('input',   renderPredictions);
+
+  // ─── Initial render — runs immediately, before auth resolves ─────────────────
+  // Groups, Matches, and Standings don't need auth and should be visible right away.
+  renderGroups();
+  renderMatches();
+  renderStandings();
 
   // ─── Utility ─────────────────────────────────────────────────────────────────
   function formatDate(iso) {
@@ -420,7 +425,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     const container = document.getElementById('groups-grid');
     if (!container) return;
     container.innerHTML = '';
-    // Reuse .standings-grid class for identical layout
     container.className = 'standings-grid';
     WC_GROUPS.forEach(group => {
       const groupMatches = WC_MATCHES.filter(m => m.group === group.id);
