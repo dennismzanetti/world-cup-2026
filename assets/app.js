@@ -254,6 +254,65 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     });
   }
 
+  // ─── Predicted Group Standings ────────────────────────────────────────────────
+  // Returns teams for a group sorted by predicted points (descending).
+  // Falls back to alphabetical order for unpredicted groups so callers always
+  // get a stable array they can index by position (0 = 1st, 1 = 2nd, …).
+  function getPredictedGroupStandings(groupId) {
+    const group = WC_GROUPS.find(g => g.id === groupId);
+    if (!group) return [];
+    const groupMatches = WC_MATCHES.filter(m => m.group === groupId);
+    return group.teams
+      .map(t => ({ ...t, ...calcPredictionPoints(groupMatches, t.name) }))
+      .sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+  }
+
+  // ─── Resolve Knockout Team ────────────────────────────────────────────────────
+  // Given a homeSource / awaySource descriptor from WC_KNOCKOUT_FIXTURES,
+  // returns { name, flag } for display — or null if not yet resolvable.
+  // Does NOT mutate any match objects.
+  function resolveKnockoutTeam(source, fallbackTeam) {
+    if (!source) return null;
+
+    if (source.type === 'group') {
+      const standings = getPredictedGroupStandings(source.group);
+      const groupMatches = WC_MATCHES.filter(m => m.group === source.group);
+      const hasPreds = groupMatches.some(m => userPredictions[m.id]);
+      if (!hasPreds) return null; // no predictions yet — keep placeholder
+      const team = standings[source.pos - 1];
+      return team ? { name: team.name, flag: team.flag } : null;
+    }
+
+    if (source.type === 'winner' || source.type === 'loser') {
+      // Reserved for Step 5 — winnerPred not yet stored
+      return null;
+    }
+
+    if (source.type === 'best3rd') {
+      // Best 3rd-place teams TBD until group stage completes
+      return null;
+    }
+
+    return null;
+  }
+
+  // ─── Build Display Match ──────────────────────────────────────────────────────
+  // For knockout matches in the Predictions tab, replace home/away with resolved
+  // team names based on predicted standings.  Falls back to the original team
+  // object (placeholder name) if no predictions exist yet.
+  // The original match object is never mutated.
+  function buildDisplayMatch(match) {
+    if (!match.stage) return match; // group stage — no resolution needed
+    const resolvedHome = resolveKnockoutTeam(match.homeSource, match.home);
+    const resolvedAway = resolveKnockoutTeam(match.awaySource, match.away);
+    if (!resolvedHome && !resolvedAway) return match;
+    return {
+      ...match,
+      home: resolvedHome || match.home,
+      away: resolvedAway || match.away,
+    };
+  }
+
   // ─── Broadcast Badges ────────────────────────────────────────────────────────
   function broadcastBadgesHTML(match) {
     const tv  = match.tvEnglish || [];
@@ -594,11 +653,17 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
         : filtered.filter(m => m.stage === group);
     }
     if (date !== 'all') filtered = filtered.filter(m => m.date === date);
+
+    // Apply display-match resolution (team name substitution) before team text filter
+    // so filtering by e.g. "Mexico" also matches resolved knockout slots.
+    const displayMatches = filtered.map(buildDisplayMatch);
+
     if (team) {
-      filtered = filtered.filter(m =>
-        m.home.name.toLowerCase().includes(team) ||
-        m.away.name.toLowerCase().includes(team)
-      );
+      filtered = filtered.filter((m, i) => {
+        const dm = displayMatches[i];
+        return dm.home.name.toLowerCase().includes(team) ||
+               dm.away.name.toLowerCase().includes(team);
+      });
     }
 
     container.innerHTML = '';
@@ -607,7 +672,12 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       return;
     }
 
-    filtered.forEach(match => {
+    filtered.forEach((match, idx) => {
+      // Use resolved display version for rendering; keep original match for save logic
+      const dm = team
+        ? buildDisplayMatch(match)  // re-resolve if filtered (filtered array is subset)
+        : displayMatches[filtered.indexOf(match)] || buildDisplayMatch(match);
+
       const status = (match.status || 'scheduled').toLowerCase();
       const isLive     = status === 'live' || status === 'ht';
       const isFinished = status === 'finished';
@@ -617,11 +687,11 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       const scoreColHTML = `
         <div class="score-inputs-wrap">
           <input type="number" min="0" max="99" class="pred-input" data-match-id="${match.id}" data-side="home"
-            value="${hasPred ? pred.homeScorePred : ''}" placeholder="-" aria-label="${match.home.name} predicted score"
+            value="${hasPred ? pred.homeScorePred : ''}" placeholder="-" aria-label="${dm.home.name} predicted score"
             ${isFinished ? 'disabled title="Match has finished"' : ''}>
           <span class="score-sep">:</span>
           <input type="number" min="0" max="99" class="pred-input" data-match-id="${match.id}" data-side="away"
-            value="${hasPred ? pred.awayScorePred : ''}" placeholder="-" aria-label="${match.away.name} predicted score"
+            value="${hasPred ? pred.awayScorePred : ''}" placeholder="-" aria-label="${dm.away.name} predicted score"
             ${isFinished ? 'disabled title="Match has finished"' : ''}>
         </div>
         ${isFinished
@@ -633,7 +703,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       const stripLabel = match.group ? 'Group ' + match.group : (match.stage || 'Match');
       const card = document.createElement('div');
       card.className = 'match-card' + (isLive ? ' match-card-live' : '');
-      card.innerHTML = matchCardHTML(match, scoreColHTML, stripLabel);
+      card.innerHTML = matchCardHTML(dm, scoreColHTML, stripLabel);
 
       if (!isFinished) {
         const saveBtn = card.querySelector('.save-pred-btn');
