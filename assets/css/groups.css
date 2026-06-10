@@ -1,0 +1,46 @@
+/* ============================================================
+   GROUPS TAB
+   Group cards grid shown on the Groups view.
+   ============================================================ */
+
+.groups-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
+  gap: var(--space-5);
+}
+
+.group-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.group-card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-accent); color: #fff;
+}
+
+.group-name {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  letter-spacing: 0.05em;
+}
+
+.group-count { font-size: var(--text-xs); opacity: 0.75; }
+
+.group-teams { padding: var(--space-2) 0; }
+
+.group-team-row {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-divider);
+  font-size: var(--text-sm);
+}
+.group-team-row:last-child { border-bottom: none; }
+
+.team-flag  { font-size: 1.25rem; width: 1.75rem; text-align: center; }
+.team-name  { flex: 1; font-weight: 500; }
+.team-pts   { font-weight: 700; color: var(--color-primary); font-size: var(--text-sm); min-width: 2rem; text-align: right; }
