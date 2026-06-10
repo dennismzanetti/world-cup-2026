@@ -238,3 +238,54 @@ function generateMatches() {
 }
 
 const WC_MATCHES = generateMatches();
+
+// ── KNOCKOUT STAGE FIXTURES ────────────────────────────────────────────────
+// Teams are TBD until group stage completes; dates/venues are official FIFA schedule.
+// home.name / away.name will be updated via Firestore once teams are known.
+const WC_KNOCKOUT_FIXTURES = [
+  // ── ROUND OF 32 ──────────────────────────────────────────────────────────
+  { id:'r32-1',  stage:'Round of 32', home:{name:'1A',flag:'🏳️'}, away:{name:'2B',flag:'🏳️'}, date:'2026-06-28', timeLocal:'15:00', tz:'ET', venue:'Estadio Azteca',           city:'Mexico City, Mexico',        tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'r32-2',  stage:'Round of 32', home:{name:'1C',flag:'🏳️'}, away:{name:'2D',flag:'🏳️'}, date:'2026-06-28', timeLocal:'19:00', tz:'ET', venue:'MetLife Stadium',          city:'East Rutherford, NJ',        tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'r32-3',  stage:'Round of 32', home:{name:'1E',flag:'🏳️'}, away:{name:'2F',flag:'🏳️'}, date:'2026-06-29', timeLocal:'15:00', tz:'ET', venue:'SoFi Stadium',             city:'Inglewood, CA',              tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'r32-4',  stage:'Round of 32', home:{name:'1G',flag:'🏳️'}, away:{name:'2H',flag:'🏳️'}, date:'2026-06-29', timeLocal:'19:00', tz:'ET', venue:"AT&T Stadium",             city:'Arlington, TX',              tvEnglish:['FS1'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'r32-5',  stage:'Round of 32', home:{name:'1I',flag:'🏳️'}, away:{name:'2J',flag:'🏳️'}, date:'2026-06-30', timeLocal:'15:00', tz:'ET', venue:'Arrowhead Stadium',        city:'Kansas City, MO',            tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'r32-6',  stage:'Round of 32', home:{name:'1K',flag:'🏳️'}, away:{name:'2L',flag:'🏳️'}, date:'2026-06-30', timeLocal:'19:00', tz:'ET', venue:'NRG Stadium',              city:'Houston, TX',                tvEnglish:['FS1'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'r32-7',  stage:'Round of 32', home:{name:'1B',flag:'🏳️'}, away:{name:'2A',flag:'🏳️'}, date:'2026-07-01', timeLocal:'15:00', tz:'ET', venue:'BC Place',                  city:'Vancouver, Canada',          tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'r32-8',  stage:'Round of 32', home:{name:'1D',flag:'🏳️'}, away:{name:'2C',flag:'🏳️'}, date:'2026-07-01', timeLocal:'19:00', tz:'ET', venue:'Lincoln Financial Field',   city:'Philadelphia, PA',           tvEnglish:['FS1'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'r32-9',  stage:'Round of 32', home:{name:'1F',flag:'🏳️'}, away:{name:'2E',flag:'🏳️'}, date:'2026-07-02', timeLocal:'15:00', tz:'ET', venue:'Lumen Field',              city:'Seattle, WA',                tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'r32-10', stage:'Round of 32', home:{name:'1H',flag:'🏳️'}, away:{name:'2G',flag:'🏳️'}, date:'2026-07-02', timeLocal:'19:00', tz:'ET', venue:'Gillette Stadium',          city:'Foxborough, MA',             tvEnglish:['FS1'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'r32-11', stage:'Round of 32', home:{name:'1J',flag:'🏳️'}, away:{name:'2I',flag:'🏳️'}, date:'2026-07-03', timeLocal:'15:00', tz:'ET', venue:'Hard Rock Stadium',         city:'Miami Gardens, FL',          tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'r32-12', stage:'Round of 32', home:{name:'1L',flag:'🏳️'}, away:{name:'2K',flag:'🏳️'}, date:'2026-07-03', timeLocal:'19:00', tz:'ET', venue:'BMO Field',                 city:'Toronto, Canada',            tvEnglish:['FS1'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'r32-13', stage:'Round of 32', home:{name:'Best 3rd 1',flag:'🏳️'}, away:{name:'Best 3rd 2',flag:'🏳️'}, date:'2026-07-04', timeLocal:'15:00', tz:'ET', venue:'Mercedes-Benz Stadium', city:'Atlanta, GA',               tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'r32-14', stage:'Round of 32', home:{name:'Best 3rd 3',flag:'🏳️'}, away:{name:'Best 3rd 4',flag:'🏳️'}, date:'2026-07-04', timeLocal:'19:00', tz:'ET', venue:'Estadio BBVA',          city:'Monterrey, Mexico',          tvEnglish:['FS1'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'r32-15', stage:'Round of 32', home:{name:'Best 3rd 5',flag:'🏳️'}, away:{name:'Best 3rd 6',flag:'🏳️'}, date:'2026-07-05', timeLocal:'15:00', tz:'ET', venue:'Estadio Akron',         city:'Guadalajara, Mexico',        tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'r32-16', stage:'Round of 32', home:{name:'Best 3rd 7',flag:'🏳️'}, away:{name:'Best 3rd 8',flag:'🏳️'}, date:'2026-07-05', timeLocal:'19:00', tz:'ET', venue:"Levi's Stadium",        city:'Santa Clara, CA',            tvEnglish:['FS1'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  // ── ROUND OF 16 ──────────────────────────────────────────────────────────
+  { id:'r16-1', stage:'Round of 16', home:{name:'W R32-1', flag:'🏳️'}, away:{name:'W R32-2', flag:'🏳️'}, date:'2026-07-07', timeLocal:'15:00', tz:'ET', venue:'MetLife Stadium',         city:'East Rutherford, NJ', tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'r16-2', stage:'Round of 16', home:{name:'W R32-3', flag:'🏳️'}, away:{name:'W R32-4', flag:'🏳️'}, date:'2026-07-07', timeLocal:'19:00', tz:'ET', venue:"AT&T Stadium",           city:'Arlington, TX',       tvEnglish:['FS1'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'r16-3', stage:'Round of 16', home:{name:'W R32-5', flag:'🏳️'}, away:{name:'W R32-6', flag:'🏳️'}, date:'2026-07-08', timeLocal:'15:00', tz:'ET', venue:'SoFi Stadium',           city:'Inglewood, CA',       tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'r16-4', stage:'Round of 16', home:{name:'W R32-7', flag:'🏳️'}, away:{name:'W R32-8', flag:'🏳️'}, date:'2026-07-08', timeLocal:'19:00', tz:'ET', venue:'Hard Rock Stadium',      city:'Miami Gardens, FL',   tvEnglish:['FS1'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'r16-5', stage:'Round of 16', home:{name:'W R32-9', flag:'🏳️'}, away:{name:'W R32-10',flag:'🏳️'}, date:'2026-07-09', timeLocal:'15:00', tz:'ET', venue:'NRG Stadium',            city:'Houston, TX',         tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'r16-6', stage:'Round of 16', home:{name:'W R32-11',flag:'🏳️'}, away:{name:'W R32-12',flag:'🏳️'}, date:'2026-07-09', timeLocal:'19:00', tz:'ET', venue:'Arrowhead Stadium',      city:'Kansas City, MO',     tvEnglish:['FS1'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'r16-7', stage:'Round of 16', home:{name:'W R32-13',flag:'🏳️'}, away:{name:'W R32-14',flag:'🏳️'}, date:'2026-07-10', timeLocal:'15:00', tz:'ET', venue:'Lumen Field',            city:'Seattle, WA',         tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'r16-8', stage:'Round of 16', home:{name:'W R32-15',flag:'🏳️'}, away:{name:'W R32-16',flag:'🏳️'}, date:'2026-07-10', timeLocal:'19:00', tz:'ET', venue:'BC Place',               city:'Vancouver, Canada',   tvEnglish:['FS1'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  // ── QUARTERFINALS ────────────────────────────────────────────────────────
+  { id:'qf-1', stage:'Quarterfinals', home:{name:'W R16-1',flag:'🏳️'}, away:{name:'W R16-2',flag:'🏳️'}, date:'2026-07-14', timeLocal:'15:00', tz:'ET', venue:'Estadio Azteca',    city:'Mexico City, Mexico',  tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'qf-2', stage:'Quarterfinals', home:{name:'W R16-3',flag:'🏳️'}, away:{name:'W R16-4',flag:'🏳️'}, date:'2026-07-14', timeLocal:'19:00', tz:'ET', venue:'MetLife Stadium',   city:'East Rutherford, NJ', tvEnglish:['FS1'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'qf-3', stage:'Quarterfinals', home:{name:'W R16-5',flag:'🏳️'}, away:{name:'W R16-6',flag:'🏳️'}, date:'2026-07-15', timeLocal:'15:00', tz:'ET', venue:'SoFi Stadium',      city:'Inglewood, CA',        tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'qf-4', stage:'Quarterfinals', home:{name:'W R16-7',flag:'🏳️'}, away:{name:'W R16-8',flag:'🏳️'}, date:'2026-07-15', timeLocal:'19:00', tz:'ET', venue:"AT&T Stadium",      city:'Arlington, TX',        tvEnglish:['FS1'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  // ── SEMIFINALS ──────────────────────────────────────────────────────────
+  { id:'sf-1', stage:'Semifinals', home:{name:'W QF-1',flag:'🏳️'}, away:{name:'W QF-2',flag:'🏳️'}, date:'2026-07-18', timeLocal:'19:00', tz:'ET', venue:'MetLife Stadium',  city:'East Rutherford, NJ', tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'sf-2', stage:'Semifinals', home:{name:'W QF-3',flag:'🏳️'}, away:{name:'W QF-4',flag:'🏳️'}, date:'2026-07-21', timeLocal:'19:00', tz:'ET', venue:"AT&T Stadium",     city:'Arlington, TX',       tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  // ── THIRD PLACE ──────────────────────────────────────────────────────────
+  { id:'tp-1', stage:'Third Place', home:{name:'L SF-1',flag:'🏳️'}, away:{name:'L SF-2',flag:'🏳️'}, date:'2026-07-24', timeLocal:'14:00', tz:'ET', venue:'Hard Rock Stadium', city:'Miami Gardens, FL',   tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  // ── FINAL ────────────────────────────────────────────────────────────────
+  { id:'final', stage:'Final', home:{name:'W SF-1',flag:'🏳️'}, away:{name:'W SF-2',flag:'🏳️'}, date:'2026-07-26', timeLocal:'17:00', tz:'ET', venue:'MetLife Stadium',  city:'East Rutherford, NJ', tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+];
+
+// Push knockout fixtures into the main WC_MATCHES array
+WC_KNOCKOUT_FIXTURES.forEach(m => {
+  m.homeScore = null;
+  m.awayScore = null;
+  WC_MATCHES.push(m);
+});
