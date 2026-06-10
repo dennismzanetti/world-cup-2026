@@ -7,7 +7,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 (function () {
   'use strict';
 
-  // ─── Constants ──────────────────────────────────────────────────────────────
+  // ─── Constants ───────────────────────────────────────────────────────────────
   const STAGE_LABELS = {
     R32: 'Round of 32',
     R16: 'Round of 16',
@@ -22,26 +22,26 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     'REPLACE_WITH_YOUR_FIREBASE_UID',
   ];
 
-  // ─── stageKeyToLabel ────────────────────────────────────────────────────────
+  // ─── stageKeyToLabel ─────────────────────────────────────────────────────────
   function stageKeyToLabel(key) {
     if (!key) return '';
     if (/^[A-Za-z]{1,2}$/.test(key)) return 'Group ' + key.toUpperCase();
     return key;
   }
 
-  // ─── State ──────────────────────────────────────────────────────────────────
+  // ─── State ───────────────────────────────────────────────────────────────────
   let currentUser = null;
   let authResolved = false;
   let firstAuthFire = true;
   let userPredictions = {};
   let authMode = 'signin';
   let unsubscribeMatches = null;
-  let activepredSubtab = 'my-picks';
+  let activePredSubtab = 'my-picks';
 
   // Bracket picks: { matchId: 'home' | 'away' }
   let bracketPicks = {};
 
-  // ─── Theme ──────────────────────────────────────────────────────────────────
+  // ─── Theme ───────────────────────────────────────────────────────────────────
   const themeToggle = document.querySelector('[data-theme-toggle]');
   const html = document.documentElement;
   function setTheme(t) {
@@ -62,7 +62,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     });
   }
 
-  // ─── Navigation ─────────────────────────────────────────────────────────────
+  // ─── Navigation ──────────────────────────────────────────────────────────────
   const navBtns = document.querySelectorAll('.nav-btn');
   const views   = document.querySelectorAll('.view');
   navBtns.forEach(btn => {
@@ -75,27 +75,27 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     });
   });
 
-  // ─── Predictions Sub-Tabs ───────────────────────────────────────────────────
+  // ─── Predictions Sub-Tabs ─────────────────────────────────────────────────────
   document.querySelectorAll('.sub-tab').forEach(tab => {
     tab.addEventListener('click', () => {
-      activepredSubtab = tab.dataset.subtab;
+      activePredSubtab = tab.dataset.subtab;
       document.querySelectorAll('.sub-tab').forEach(t => {
         t.classList.toggle('active', t === tab);
         t.setAttribute('aria-selected', t === tab ? 'true' : 'false');
       });
       document.querySelectorAll('.sub-tab-panel').forEach(p => {
-        const isActive = p.id === 'subtab-' + activepredSubtab;
+        const isActive = p.id === 'subtab-' + activePredSubtab;
         p.classList.toggle('active', isActive);
         p.hidden = !isActive;
       });
-      if (activepredSubtab === 'my-picks')             renderPredictions();
-      if (activepredSubtab === 'pred-bracket')         renderKnockoutBracket();
-      if (activepredSubtab === 'pred-standings')       renderPredStandings();
-      if (activepredSubtab === 'pred-group-standings') renderPredGroupStandings();
+      if (activePredSubtab === 'my-picks')            renderPredictions();
+      if (activePredSubtab === 'pred-bracket')        renderKnockoutBracket();
+      if (activePredSubtab === 'pred-standings')      renderPredStandings();
+      if (activePredSubtab === 'pred-group-standings') renderPredGroupStandings();
     });
   });
 
-  // ─── Auth State ─────────────────────────────────────────────────────────────
+  // ─── Auth State ──────────────────────────────────────────────────────────────
   const authBtn        = document.getElementById('auth-btn');
   const authModal      = document.getElementById('auth-modal');
   const authBackdrop   = document.getElementById('auth-backdrop');
@@ -156,7 +156,10 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   authBackdrop.addEventListener('click', closeModal);
   authSwitch.addEventListener('click', () => setAuthMode(authMode === 'signin' ? 'signup' : 'signin'));
   if (predictSigninBtn) predictSigninBtn.addEventListener('click', openModal);
-  document.querySelectorAll('.pred-standings-signin-btn').forEach(b => b.addEventListener('click', openModal));
+
+  document.querySelectorAll('.pred-standings-signin-btn').forEach(btn => {
+    btn.addEventListener('click', openModal);
+  });
 
   authForm.addEventListener('submit', async e => {
     e.preventDefault();
@@ -166,9 +169,8 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     authSubmit.disabled = true;
     try {
       if (authMode === 'signup') {
-        const name = authNameInput.value.trim();
-        if (!name) { authError.textContent = 'Please enter your name.'; return; }
-        await signUp(email, password, name);
+        const displayName = authNameInput.value.trim() || email.split('@')[0];
+        await signUp(email, password, displayName);
       } else {
         await signIn(email, password);
       }
@@ -180,52 +182,112 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     }
   });
 
-  signOutBtn.addEventListener('click', async () => {
-    await logOut();
-  });
+  if (signOutBtn) signOutBtn.addEventListener('click', async () => { await logOut(); });
 
-  // ─── Watch Auth ─────────────────────────────────────────────────────────────
   watchAuth(async (user) => {
     currentUser = user;
     authResolved = true;
 
     if (user) {
-      authBtn.hidden = true;
-      userBar.hidden = false;
-      userGreeting.textContent = 'Hi, ' + (user.displayName || user.email);
-      userPredictions = await getUserPredictions(user.uid);
+      authBtn.textContent = 'Account';
+      authBtn.setAttribute('aria-label', 'Account');
+      if (userBar) userBar.hidden = false;
+      if (userGreeting) userGreeting.textContent = 'Hello, ' + (user.displayName || user.email);
+
+      // Load bracket picks from localStorage
+      const savedPicks = localStorage.getItem('bracketPicks_' + user.uid);
+      bracketPicks = savedPicks ? JSON.parse(savedPicks) : {};
+
+      try {
+        const preds = await getUserPredictions(user.uid);
+        userPredictions = {};
+        preds.forEach(p => { userPredictions[p.matchId] = p; });
+      } catch (err) {
+        console.error('Error loading predictions:', err);
+        userPredictions = {};
+      }
     } else {
-      authBtn.hidden = false;
-      userBar.hidden = true;
+      authBtn.textContent = 'Sign In';
+      authBtn.setAttribute('aria-label', 'Sign in');
+      if (userBar) userBar.hidden = true;
       userPredictions = {};
+      bracketPicks = {};
     }
 
-    if (firstAuthFire) {
-      firstAuthFire = false;
-      startMatchListener();
-    } else {
-      renderAll();
-    }
+    renderAll();
+    firstAuthFire = false;
   });
 
-  // ─── Match Listener ──────────────────────────────────────────────────────────
-  function startMatchListener() {
-    if (unsubscribeMatches) unsubscribeMatches();
-    unsubscribeMatches = watchMatches((matches) => {
-      // Merge live match data into WC_MATCHES
-      matches.forEach(m => {
-        const match = WC_MATCHES.find(wm => wm.id === m.id);
-        if (match) {
-          match.homeScore = m.homeScore;
-          match.awayScore = m.awayScore;
-          match.status    = m.status;
-        }
-      });
-      renderAll();
+  // ─── Firestore Live Match Updates ─────────────────────────────────────────────
+  unsubscribeMatches = watchMatches((updatedMatches) => {
+    updatedMatches.forEach(um => {
+      const idx = WC_MATCHES.findIndex(m => m.id === um.id);
+      if (idx !== -1) {
+        WC_MATCHES[idx] = { ...WC_MATCHES[idx], ...um };
+      } else {
+        const kidx = WC_KNOCKOUT_FIXTURES.findIndex(m => m.id === um.id);
+        if (kidx !== -1) WC_KNOCKOUT_FIXTURES[kidx] = { ...WC_KNOCKOUT_FIXTURES[kidx], ...um };
+      }
+    });
+    renderAll();
+  });
+
+  // ─── Date/Group/Venue Filter Helpers ─────────────────────────────────────────
+  function populateDateSelect(sel, matches) {
+    if (!sel) return;
+    const dates = [...new Set(matches.map(m => m.date).filter(Boolean))].sort();
+    sel.innerHTML = '<option value="all">All Dates</option>';
+    dates.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d;
+      opt.textContent = formatDate(d);
+      sel.appendChild(opt);
     });
   }
 
-  // ─── Render All ─────────────────────────────────────────────────────────────
+  function populateStageSelect(sel, matches, allLabel) {
+    if (!sel) return;
+    const stages = [...new Set(matches.map(m => m.group || m.stage).filter(Boolean))];
+    sel.innerHTML = `<option value="all">${allLabel}</option>`;
+    stages.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s;
+      opt.textContent = stageKeyToLabel(s);
+      sel.appendChild(opt);
+    });
+  }
+
+  function populateVenueSelect(sel, matches) {
+    if (!sel) return;
+    const venues = [...new Set(matches.map(m => m.venue).filter(Boolean))].sort();
+    sel.innerHTML = '<option value="all">All Venues</option>';
+    venues.forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = v;
+      sel.appendChild(opt);
+    });
+  }
+
+  function populateTeamSelect(sel, matches) {
+    if (!sel) return;
+    const teams = [...new Set(matches.flatMap(m => [m.home, m.away]).filter(Boolean))].sort();
+    sel.innerHTML = '<option value="all">All Teams</option>';
+    teams.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t;
+      opt.textContent = t;
+      sel.appendChild(opt);
+    });
+  }
+
+  function formatDate(d) {
+    if (!d) return '';
+    const dt = new Date(d + 'T12:00:00Z');
+    return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  }
+
+  // ─── Render All ──────────────────────────────────────────────────────────────
   function renderAll() {
     const activeView = document.querySelector('.view.active');
     if (!activeView) return;
@@ -233,34 +295,75 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     if (viewId === 'view-schedule')    renderSchedule();
     if (viewId === 'view-standings')   renderStandings();
     if (viewId === 'view-predictions') {
-      renderPredictions();
-      renderKnockoutBracket();
-      renderPredStandings();
-      renderPredGroupStandings();
+      if (activePredSubtab === 'my-picks')            renderPredictions();
+      if (activePredSubtab === 'pred-bracket')        renderKnockoutBracket();
+      if (activePredSubtab === 'pred-standings')      renderPredStandings();
+      if (activePredSubtab === 'pred-group-standings') renderPredGroupStandings();
     }
   }
 
-  // ─── Schedule ───────────────────────────────────────────────────────────────
+  // ─── Schedule ────────────────────────────────────────────────────────────────
+  let schedFilters = { date: 'all', stage: 'all', venue: 'all', team: 'all' };
+
   function renderSchedule() {
     const container = document.getElementById('schedule-container');
     if (!container) return;
 
     const isAdmin = currentUser && ADMIN_UIDS.includes(currentUser.uid);
 
-    // Group matches by stage
+    // Build filter bar once
+    const existingFilters = document.getElementById('sched-filter-bar');
+    if (!existingFilters) {
+      const bar = document.createElement('div');
+      bar.id = 'sched-filter-bar';
+      bar.className = 'filter-bar';
+      bar.innerHTML = `
+        <select id="sched-date-sel"></select>
+        <select id="sched-stage-sel"></select>
+        <select id="sched-venue-sel"></select>
+        <select id="sched-team-sel"></select>`;
+      container.parentElement.insertBefore(bar, container);
+
+      populateDateSelect(bar.querySelector('#sched-date-sel'), WC_MATCHES);
+      populateStageSelect(bar.querySelector('#sched-stage-sel'), WC_MATCHES, 'All Groups/Stages');
+      populateVenueSelect(bar.querySelector('#sched-venue-sel'), WC_MATCHES);
+      populateTeamSelect(bar.querySelector('#sched-team-sel'), WC_MATCHES);
+
+      bar.addEventListener('change', e => {
+        if (e.target.id === 'sched-date-sel')  schedFilters.date  = e.target.value;
+        if (e.target.id === 'sched-stage-sel') schedFilters.stage = e.target.value;
+        if (e.target.id === 'sched-venue-sel') schedFilters.venue = e.target.value;
+        if (e.target.id === 'sched-team-sel')  schedFilters.team  = e.target.value;
+        renderSchedule();
+      });
+    }
+
+    // Filter matches
+    let matches = WC_MATCHES.slice();
+    if (schedFilters.date  !== 'all') matches = matches.filter(m => m.date  === schedFilters.date);
+    if (schedFilters.stage !== 'all') matches = matches.filter(m => (m.group || m.stage) === schedFilters.stage);
+    if (schedFilters.venue !== 'all') matches = matches.filter(m => m.venue === schedFilters.venue);
+    if (schedFilters.team  !== 'all') matches = matches.filter(m => m.home === schedFilters.team || m.away === schedFilters.team);
+
+    if (matches.length === 0) {
+      container.innerHTML = '<p class="muted" style="padding:var(--space-8) 0">No matches match your filters.</p>';
+      return;
+    }
+
+    // Group by stage
     const byStage = {};
-    WC_MATCHES.forEach(m => {
-      const key = m.stage || 'Group';
+    matches.forEach(m => {
+      const key = m.stage || m.group || 'Group';
       if (!byStage[key]) byStage[key] = [];
       byStage[key].push(m);
     });
 
     let html = '';
-    Object.entries(byStage).forEach(([stage, matches]) => {
+    Object.entries(byStage).forEach(([stage, stageMatches]) => {
       html += `<div class="stage-section">
         <h2 class="stage-heading">${stageKeyToLabel(stage)}</h2>
         <div class="match-list">`;
-      matches.forEach(m => {
+      stageMatches.forEach(m => {
         const hasResult = m.homeScore !== undefined && m.homeScore !== null;
         const scoreHtml = hasResult
           ? `<span class="score">${m.homeScore} – ${m.awayScore}</span>`
@@ -272,9 +375,10 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
             <input type="number" class="score-input away-score" placeholder="A" min="0" max="20" value="${hasResult ? m.awayScore : ''}">
             <button class="save-score-btn" data-match="${m.id}">Save</button>
           </div>` : '';
+        const venueLine = m.venue ? `<span class="match-venue">${m.venue}</span>` : '';
         html += `
           <div class="match-card ${hasResult ? 'has-result' : ''}">
-            <div class="match-meta">${m.date || ''} · ${stageKeyToLabel(m.stage || m.group || '')}</div>
+            <div class="match-meta">${m.date ? formatDate(m.date) : ''}${m.date && m.time ? ' · ' : ''}${m.time || ''}${venueLine ? ' · ' : ''}${venueLine} · ${stageKeyToLabel(m.stage || m.group || '')}</div>
             <div class="match-teams">
               <span class="team home">${m.homeFlag || ''} ${m.home}</span>
               ${scoreHtml}
@@ -312,7 +416,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     }
   }
 
-  // ─── Standings ──────────────────────────────────────────────────────────────
+  // ─── Standings ───────────────────────────────────────────────────────────────
   function calcActualPoints(matches, teamName) {
     let pts = 0, w = 0, d = 0, l = 0, gf = 0, ga = 0;
     matches.forEach(m => {
@@ -361,7 +465,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     container.innerHTML = html;
   }
 
-  // ─── Predictions ────────────────────────────────────────────────────────────
+  // ─── Predictions ─────────────────────────────────────────────────────────────
   function calcPredPoints(matches, teamName) {
     let pts = 0, w = 0, d = 0, l = 0, gf = 0, ga = 0;
     matches.forEach(m => {
@@ -411,7 +515,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
         const saved = pred.homeScorePred !== undefined;
         html += `
           <div class="pred-match-card ${saved ? 'saved' : ''}" data-match="${m.id}">
-            <div class="pred-match-meta">${m.date || ''}</div>
+            <div class="pred-match-meta">${m.date ? formatDate(m.date) : ''}</div>
             <div class="pred-match-row">
               <span class="pred-team home">${m.homeFlag || ''} ${m.home}</span>
               <input type="number" class="pred-input home-pred" min="0" max="20" value="${hVal}" placeholder="0">
@@ -451,7 +555,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     });
   }
 
-  // ─── Predicted Group Standings ───────────────────────────────────────────────
+  // ─── Predicted Group Standings ────────────────────────────────────────────────
   function renderPredGroupStandings() {
     const container = document.getElementById('pred-group-standings-container');
     if (!container) return;
@@ -492,7 +596,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     container.innerHTML = html;
   }
 
-  // ─── Knockout Bracket ────────────────────────────────────────────────────────
+  // ─── Knockout Bracket ─────────────────────────────────────────────────────────
 
   // Get actual group finisher from recorded match results
   function getActualGroupFinisher(groupId, pos) {
@@ -527,7 +631,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       ...t,
       ...calcPredPoints(groupMatches, t.name)
     })).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
-    if (teams[pos]) return { name: teams[pos].name, flag: teams[pos].flag };
+    if (teams[pos]) return { name: teams[pos].name, flag: teams[pos].flag }; 
     return null;
   }
 
@@ -550,12 +654,32 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     return null;
   }
 
+  function clearDownstreamPicks(fixtureId) {
+    // Find any fixtures that depend on the winner of fixtureId and clear them recursively
+    WC_KNOCKOUT_FIXTURES.forEach(f => {
+      const dependsHome = f.home && f.home.type === 'winner' && f.home.matchId === fixtureId;
+      const dependsAway = f.away && f.away.type === 'winner' && f.away.matchId === fixtureId;
+      if (dependsHome || dependsAway) {
+        delete bracketPicks[f.id];
+        clearDownstreamPicks(f.id);
+      }
+    });
+  }
+
   function teamLabel(source, resolved) {
     if (resolved) return `${resolved.flag || ''} ${resolved.name}`;
     if (!source) return '?';
     if (source.type === 'group') return `${source.pos === 0 ? '1' : '2'}${source.groupId}`;
     if (source.type === 'winner') return `W${source.matchId}`;
     return '?';
+  }
+
+  function saveBracketPicks() {
+    if (currentUser) {
+      try {
+        localStorage.setItem('bracketPicks_' + currentUser.uid, JSON.stringify(bracketPicks));
+      } catch (e) { /* storage blocked in some iframes */ }
+    }
   }
 
   function renderKnockoutBracket() {
@@ -571,13 +695,30 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       return;
     }
 
+    // Progress bar
+    const totalSlots = WC_KNOCKOUT_FIXTURES.length;
+    const filledSlots = WC_KNOCKOUT_FIXTURES.filter(f => bracketPicks[f.id]).length;
+    const pct = totalSlots ? Math.round((filledSlots / totalSlots) * 100) : 0;
+
     const stages = [...new Set(WC_KNOCKOUT_FIXTURES.map(f => f.stage))];
-    let html = '<div class="bracket-scroll"><div class="bracket-stages">';
+    let html = `
+      <div class="bracket-progress">
+        <div class="bracket-progress-label">${filledSlots} / ${totalSlots} picks made</div>
+        <div class="bracket-progress-bar"><div class="bracket-progress-fill" style="width:${pct}%"></div></div>
+      </div>
+      <div class="bracket-controls">
+        <button class="btn btn-ghost btn-sm" id="bracket-seed-btn">Seed from Results</button>
+        <button class="btn btn-ghost btn-sm" id="bracket-reset-btn">Reset All</button>
+      </div>
+      <div class="bracket-scroll"><div class="bracket-stages">`;
 
     stages.forEach(stage => {
       const fixtures = WC_KNOCKOUT_FIXTURES.filter(f => f.stage === stage);
       html += `<div class="bracket-stage">
-        <div class="bracket-stage-label">${STAGE_LABELS[stage] || stage}</div>
+        <div class="bracket-stage-header">
+          <span class="bracket-stage-label">${STAGE_LABELS[stage] || stage}</span>
+          <button class="btn btn-ghost btn-xs bracket-stage-reset" data-stage="${stage}">Reset</button>
+        </div>
         <div class="bracket-matches">`;
 
       fixtures.forEach(fixture => {
@@ -606,7 +747,19 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       html += `</div></div>`;
     });
 
-    html += '</div></div>';
+    // Champion display
+    const finalFixture = WC_KNOCKOUT_FIXTURES.find(f => f.stage === 'F');
+    const champion = finalFixture ? resolveKnockoutTeam({ type: 'winner', matchId: finalFixture.id }) : null;
+    html += `</div>`;
+    if (champion) {
+      html += `<div class="bracket-champion">
+        <span class="champion-trophy">🏆</span>
+        <span class="champion-label">Champion</span>
+        <span class="champion-team">${champion.flag || ''} ${champion.name}</span>
+      </div>`;
+    }
+    html += `</div>`;
+
     container.innerHTML = html;
 
     // Pick listeners
@@ -614,13 +767,57 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       el.addEventListener('click', () => {
         const fixtureId = el.dataset.fixture;
         const side = el.dataset.side;
+        if (bracketPicks[fixtureId] !== side) {
+          clearDownstreamPicks(fixtureId);
+        }
         bracketPicks[fixtureId] = side;
+        saveBracketPicks();
         renderKnockoutBracket();
       });
     });
+
+    // Reset all
+    const resetBtn = container.querySelector('#bracket-reset-btn');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => {
+        bracketPicks = {};
+        saveBracketPicks();
+        renderKnockoutBracket();
+      });
+    }
+
+    // Reset per stage
+    container.querySelectorAll('.bracket-stage-reset').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const stage = btn.dataset.stage;
+        WC_KNOCKOUT_FIXTURES.filter(f => f.stage === stage).forEach(f => {
+          delete bracketPicks[f.id];
+          clearDownstreamPicks(f.id);
+        });
+        saveBracketPicks();
+        renderKnockoutBracket();
+      });
+    });
+
+    // Seed from results
+    const seedBtn = container.querySelector('#bracket-seed-btn');
+    if (seedBtn) {
+      seedBtn.addEventListener('click', () => {
+        WC_KNOCKOUT_FIXTURES.forEach(fixture => {
+          const homeResolved = resolveKnockoutTeam(fixture.home);
+          const awayResolved = resolveKnockoutTeam(fixture.away);
+          if (homeResolved && awayResolved && !bracketPicks[fixture.id]) {
+            // Default: pick home team as placeholder
+            bracketPicks[fixture.id] = 'home';
+          }
+        });
+        saveBracketPicks();
+        renderKnockoutBracket();
+      });
+    }
   }
 
-  // ─── Pred Standings ─────────────────────────────────────────────────────────
+  // ─── Pred Standings ──────────────────────────────────────────────────────────
   function renderPredStandings() {
     const container = document.getElementById('pred-standings-container');
     if (!container) return;
@@ -637,7 +834,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     container.innerHTML = '<p class="muted">Predicted overall standings coming soon.</p>';
   }
 
-  // ─── Init ────────────────────────────────────────────────────────────────────
+  // ─── Init ─────────────────────────────────────────────────────────────────────
   function init() {
     renderSchedule();
     renderStandings();
@@ -647,7 +844,9 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 
   // expose for testing
   window._wc = {
-    getMatches() { return [...WC_MATCHES]; }
+    getAllMatches() {
+      return [...WC_MATCHES];
+    }
   }
 
 })();
