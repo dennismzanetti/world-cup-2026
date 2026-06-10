@@ -22,10 +22,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     'REPLACE_WITH_YOUR_FIREBASE_UID',
   ];
 
-  // ─── stageKeyToLabel: converts raw group/stage key to display label ──────────
-  // Defined first so it is available to populateStageSelect at init time.
-  // Group IDs are single/double uppercase letters (A–L); knockout stages are
-  // already human-readable strings like 'Round of 32'.
+  // ─── stageKeyToLabel ─────────────────────────────────────────────────────────
   function stageKeyToLabel(key) {
     if (!key) return '';
     if (/^[A-Za-z]{1,2}$/.test(key)) return 'Group ' + key.toUpperCase();
@@ -40,6 +37,9 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   let authMode = 'signin';
   let unsubscribeMatches = null;
   let activePredSubtab = 'my-picks';
+
+  // Bracket picks: { matchId: 'home' | 'away' }
+  let bracketPicks = {};
 
   // ─── Theme ───────────────────────────────────────────────────────────────────
   const themeToggle = document.querySelector('[data-theme-toggle]');
@@ -194,6 +194,10 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       if (userBar) userBar.hidden = false;
       if (userGreeting) userGreeting.textContent = 'Hello, ' + (user.displayName || user.email);
 
+      // Load bracket picks from localStorage
+      const savedPicks = localStorage.getItem('bracketPicks_' + user.uid);
+      bracketPicks = savedPicks ? JSON.parse(savedPicks) : {};
+
       try {
         const preds = await getUserPredictions(user.uid);
         userPredictions = {};
@@ -207,6 +211,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       authBtn.setAttribute('aria-label', 'Sign in');
       if (userBar) userBar.hidden = true;
       userPredictions = {};
+      bracketPicks = {};
     }
 
     renderAll();
@@ -301,7 +306,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
   if (predGroupFilter) predGroupFilter.addEventListener('change', renderPredictions);
   if (predTeamFilter)  predTeamFilter.addEventListener('input',   renderPredictions);
 
-  // ─── Initial render — runs immediately, before auth resolves ─────────────────
+  // ─── Initial render ──────────────────────────────────────────────────────────
   renderGroups();
   renderMatches();
   renderStandings();
@@ -347,7 +352,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     return { pts, gf, ga, gd: gf - ga, w, d, l };
   }
 
-  // ─── Shared helper: build a standings card (used by Groups & Standings tabs) ──
+  // ─── Shared helper: build a standings card ────────────────────────────────────
   function buildStandingsCard(groupId, teams) {
     const card = document.createElement('div');
     card.className = 'standings-card';
@@ -376,7 +381,7 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     return card;
   }
 
-  // ─── Match Card HTML — aligned with style.css class names ────────────────────
+  // ─── Match Card HTML ──────────────────────────────────────────────────────────
   function matchCardHTML(dm, scoreColContent, groupOrStage) {
     const dateStr = dm.date      ? formatDate(dm.date) : '';
     const timeStr = dm.timeLocal ? dm.timeLocal + (dm.tz ? ' ' + dm.tz : '') : '';
@@ -559,7 +564,6 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
 
     container.innerHTML = '';
 
-    // Group by the raw key (group ID like 'A' or stage string like 'Round of 32')
     const byStage = {};
     filtered.forEach(m => {
       const key = m.group || m.stage || 'Other';
@@ -567,9 +571,8 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
       byStage[key].push(m);
     });
 
-    // Order: group IDs A–L first, then knockout stages in order
     const stageOrder = [
-      ...WC_GROUPS.map(g => g.id),                  // 'A', 'B', ... 'L'
+      ...WC_GROUPS.map(g => g.id),
       'Round of 32', 'Round of 16', 'Quarterfinals',
       'Semifinals', 'Third Place', 'Final'
     ];
@@ -660,16 +663,244 @@ import { watchMatches, savePrediction, getUserPredictions } from './db.js';
     }
   }
 
-  // ─── Render Knockout Bracket (Placeholder) ───────────────────────────────────
+  // ─── Bracket Helpers ─────────────────────────────────────────────────────────
+
+  // Get the predicted group winner (pos=0) or runner-up (pos=1) from user's
+  // score predictions. Falls back to the data.js placeholder label.
+  function getPredictedGroupFinisher(groupId, pos) {
+    const group = WC_GROUPS.find(g => g.id === groupId);
+    if (!group) return null;
+    const groupMatches = WC_MATCHES.filter(m => m.group === groupId);
+    const teams = group.teams.map(t => ({
+      ...t,
+      ...calcPredPoints(groupMatches, t.name)
+    })).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+    if (teams[pos]) return { name: teams[pos].name, flag: teams[pos].flag };
+    return null;
+  }
+
+  // Resolve a knockout fixture's home/away team using:
+  //  1. homeSource / awaySource in data (type='group' → predicted standings)
+  //  2. bracketPicks cascade (type='winner' → picked winner of prior match)
+  //  3. Fallback to the placeholder name in data.js
+  function resolveKnockoutTeam(source, fixture) {
+    if (!source) return { name: '?', flag: '🏳️' };
+
+    if (source.type === 'group') {
+      const resolved = getPredictedGroupFinisher(source.group, source.pos);
+      if (resolved) return resolved;
+      // Fallback label e.g. "1A"
+      const posLabel = source.pos === 0 ? '1' : '2';
+      return { name: posLabel + source.group, flag: '🏳️' };
+    }
+
+    if (source.type === 'best3rd') {
+      return { name: 'Best 3rd #' + source.rank, flag: '🏳️' };
+    }
+
+    if (source.type === 'winner') {
+      const priorMatchId = source.matchId;
+      const pick = bracketPicks[priorMatchId]; // 'home' or 'away'
+      if (pick) {
+        const priorFixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === priorMatchId);
+        if (priorFixture) {
+          const priorHome = resolveKnockoutTeam(priorFixture.homeSource, priorFixture);
+          const priorAway = resolveKnockoutTeam(priorFixture.awaySource, priorFixture);
+          return pick === 'home' ? priorHome : priorAway;
+        }
+      }
+      // No pick yet — show placeholder
+      return { name: fixture ? (fixture.home.name.startsWith('W ') ? fixture.home.name : '?') : '?', flag: '🏳️' };
+    }
+
+    if (source.type === 'loser') {
+      return { name: 'Loser of ' + source.matchId.toUpperCase(), flag: '🏳️' };
+    }
+
+    return { name: '?', flag: '🏳️' };
+  }
+
+  // Given a matchId pick ('home'/'away'), clear all downstream bracket picks
+  // that depended on this match's result.
+  function clearDownstreamPicks(matchId) {
+    // Find all fixtures that source their team from this match
+    const dependents = WC_KNOCKOUT_FIXTURES.filter(f =>
+      (f.homeSource && f.homeSource.type === 'winner' && f.homeSource.matchId === matchId) ||
+      (f.awaySource && f.awaySource.type === 'winner' && f.awaySource.matchId === matchId)
+    );
+    dependents.forEach(f => {
+      if (bracketPicks[f.id]) {
+        delete bracketPicks[f.id];
+        clearDownstreamPicks(f.id);
+      }
+    });
+  }
+
+  function saveBracketPicks() {
+    if (currentUser) {
+      localStorage.setItem('bracketPicks_' + currentUser.uid, JSON.stringify(bracketPicks));
+    }
+  }
+
+  // ─── Render Knockout Bracket ─────────────────────────────────────────────────
   function renderKnockoutBracket() {
     const container = document.getElementById('pred-bracket-container');
     if (!container) return;
+
     if (!authResolved || !currentUser) {
       container.innerHTML = `<div class="auth-prompt"><p>Sign in to view and fill in your knockout predictions.</p><button class="btn btn-primary pred-standings-signin-btn">Sign In to Predict</button></div>`;
       container.querySelector('.pred-standings-signin-btn')?.addEventListener('click', openModal);
       return;
     }
-    container.innerHTML = `<p class="bracket-intro">Knockout bracket predictions coming soon — will auto-populate from your Group Standings predictions.</p>`;
+
+    const rounds = [
+      { label: 'Round of 32',   ids: ['r32-1','r32-2','r32-3','r32-4','r32-5','r32-6','r32-7','r32-8','r32-9','r32-10','r32-11','r32-12','r32-13','r32-14','r32-15','r32-16'] },
+      { label: 'Round of 16',   ids: ['r16-1','r16-2','r16-3','r16-4','r16-5','r16-6','r16-7','r16-8'] },
+      { label: 'Quarterfinals', ids: ['qf-1','qf-2','qf-3','qf-4'] },
+      { label: 'Semifinals',    ids: ['sf-1','sf-2'] },
+      { label: 'Final',         ids: ['final'] },
+    ];
+
+    container.innerHTML = '';
+
+    // Header row with progress info
+    const totalPicks = Object.keys(bracketPicks).length;
+    const totalMatches = 31; // R32(16) + R16(8) + QF(4) + SF(2) + F(1)
+    const pct = Math.round((totalPicks / totalMatches) * 100);
+
+    const header = document.createElement('div');
+    header.className = 'bracket-header';
+    header.innerHTML = `
+      <div class="bracket-progress">
+        <span class="bracket-progress-label">Bracket completion: <strong>${totalPicks}/${totalMatches} picks (${pct}%)</strong></span>
+        <div class="bracket-progress-bar"><div class="bracket-progress-fill" style="width:${pct}%"></div></div>
+      </div>
+      <div class="bracket-actions">
+        <button class="btn btn-ghost btn-sm" id="bracket-reset-all">Reset All</button>
+      </div>`;
+    container.appendChild(header);
+
+    header.querySelector('#bracket-reset-all').addEventListener('click', () => {
+      bracketPicks = {};
+      saveBracketPicks();
+      renderKnockoutBracket();
+    });
+
+    // Bracket scroll wrapper
+    const scroll = document.createElement('div');
+    scroll.className = 'bracket-scroll';
+    container.appendChild(scroll);
+
+    const bracketEl = document.createElement('div');
+    bracketEl.className = 'bracket';
+    scroll.appendChild(bracketEl);
+
+    rounds.forEach((round, roundIdx) => {
+      const col = document.createElement('div');
+      col.className = 'bracket-round';
+
+      const roundHeader = document.createElement('div');
+      roundHeader.className = 'bracket-round-label';
+      roundHeader.innerHTML = `
+        <span>${round.label}</span>
+        ${roundIdx > 0 ? `<button class="bracket-reset-round btn-xs" data-round="${roundIdx}" title="Reset this round and beyond">↺</button>` : ''}
+      `;
+      col.appendChild(roundHeader);
+
+      if (roundIdx > 0) {
+        const resetBtn = roundHeader.querySelector('.bracket-reset-round');
+        resetBtn && resetBtn.addEventListener('click', () => {
+          // Clear picks from this round onward
+          const roundsToReset = rounds.slice(roundIdx);
+          roundsToReset.forEach(r => r.ids.forEach(id => delete bracketPicks[id]));
+          saveBracketPicks();
+          renderKnockoutBracket();
+        });
+      }
+
+      const matchesEl = document.createElement('div');
+      matchesEl.className = 'bracket-matches';
+      col.appendChild(matchesEl);
+
+      round.ids.forEach(matchId => {
+        const fixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === matchId);
+        if (!fixture) return;
+
+        const homeTeam = resolveKnockoutTeam(fixture.homeSource, fixture);
+        const awayTeam = resolveKnockoutTeam(fixture.awaySource, fixture);
+        const pick = bracketPicks[matchId]; // 'home' | 'away' | undefined
+
+        const matchEl = document.createElement('div');
+        matchEl.className = 'bracket-match';
+        matchEl.dataset.matchId = matchId;
+
+        // Determine if teams are TBD (not yet resolvable)
+        const homeTBD = homeTeam.name === '?' || homeTeam.name.startsWith('Best 3rd') || homeTeam.name.startsWith('W ');
+        const awayTBD = awayTeam.name === '?' || awayTeam.name.startsWith('Best 3rd') || awayTeam.name.startsWith('W ');
+
+        const homePickedClass = pick === 'home' ? ' bracket-team--picked' : (pick === 'away' ? ' bracket-team--eliminated' : '');
+        const awayPickedClass = pick === 'away' ? ' bracket-team--picked' : (pick === 'home' ? ' bracket-team--eliminated' : '');
+
+        matchEl.innerHTML = `
+          <button class="bracket-team bracket-team--home${homePickedClass}${homeTBD ? ' bracket-team--tbd' : ''}" data-side="home" ${homeTBD ? 'disabled' : ''} aria-label="Pick ${homeTeam.name}">
+            <span class="bracket-flag">${homeTeam.flag}</span>
+            <span class="bracket-name">${homeTeam.name}</span>
+            ${pick === 'home' ? '<span class="bracket-check">✓</span>' : ''}
+          </button>
+          <div class="bracket-vs">vs</div>
+          <button class="bracket-team bracket-team--away${awayPickedClass}${awayTBD ? ' bracket-team--tbd' : ''}" data-side="away" ${awayTBD ? 'disabled' : ''} aria-label="Pick ${awayTeam.name}">
+            <span class="bracket-flag">${awayTeam.flag}</span>
+            <span class="bracket-name">${awayTeam.name}</span>
+            ${pick === 'away' ? '<span class="bracket-check">✓</span>' : ''}
+          </button>
+          ${fixture.date ? `<div class="bracket-date">${formatDate(fixture.date)}</div>` : ''}
+        `;
+
+        // Click handlers for team buttons
+        matchEl.querySelectorAll('.bracket-team').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const side = btn.dataset.side;
+            if (bracketPicks[matchId] === side) {
+              // Toggle off — also clear downstream
+              delete bracketPicks[matchId];
+            } else {
+              bracketPicks[matchId] = side;
+            }
+            clearDownstreamPicks(matchId);
+            saveBracketPicks();
+            renderKnockoutBracket();
+          });
+        });
+
+        matchesEl.appendChild(matchEl);
+      });
+
+      bracketEl.appendChild(col);
+    });
+
+    // ── Champion display ──────────────────────────────────────────────────────
+    const finalFixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === 'final');
+    const finalPick = bracketPicks['final'];
+    let champion = null;
+    if (finalFixture && finalPick) {
+      const homeTeam = resolveKnockoutTeam(finalFixture.homeSource, finalFixture);
+      const awayTeam = resolveKnockoutTeam(finalFixture.awaySource, finalFixture);
+      champion = finalPick === 'home' ? homeTeam : awayTeam;
+    }
+
+    const champCol = document.createElement('div');
+    champCol.className = 'bracket-round bracket-round--champion';
+    champCol.innerHTML = `
+      <div class="bracket-round-label"><span>Champion</span></div>
+      <div class="bracket-champion">
+        ${champion
+          ? `<div class="bracket-champion-flag">${champion.flag}</div>
+             <div class="bracket-champion-name">${champion.name}</div>
+             <div class="bracket-champion-trophy">🏆</div>`
+          : `<div class="bracket-champion-empty">Pick your champion</div>`
+        }
+      </div>`;
+    bracketEl.appendChild(champCol);
   }
 
   // ─── Render Standings ─────────────────────────────────────────────────────────

@@ -74,7 +74,6 @@
 }
 
 /* ---- Prediction Standings header variant ---- */
-/* Subtly different from real standings to visually distinguish */
 
 .pred-standings-header {
   background: color-mix(in srgb, var(--color-accent) 80%, var(--color-primary) 20%);
@@ -87,13 +86,293 @@
   padding: 0.15rem 0.55rem; opacity: 0.9;
 }
 
-/* ---- Knockout Bracket ---- */
-/* Placeholder styles; full bracket classes added when feature is built */
+/* ============================================================
+   KNOCKOUT BRACKET
+   ============================================================ */
 
-.bracket-intro {
+/* ---- Header / progress ---- */
+
+.bracket-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.bracket-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 200px;
+}
+
+.bracket-progress-label {
   font-size: var(--text-sm);
   color: var(--color-text-muted);
-  margin-bottom: var(--space-6);
+}
+
+.bracket-progress-bar {
+  height: 6px;
+  background: var(--color-surface-offset);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.bracket-progress-fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: var(--radius-full);
+  transition: width 300ms ease;
+}
+
+.bracket-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+/* ---- Bracket scroll container ---- */
+
+.bracket-scroll {
+  overflow-x: auto;
+  overflow-y: visible;
+  padding-bottom: var(--space-4);
+  /* Scrollbar styling */
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+.bracket-scroll::-webkit-scrollbar { height: 6px; }
+.bracket-scroll::-webkit-scrollbar-track { background: transparent; }
+.bracket-scroll::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: var(--radius-full); }
+
+/* ---- Bracket layout ---- */
+
+.bracket {
+  display: flex;
+  gap: 0;
+  align-items: flex-start;
+  min-width: max-content;
+  padding: var(--space-2) 0 var(--space-4);
+}
+
+/* ---- Round column ---- */
+
+.bracket-round {
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  max-width: 200px;
+  position: relative;
+}
+
+.bracket-round--champion {
+  min-width: 160px;
+  max-width: 180px;
+  justify-content: flex-start;
+}
+
+.bracket-round-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--space-3);
+  height: 2.5rem;
+}
+
+.bracket-reset-round {
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  line-height: 1;
+  opacity: 0.6;
+  transition: opacity var(--transition-interactive), color var(--transition-interactive);
+}
+.bracket-reset-round:hover { opacity: 1; color: var(--color-error); }
+
+/* ---- Matches list within a round ---- */
+
+.bracket-matches {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 0 var(--space-2);
+  position: relative;
+}
+
+/* Connector lines between rounds using pseudo-elements on the round column */
+.bracket-round:not(.bracket-round--champion) + .bracket-round .bracket-matches::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--color-border);
+  opacity: 0.5;
+}
+
+/* ---- Individual match card ---- */
+
+.bracket-match {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition-interactive);
+}
+.bracket-match:hover {
+  box-shadow: var(--shadow-md);
+}
+
+/* ---- Team row buttons ---- */
+
+.bracket-team {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-interactive),
+              color var(--transition-interactive);
+  min-height: 2.5rem;
+}
+
+.bracket-team:hover:not(:disabled):not(.bracket-team--picked):not(.bracket-team--eliminated) {
+  background: var(--color-surface-2);
+  color: var(--color-primary);
+}
+
+.bracket-team:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.bracket-team--tbd {
+  color: var(--color-text-faint);
+  font-style: italic;
+}
+
+.bracket-team--picked {
+  background: var(--color-primary-highlight);
+  color: var(--color-primary);
+  font-weight: 700;
+}
+[data-theme="dark"] .bracket-team--picked {
+  background: color-mix(in srgb, var(--color-primary) 15%, var(--color-surface));
+  color: var(--color-primary);
+}
+
+.bracket-team--eliminated {
+  opacity: 0.38;
+  text-decoration: line-through;
+  color: var(--color-text-faint);
+}
+
+.bracket-flag {
+  font-size: 1.1em;
+  flex-shrink: 0;
+}
+
+.bracket-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bracket-check {
+  font-size: var(--text-xs);
+  color: var(--color-primary);
+  flex-shrink: 0;
+  font-weight: 700;
+}
+
+/* ---- vs divider between two team rows ---- */
+
+.bracket-vs {
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+  text-align: center;
+  padding: 0 var(--space-3);
+  border-top: 1px solid var(--color-divider);
+  border-bottom: 1px solid var(--color-divider);
+  line-height: 1.6;
+}
+
+/* ---- Match date ---- */
+
+.bracket-date {
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+  text-align: center;
+  padding: var(--space-1) var(--space-3);
+  border-top: 1px solid var(--color-divider);
+  background: var(--color-surface-2);
+}
+
+/* ---- Champion column ---- */
+
+.bracket-champion {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  background: var(--color-surface);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-lg);
+  margin: 0 var(--space-2);
+  box-shadow: var(--shadow-md);
+  min-height: 120px;
+}
+
+.bracket-champion-flag {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.bracket-champion-name {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  letter-spacing: 0.04em;
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.bracket-champion-trophy {
+  font-size: 1.5rem;
+}
+
+.bracket-champion-empty {
+  font-size: var(--text-sm);
+  color: var(--color-text-faint);
+  font-style: italic;
+  padding: var(--space-4);
 }
 
 /* ---- Responsive ---- */
@@ -103,4 +382,9 @@
   .pred-stats-grid { grid-template-columns: repeat(2, 1fr); gap: var(--space-3); }
   .pred-stat-card { padding: var(--space-4); }
   .pred-stat-value { font-size: var(--text-lg); }
+
+  .bracket-round { min-width: 150px; max-width: 165px; }
+  .bracket-round--champion { min-width: 140px; }
+  .bracket-team { font-size: var(--text-xs); padding: var(--space-2); }
+  .bracket-round-label { font-size: var(--text-xs); }
 }
