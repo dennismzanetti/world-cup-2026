@@ -34,6 +34,45 @@
 .sub-tab-panel.active { display: block; }
 .sub-tab-panel[hidden] { display: none !important; }
 
+/* ---- Prediction Standings — stats grid ---- */
+
+.pred-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-8);
+}
+
+.pred-stat-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-5) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-1);
+}
+
+.pred-stat-value {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--color-primary);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.pred-stat-label {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
 /* ---- Prediction Standings header variant ---- */
 /* Subtly different from real standings to visually distinguish */
 
@@ -61,4 +100,7 @@
 
 @media (max-width: 600px) {
   .sub-tab { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); }
+  .pred-stats-grid { grid-template-columns: repeat(2, 1fr); gap: var(--space-3); }
+  .pred-stat-card { padding: var(--space-4); }
+  .pred-stat-value { font-size: var(--text-lg); }
 }
