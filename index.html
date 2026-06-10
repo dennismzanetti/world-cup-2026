@@ -139,6 +139,7 @@
         <div class="sub-tabs" role="tablist" aria-label="Predictions sub-tabs">
           <button class="sub-tab active" data-subtab="my-picks" role="tab" aria-selected="true" aria-controls="subtab-my-picks">My Predictions</button>
           <button class="sub-tab" data-subtab="pred-standings" role="tab" aria-selected="false" aria-controls="subtab-pred-standings">Prediction Standings</button>
+          <button class="sub-tab" data-subtab="pred-bracket" role="tab" aria-selected="false" aria-controls="subtab-pred-bracket">Knockout Bracket</button>
         </div>
 
         <!-- My Predictions panel -->
@@ -177,6 +178,11 @@
             <button class="btn btn-primary pred-standings-signin-btn">Sign In</button>
           </div>
           <div class="standings-grid" id="pred-standings-grid"></div>
+        </div>
+
+        <!-- Knockout Bracket panel -->
+        <div class="sub-tab-panel" id="subtab-pred-bracket" role="tabpanel" hidden>
+          <div id="pred-bracket-container"></div>
         </div>
 
       </div>
