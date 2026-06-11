@@ -33,20 +33,16 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
   }
 
   // ─── Stage label ──────────────────────────────────────────────────────────
-  // stage values come directly from data.js: 'Round of 32', 'Round of 16',
-  // 'Quarterfinals', 'Semifinals', 'Third Place', 'Final', or single letter 'A'-'L' for groups.
   function stageKeyToLabel(key) {
     if (!key) return '';
     if (/^[A-L]$/.test(key)) return `Group ${key}`;
-    return key; // data.js stage strings are already human-readable
+    return key;
   }
 
   // ─── Stage key extractor ─────────────────────────────────────────────────
-  // For group matches: returns the group letter (e.g. 'A').
-  // For knockout matches: returns the f.stage string from data.js (e.g. 'Round of 32').
   function matchStageKey(m) { return m.group || m.stage || null; }
 
-  // ─── Knockout stage ordering for filter dropdown ─────────────────────────
+  // ─── Knockout stage ordering ───────────────────────────────────────────────
   const KNOCKOUT_STAGE_ORDER = [
     'Round of 32', 'Round of 16', 'Quarterfinals',
     'Semifinals', 'Third Place', 'Final'
@@ -225,7 +221,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
       teamName(a.team).localeCompare(teamName(b.team)));
   }
 
-  // ─── Populate filters ─────────────────────────────────────────────────────
+  // ─── Populate filters (called once on init only) ─────────────────────────
   function populateMatchFilters() {
     const dateEl  = document.getElementById('match-date-filter');
     const stageEl = document.getElementById('match-group-filter');
@@ -236,12 +232,12 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
         dates.map(d => `<option value="${d}">${d}</option>`).join('');
     }
     if (stageEl) {
-      const groupStages   = [...new Set(liveMatches.filter(m => m.group).map(m => m.group))].sort();
+      const groupStages    = [...new Set(liveMatches.filter(m => m.group).map(m => m.group))].sort();
       const knockoutStages = KNOCKOUT_STAGE_ORDER.filter(s =>
         WC_KNOCKOUT_FIXTURES.some(f => f.stage === s));
-      const stages = [...groupStages, ...knockoutStages];
       stageEl.innerHTML = '<option value="all">All Stages</option>' +
-        stages.map(s => `<option value="${s}">${stageKeyToLabel(s)}</option>`).join('');
+        [...groupStages, ...knockoutStages]
+          .map(s => `<option value="${s}">${stageKeyToLabel(s)}</option>`).join('');
     }
     if (venueEl) {
       const venues = [...new Set(liveMatches.map(m => m.venue).filter(Boolean))].sort();
@@ -254,20 +250,19 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     const dateEl  = document.getElementById('pred-date-filter');
     const stageEl = document.getElementById('pred-group-filter');
     if (dateEl) {
-      const groupDates   = liveMatches.filter(m => m.group).map(m => m.date);
+      const groupDates    = liveMatches.filter(m => m.group).map(m => m.date);
       const knockoutDates = WC_KNOCKOUT_FIXTURES.map(f => f.date);
       const dates = [...new Set([...groupDates, ...knockoutDates].filter(Boolean))].sort();
       dateEl.innerHTML = '<option value="all">All Dates</option>' +
         dates.map(d => `<option value="${d}">${d}</option>`).join('');
     }
     if (stageEl) {
-      // Group stages A–L first, then knockout stages in canonical order
       const groupStages    = [...new Set(liveMatches.filter(m => m.group).map(m => m.group))].sort();
       const knockoutStages = KNOCKOUT_STAGE_ORDER.filter(s =>
         WC_KNOCKOUT_FIXTURES.some(f => f.stage === s));
-      const stages = [...groupStages, ...knockoutStages];
       stageEl.innerHTML = '<option value="all">All Stages</option>' +
-        stages.map(s => `<option value="${s}">${stageKeyToLabel(s)}</option>`).join('');
+        [...groupStages, ...knockoutStages]
+          .map(s => `<option value="${s}">${stageKeyToLabel(s)}</option>`).join('');
     }
   }
 
@@ -446,7 +441,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     const live = liveMatches.find(m => m.id === fixture.id);
     return {
       id:        fixture.id,
-      stage:     fixture.stage,  // use the string directly from data.js
+      stage:     fixture.stage,
       home:      homeName,
       away:      awayName,
       homeScore: live?.homeScore,
@@ -644,18 +639,19 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
       return;
     }
     authPrompt?.setAttribute('hidden', '');
-    populatePredFilters();
+    // NOTE: populatePredFilters() is NOT called here — it runs once in init()
+    // so filter selections are preserved across renders.
 
     const dateVal  = document.getElementById('pred-date-filter')?.value  || 'all';
     const stageVal = document.getElementById('pred-group-filter')?.value || 'all';
     const teamVal  = (document.getElementById('pred-team-filter')?.value || '').toLowerCase().trim();
 
-    // Group stage matches + knockout matches
-    const groupMatches   = liveMatches.filter(m => m.group);
+    // Group matches + knockout matches (no double-inclusion — knockout fixtures
+    // are already in liveMatches but we use buildKnockoutPredMatch for resolved team names)
+    const groupMatches    = liveMatches.filter(m => m.group);
     const knockoutMatches = WC_KNOCKOUT_FIXTURES.map(f => buildKnockoutPredMatch(f));
     let matches = [...groupMatches, ...knockoutMatches];
 
-    // Apply filters — matchStageKey returns m.group || m.stage, both are now consistent strings
     if (dateVal  !== 'all') matches = matches.filter(m => m.date === dateVal);
     if (stageVal !== 'all') matches = matches.filter(m => matchStageKey(m) === stageVal);
     if (teamVal)            matches = matches.filter(m =>
@@ -873,7 +869,6 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
       });
       scrollArea.appendChild(roundEl);
     });
-    // Champion display
     const finalFixture = WC_KNOCKOUT_FIXTURES.find(f => f.stage === 'Final');
     let champion = null;
     if (finalFixture) {
@@ -904,7 +899,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
   // ─── Init ─────────────────────────────────────────────────────────────────
   function init() {
     populateMatchFilters();
-    populatePredFilters();
+    populatePredFilters(); // populate once — never reset by renderPredictions()
     renderGroups();
   }
   init();
