@@ -11,7 +11,12 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
   let activeTab        = 'groups';
   let activePredSubtab = 'my-picks';
   let userPredictions  = {};  // matchId → {home, away}
-  let liveMatches      = WC_MATCHES.slice(); // mutable working copy
+  let liveMatches      = WC_MATCHES.slice(); // mutable working copy (group stage)
+
+  // All matches for predictions = group stage + knockout fixtures
+  function allPredMatches() {
+    return [...liveMatches, ...WC_KNOCKOUT_FIXTURES];
+  }
 
   // ─── Admin UIDs ───────────────────────────────────────────────────────────
   const ADMIN_UIDS = ['EAi3lYhlSFYGaqm9F87BdJb1Vrg1'];
@@ -84,7 +89,6 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
       authBtn?.setAttribute('hidden', '');
       signOutBtn?.removeAttribute('hidden');
       try {
-        // getUserPredictions returns { matchId: { home, away } }
         const preds = await getUserPredictions(user.uid);
         userPredictions = preds || {};
       } catch (e) {
@@ -160,13 +164,13 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     }
   });
 
-  // ─── Match filters (Matches tab) ───────────────────────────────────────────────
+  // ─── Match filters (Matches tab) ────────────────────────────────────────────
   document.getElementById('match-date-filter')?.addEventListener('change', renderMatches);
   document.getElementById('match-group-filter')?.addEventListener('change', renderMatches);
   document.getElementById('match-venue-filter')?.addEventListener('change', renderMatches);
   document.getElementById('match-team-filter')?.addEventListener('input', renderMatches);
 
-  // ─── Prediction filters (Predictions tab) ─────────────────────────────────────
+  // ─── Prediction filters (Predictions tab) ────────────────────────────────────
   document.getElementById('pred-date-filter')?.addEventListener('change', renderPredictions);
   document.getElementById('pred-group-filter')?.addEventListener('change', renderPredictions);
   document.getElementById('pred-team-filter')?.addEventListener('input', renderPredictions);
@@ -212,7 +216,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     '3P': 'Third Place', F: 'Final'
   }[key] || (/^[A-Z]$/.test(key) ? `Group ${key}` : key));
 
-  // ─── Populate filters (Matches tab) ─────────────────────────────────────────────
+  // ─── Populate filters (Matches tab) ─────────────────────────────────────────
   function populateMatchFilters() {
     const dateEl  = document.getElementById('match-date-filter');
     const stageEl = document.getElementById('match-group-filter');
@@ -234,34 +238,31 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     }
   }
 
-  // ─── Populate filters (Predictions tab) ───────────────────────────────────────
+  // ─── Populate filters (Predictions tab) ──────────────────────────────────────
   function populatePredFilters() {
     const dateEl  = document.getElementById('pred-date-filter');
     const stageEl = document.getElementById('pred-group-filter');
     if (dateEl && dateEl.options.length <= 1) {
-      // Only populate once — preserve user selection on re-renders
-      const dates = [...new Set(liveMatches.map(m => m.date).filter(Boolean))].sort();
+      const dates = [...new Set(allPredMatches().map(m => m.date).filter(Boolean))].sort();
       dates.forEach(d => {
         const opt = document.createElement('option');
-        opt.value = d;
-        opt.textContent = d;
+        opt.value = d; opt.textContent = d;
         dateEl.appendChild(opt);
       });
     }
     if (stageEl && stageEl.options.length <= 1) {
-      // Groups
+      // Group stage options
       WC_GROUPS.forEach(g => {
         const opt = document.createElement('option');
-        opt.value = g.id;
-        opt.textContent = `Group ${g.id}`;
+        opt.value = g.id; opt.textContent = `Group ${g.id}`;
         stageEl.appendChild(opt);
       });
-      // Knockout stages
-      [['R32','Round of 32'],['R16','Round of 16'],['QF','Quarter-Finals'],
-       ['SF','Semi-Finals'],['3P','Third Place'],['F','Final']].forEach(([val, label]) => {
+      // Knockout stage options — only add stages that actually exist in WC_KNOCKOUT_FIXTURES
+      const knockoutStages = [...new Set(WC_KNOCKOUT_FIXTURES.map(f => f.stage).filter(Boolean))];
+      const stageOrder = ['R32','R16','QF','SF','3P','F'];
+      stageOrder.filter(s => knockoutStages.includes(s)).forEach(s => {
         const opt = document.createElement('option');
-        opt.value = val;
-        opt.textContent = label;
+        opt.value = s; opt.textContent = stageKeyToLabel(s);
         stageEl.appendChild(opt);
       });
     }
@@ -340,7 +341,6 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     let scoreColHtml = '';
 
     if (isPred && currentUser) {
-      // userPredictions[matchId] = { home, away } from Firestore
       const pred = userPredictions[m.id] || {};
       const hVal = pred.home !== undefined ? pred.home : '';
       const aVal = pred.away !== undefined ? pred.away : '';
@@ -384,14 +384,13 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
       scoreColHtml = `<div class="card-score-col"><span class="${cls}">${hs} – ${as_}</span></div>`;
     }
 
-    // ── Date/time string
     const dtStr = [m.date, m.timeLocal, m.tz].filter(Boolean).join(' ');
 
-    // ── Card HTML
     card.innerHTML = `
       <div class="card-header">
         <span class="card-header-group">${stageLabel}</span>
         ${statusBadge}
+        <span class="card-header-date">${dtStr}</span>
       </div>
       <div class="card-teams">
         <div class="card-team home-team">
@@ -404,16 +403,12 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
           ${aFlag ? `<span class="team-flag" aria-hidden="true">${aFlag}</span>` : ''}
         </div>
       </div>
-      ${(m.venue || dtStr) ? `
+      ${m.venue ? `
       <div class="card-meta">
-        ${m.venue ? `<span class="card-meta-item">
+        <span class="card-meta-item">
           <svg class="meta-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/><path d="M13 6c0 4.5-5 8.5-5 8.5S3 10.5 3 6a5 5 0 0 1 10 0z"/></svg>
           ${m.venue}${m.city ? ', ' + m.city : ''}
-        </span>` : ''}
-        ${dtStr ? `<span class="card-meta-item">
-          <svg class="meta-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M5 1.5v3M11 1.5v3M2 7h12"/></svg>
-          ${dtStr}
-        </span>` : ''}
+        </span>
       </div>` : ''}`;
 
     // ── Event listeners
@@ -432,10 +427,8 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
         if (errEl)    errEl.hidden    = true;
         if (savingEl) savingEl.hidden = false;
         if (btn)      btn.disabled    = true;
-        // Optimistically update local state using the { home, away } shape
         userPredictions[m.id] = { home: homeVal, away: awayVal };
         try {
-          // savePrediction(uid, matchId, home, away)
           await savePrediction(currentUser.uid, m.id, homeVal, awayVal);
           if (savingEl) savingEl.hidden = true;
           if (savedEl)  { savedEl.hidden = false; setTimeout(() => { savedEl.hidden = true; }, 2000); }
@@ -516,16 +509,14 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     authPrompt?.setAttribute('hidden', '');
     if (filtersBar) filtersBar.hidden = false;
 
-    // Populate filter dropdowns (only fills them once; preserves selections on re-render)
     populatePredFilters();
 
-    // Read current filter values
     const dateVal  = document.getElementById('pred-date-filter')?.value  || 'all';
     const stageVal = document.getElementById('pred-group-filter')?.value || 'all';
     const teamVal  = (document.getElementById('pred-team-filter')?.value || '').toLowerCase().trim();
 
-    // Filter matches — all group matches from liveMatches
-    let matches = liveMatches.slice();
+    // Use combined group + knockout match pool
+    let matches = allPredMatches();
     if (dateVal  !== 'all') matches = matches.filter(m => m.date === dateVal);
     if (stageVal !== 'all') matches = matches.filter(m => (m.group || m.stage) === stageVal);
     if (teamVal)            matches = matches.filter(m =>
@@ -548,7 +539,6 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
       stats[n] = { team: t, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, pts: 0 };
     });
     matches.forEach(m => {
-      // userPredictions[matchId] = { home, away }
       const pred = userPredictions[m.id];
       if (!pred || pred.home == null || pred.away == null) return;
       const hn = teamName(m.home), an = teamName(m.away);
@@ -615,16 +605,14 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     }
     authPrompt?.setAttribute('hidden', '');
     let correctExact = 0, correctResult = 0, total = 0;
-    liveMatches.forEach(match => {
-      // userPredictions[matchId] = { home, away }
+    // Score accuracy across all matches (group + knockout)
+    allPredMatches().forEach(match => {
       const pred = userPredictions[match.id];
       if (!pred || pred.home == null || pred.away == null) return;
       if (match.homeScore == null || match.awayScore == null) return;
       total++;
-      const predResult   = pred.home > pred.away ? 'H'
-                         : pred.home < pred.away ? 'A' : 'D';
-      const actualResult = match.homeScore > match.awayScore ? 'H'
-                         : match.homeScore < match.awayScore ? 'A' : 'D';
+      const predResult   = pred.home > pred.away ? 'H' : pred.home < pred.away ? 'A' : 'D';
+      const actualResult = match.homeScore > match.awayScore ? 'H' : match.homeScore < match.awayScore ? 'A' : 'D';
       if (pred.home === match.homeScore && pred.away === match.awayScore) {
         correctExact++; correctResult++;
       } else if (predResult === actualResult) {
