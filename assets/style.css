@@ -500,6 +500,13 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
 .standings-table td.pts { font-weight: 700; color: var(--color-primary); }
 .standings-table tr:last-child td { border-bottom: none; }
 
+/* Predicted Group Standings container — matches the standings-grid layout */
+#pred-group-standings-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(480px, 100%), 1fr));
+  gap: var(--space-6);
+}
+
 /* ---- PREDICTION STATS ---- */
 .pred-stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(180px,100%),1fr)); gap: var(--space-4); margin-bottom: var(--space-6); }
 .pred-stat-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-5) var(--space-4); text-align: center; box-shadow: var(--shadow-sm); }
@@ -670,4 +677,5 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
   .sub-tab { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); }
   .bracket-round { min-width: 150px; }
   .bracket-header { flex-direction: column; align-items: flex-start; }
+  #pred-group-standings-container { grid-template-columns: 1fr; }
 }
