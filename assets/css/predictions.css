@@ -296,9 +296,10 @@
 .bracket {
   display: flex;
   gap: 0;
-  align-items: flex-start;
+  align-items: stretch;
   min-width: max-content;
   padding: var(--space-2) 0 var(--space-4);
+  position: relative;
 }
 
 /* ── Round column ── */
@@ -341,6 +342,7 @@
   border-bottom: 1px solid var(--color-border);
   margin-bottom: var(--space-3);
   height: 2.5rem;
+  flex-shrink: 0;
 }
 
 .bracket-reset-round {
@@ -359,18 +361,89 @@
 .bracket-matches {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  flex: 1;
   padding: 0 var(--space-2);
   position: relative;
+  /* Distribute matches evenly so they vertically center-align
+     with the pair they came from in the previous round */
+  justify-content: space-around;
+  gap: var(--space-2);
 }
 
-/* Connector line on left edge of each match column */
-.bracket-round:not(.bracket-round--champion) + .bracket-round .bracket-matches::before {
+/* ── SVG connector layer — drawn behind each round ── */
+
+.bracket-connectors {
+  position: absolute;
+  top: 2.5rem; /* below the round label */
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.bracket-connector-line {
+  stroke: var(--color-border);
+  stroke-width: 1.5;
+  fill: none;
+  opacity: 0.5;
+  transition: stroke var(--transition-interactive), opacity var(--transition-interactive);
+}
+
+.bracket-connector-line--active {
+  stroke: var(--color-primary);
+  opacity: 0.7;
+}
+
+.bracket-connector-line--correct {
+  stroke: var(--color-success);
+  opacity: 0.8;
+}
+
+/* Right-side connector stub on each match card */
+.bracket-match::after {
   content: '';
   position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
+  right: -1rem;
+  top: 50%;
+  width: 1rem;
+  height: 1px;
+  background: var(--color-border);
+  opacity: 0.5;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+/* Left-side connector stub on each match card (except R32) */
+.bracket-round:not(:first-child) .bracket-match::before {
+  content: '';
+  position: absolute;
+  left: -1rem;
+  top: 50%;
+  width: 1rem;
+  height: 1px;
+  background: var(--color-border);
+  opacity: 0.5;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+/* Vertical bridge between sibling matches that feed the next round */
+.bracket-match-pair {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  gap: var(--space-3);
+}
+
+/* Vertical line connecting the two matches in a pair */
+.bracket-match-pair::after {
+  content: '';
+  position: absolute;
+  right: -1rem;
+  /* positioned by JS-calculated midpoints, but give a sensible default */
+  top: 30%;
+  bottom: 30%;
   width: 1px;
   background: var(--color-border);
   opacity: 0.4;
@@ -384,6 +457,7 @@
   border-radius: var(--radius-md);
   overflow: hidden;
   box-shadow: var(--shadow-sm);
+  position: relative;
   transition: box-shadow var(--transition-interactive),
               border-color var(--transition-interactive);
 }
@@ -495,6 +569,20 @@
   padding: var(--space-1) var(--space-3);
   border-top: 1px solid var(--color-divider);
   background: var(--color-surface-2);
+}
+
+/* ── Match index label (R32 match number) ── */
+
+.bracket-match-num {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: center;
+  padding: var(--space-1) var(--space-2) 0;
+  background: var(--color-surface-2);
+  border-bottom: 1px solid var(--color-divider);
 }
 
 /* ============================================================
@@ -768,4 +856,7 @@
   .bab-main { gap: var(--space-4); }
   .bab-divider { display: none; }
   .bt-name { font-size: 0.65rem; }
+
+  /* On mobile, stack rounds as tabs instead of horizontal scroll */
+  .bracket-matches { justify-content: flex-start; gap: var(--space-3); }
 }
