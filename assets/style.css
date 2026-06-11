@@ -115,6 +115,9 @@
     --color-accent:#1a3a6b; --color-success:#48bb6a; --color-success-highlight:#0d2e16;
     --color-error:#e05a4e; --color-error-highlight:#2e0c0a;
     --color-live:#ff6b35; --color-live-bg:#2a1500; --color-live-border:#7a3010;
+    --color-tv-bg:#1a2540; --color-tv-text:#7aacf0;
+    --color-esp-bg:#2e1f00; --color-esp-text:#f0b860;
+    --color-stream-bg:#0d2e16; --color-stream-text:#48bb6a;
     --shadow-sm:0 1px 3px rgba(0,0,0,0.3); --shadow-md:0 4px 12px rgba(0,0,0,0.4);
     --shadow-lg:0 12px 32px rgba(0,0,0,0.5);
   }
@@ -472,6 +475,39 @@ a, button, [role="button"], input, select {
 }
 .card-meta-item { display: flex; align-items: center; gap: var(--space-1); }
 .meta-icon { width: 12px; height: 12px; flex-shrink: 0; }
+
+/* ── Broadcaster chips ── */
+.card-meta-broadcast {
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.card-meta-broadcast .card-meta-item {
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.broadcaster-chip {
+  display: inline-flex; align-items: center;
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs); font-weight: 600; line-height: 1.6;
+  background: var(--color-tv-bg); color: var(--color-tv-text);
+  white-space: nowrap;
+}
+
+/* Spanish-language broadcasters (Telemundo, TUDN, Univision) */
+.broadcaster-chip:is(
+  [data-net="Telemundo"],
+  [data-net="TUDN"],
+  [data-net="Univision"]
+) {
+  background: var(--color-esp-bg); color: var(--color-esp-text);
+}
+
+/* Streaming-specific chip */
+.broadcaster-chip--stream {
+  background: var(--color-stream-bg); color: var(--color-stream-text);
+}
 
 .empty-filter-msg { color: var(--color-text-muted); font-size: var(--text-sm); padding: var(--space-8) 0; text-align: center; }
 
