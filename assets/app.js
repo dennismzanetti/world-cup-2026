@@ -114,6 +114,8 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult, sa
   }
 
   watchMatches(matches => {
+    // Fall back to static WC_MATCHES if Firestore matches collection is empty
+    if (!matches || matches.length === 0) matches = WC_MATCHES.slice();
     liveMatches = matches;
     if (activeTab === 'matches')   renderMatches();
     if (activeTab === 'standings') renderStandings();
@@ -148,16 +150,27 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult, sa
     authMode = authMode === 'signin' ? 'signup' : 'signin';
     signInForm?.classList.toggle('hidden', authMode !== 'signin');
     signUpForm?.classList.toggle('hidden', authMode !== 'signup');
-    if (authHeading) authHeading.textContent = authMode === 'signin' ? 'Sign In' : 'Create Account';
-    if (authSubmit)  authSubmit.textContent  = authMode === 'signin' ? 'Sign In' : 'Sign Up';
-    if (authToggle)  authToggle.textContent  = authMode === 'signin' ? "Don't have an account? Sign Up" : 'Already have an account? Sign In';
-    if (authError)   authError.textContent   = '';
+    if (authMode === 'signin') {
+      authHeading.textContent = 'Sign In';
+      authSubmit.textContent  = 'Sign In';
+      authToggle.textContent  = 'Sign up';
+      authToggle.previousSibling.textContent = "Don\u2019t have an account? ";
+    } else {
+      authHeading.textContent = 'Create Account';
+      authSubmit.textContent  = 'Create Account';
+      authToggle.textContent  = 'Sign in';
+      authToggle.previousSibling.textContent = 'Already have an account? ';
+    }
   });
+
+  document.getElementById('predict-signin-btn')?.addEventListener('click', openModal);
+  document.querySelectorAll('.pred-standings-signin-btn').forEach(b => b.addEventListener('click', openModal));
 
   document.getElementById('auth-form')?.addEventListener('submit', async e => {
     e.preventDefault();
-    if (authError) authError.textContent = '';
-    if (authSubmit) authSubmit.disabled = true;
+    authError?.setAttribute('hidden', '');
+    authSubmit.disabled = true;
+    authSubmit.textContent = 'Please wait\u2026';
     try {
       if (authMode === 'signin') {
         const email = document.getElementById('signin-email')?.value.trim();
@@ -171,57 +184,81 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult, sa
       }
       closeModal();
     } catch (err) {
-      if (authError) authError.textContent = err.message || 'Authentication failed';
+      if (authError) {
+        authError.textContent = err.message || 'Authentication failed.';
+        authError.removeAttribute('hidden');
+      }
     } finally {
-      if (authSubmit) authSubmit.disabled = false;
+      authSubmit.disabled = false;
+      authSubmit.textContent = authMode === 'signin' ? 'Sign In' : 'Create Account';
     }
   });
 
   // ─── Theme toggle ─────────────────────────────────────────────────────────
   (function () {
     const toggle = document.querySelector('[data-theme-toggle]');
-    const html   = document.documentElement;
-    let savedTheme = null;
-    try { savedTheme = localStorage.getItem('theme'); } catch(e) {}
-    let theme = savedTheme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-    html.setAttribute('data-theme', theme);
-    function updateIcon() {
-      if (!toggle) return;
-      toggle.innerHTML = theme === 'dark'
-        ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>'
-        : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
-      toggle.setAttribute('aria-label', `Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`);
+    const root   = document.documentElement;
+    let theme = root.getAttribute('data-theme') || 'dark';
+
+    function applyTheme(t) {
+      root.setAttribute('data-theme', t);
+      theme = t;
+      if (toggle) {
+        toggle.setAttribute('aria-label', `Switch to ${t === 'dark' ? 'light' : 'dark'} mode`);
+        toggle.innerHTML = theme === 'dark'
+          ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>'
+          : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+      }
     }
-    updateIcon();
-    toggle?.addEventListener('click', () => {
-      theme = theme === 'dark' ? 'light' : 'dark';
-      html.setAttribute('data-theme', theme);
-      try { localStorage.setItem('theme', theme); } catch(e) {}
-      updateIcon();
-    });
+
+    applyTheme(theme);
+    toggle?.addEventListener('click', () => applyTheme(theme === 'dark' ? 'light' : 'dark'));
   })();
 
-  // ─── Match filter helpers ──────────────────────────────────────────────────
-  let matchFilters = { group: 'all', date: 'all', search: '' };
-  let predFilters  = { group: 'all', status: 'all' };
+  // ─── Filter setup ─────────────────────────────────────────────────────────
+  const matchFilters = { group: 'all', date: 'all', search: '' };
+  const predFilters  = { group: 'all', status: 'all' };
 
   function populateMatchFilters() {
     const sel = document.getElementById('match-group-filter');
-    if (!sel) return;
-    WC_GROUPS.forEach(g => {
-      const opt = document.createElement('option');
-      opt.value = g.id; opt.textContent = `Group ${g.id}`;
-      sel.appendChild(opt);
-    });
+    if (sel) {
+      WC_GROUPS.forEach(g => {
+        const opt = document.createElement('option');
+        opt.value = g.id; opt.textContent = `Group ${g.id}`;
+        sel.appendChild(opt);
+      });
+    }
+    const dateSel = document.getElementById('match-date-filter');
+    if (dateSel) {
+      const dates = [...new Set(WC_MATCHES.map(m => m.date))].sort();
+      dates.forEach(d => {
+        const opt = document.createElement('option');
+        const dt = new Date(d + 'T12:00:00');
+        opt.value = d;
+        opt.textContent = dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        dateSel.appendChild(opt);
+      });
+    }
+    const venueSel = document.getElementById('match-venue-filter');
+    if (venueSel) {
+      const venues = [...new Set(WC_MATCHES.map(m => m.venue).filter(Boolean))].sort();
+      venues.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v; opt.textContent = v;
+        venueSel.appendChild(opt);
+      });
+    }
   }
+
   function populatePredFilters() {
     const sel = document.getElementById('pred-group-filter');
-    if (!sel) return;
-    WC_GROUPS.forEach(g => {
-      const opt = document.createElement('option');
-      opt.value = g.id; opt.textContent = `Group ${g.id}`;
-      sel.appendChild(opt);
-    });
+    if (sel) {
+      WC_GROUPS.forEach(g => {
+        const opt = document.createElement('option');
+        opt.value = g.id; opt.textContent = `Group ${g.id}`;
+        sel.appendChild(opt);
+      });
+    }
   }
 
   document.getElementById('match-group-filter')?.addEventListener('change', e => {
@@ -242,35 +279,21 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult, sa
 
   // ─── Groups tab ───────────────────────────────────────────────────────────
   function calcPoints(teams, matches) {
-    const table = {};
-    teams.forEach(t => { table[t.name] = { team: t, pts: 0, gd: 0, gf: 0, ga: 0, played: 0, w: 0, d: 0, l: 0 }; });
+    const rows = teams.map(t => ({ team: t, played: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, gd: 0, pts: 0 }));
+    const rowOf = name => rows.find(r => teamName(r.team) === teamName(name));
     matches.forEach(m => {
       if (m.homeScore == null || m.awayScore == null) return;
-      const h = table[teamName(m.home)], a = table[teamName(m.away)];
+      const h = rowOf(m.home), a = rowOf(m.away);
       if (!h || !a) return;
-      h.gf += m.homeScore; h.ga += m.awayScore; h.gd = h.gf - h.ga; h.played++;
-      a.gf += m.awayScore; a.ga += m.homeScore; a.gd = a.gf - a.ga; a.played++;
-      if (m.homeScore > m.awayScore) { h.pts += 3; h.w++; a.l++; }
-      else if (m.homeScore < m.awayScore) { a.pts += 3; a.w++; h.l++; }
-      else { h.pts += 1; a.pts += 1; h.d++; a.d++; }
+      h.played++; a.played++;
+      h.gf += m.homeScore; h.ga += m.awayScore;
+      a.gf += m.awayScore; a.ga += m.homeScore;
+      if (m.homeScore > m.awayScore)      { h.w++; h.pts += 3; a.l++; }
+      else if (m.homeScore < m.awayScore) { a.w++; a.pts += 3; h.l++; }
+      else                                { h.d++; h.pts++; a.d++; a.pts++; }
     });
-    return Object.values(table).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
-  }
-
-  function calcPredPoints(teams, matches) {
-    const table = {};
-    teams.forEach(t => { table[t.name] = { team: t, pts: 0, gd: 0, gf: 0, ga: 0, played: 0 }; });
-    matches.forEach(m => {
-      const pred = userPredictions[m.id];
-      if (!pred || pred.homeScorePred == null || pred.awayScorePred == null) return;
-      const h = table[teamName(m.home)], a = table[teamName(m.away)];
-      if (!h || !a) return;
-      const hs = pred.homeScorePred, as = pred.awayScorePred;
-      h.gf += hs; h.ga += as; h.gd = h.gf - h.ga; h.played++;
-      a.gf += as; a.ga += hs; a.gd = a.gf - a.ga; a.played++;
-      if (hs > as) { h.pts += 3; } else if (hs < as) { a.pts += 3; } else { h.pts += 1; a.pts += 1; }
-    });
-    return Object.values(table).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+    rows.forEach(r => r.gd = r.gf - r.ga);
+    return rows.sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
   }
 
   function renderGroups() {
@@ -419,8 +442,6 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult, sa
     }
     let matches = liveMatches.filter(m => m.group);
     if (predFilters.group !== 'all') matches = matches.filter(m => m.group === predFilters.group);
-    if (predFilters.status === 'unpredicted') matches = matches.filter(m => !userPredictions[m.id]);
-    if (predFilters.status === 'predicted')   matches = matches.filter(m =>  userPredictions[m.id]);
     if (!matches.length) {
       container.innerHTML = '<div class="empty-filter-msg">No matches to show.</div>';
       return;
@@ -428,553 +449,399 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult, sa
     const byDate = {};
     matches.forEach(m => { (byDate[m.date] = byDate[m.date] || []).push(m); });
     container.innerHTML = '';
+    document.getElementById('pred-filters')?.removeAttribute('hidden');
     Object.keys(byDate).sort().forEach(date => {
       const section = document.createElement('div');
       section.className = 'pred-date-section';
       const d = new Date(date + 'T12:00:00');
       section.innerHTML = `<h3 class="pred-date-header">${d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</h3>`;
-      byDate[date].forEach(m => section.appendChild(buildPredCard(m)));
+      byDate[date].forEach(m => {
+        const pred = userPredictions[m.id] || {};
+        const played = m.homeScore != null;
+        const card = document.createElement('div');
+        card.className = 'pred-card' + (played ? ' pred-played' : '');
+        card.innerHTML = `
+          <div class="pred-match-header">
+            <span class="pred-group-badge">Group ${m.group}</span>
+            <span class="pred-time">${m.timeLocal} ${m.tz} &bull; ${m.venue}</span>
+          </div>
+          <div class="pred-teams">
+            <div class="pred-team pred-team--home">
+              <span class="pred-flag">${teamFlag(m.home)}</span>
+              <span class="pred-name">${teamName(m.home)}</span>
+            </div>
+            <div class="pred-score-inputs">
+              <input type="number" class="pred-score-input" min="0" max="30"
+                placeholder="-" value="${pred.homeScorePred ?? ''}"
+                data-match-id="${m.id}" data-field="home"
+                ${played ? 'disabled' : ''} />
+              <span class="pred-sep">&#8211;</span>
+              <input type="number" class="pred-score-input" min="0" max="30"
+                placeholder="-" value="${pred.awayScorePred ?? ''}"
+                data-match-id="${m.id}" data-field="away"
+                ${played ? 'disabled' : ''} />
+            </div>
+            <div class="pred-team pred-team--away">
+              <span class="pred-name">${teamName(m.away)}</span>
+              <span class="pred-flag">${teamFlag(m.away)}</span>
+            </div>
+          </div>
+          ${played ? `<div class="pred-actual-result">Result: ${m.homeScore} \u2013 ${m.awayScore}</div>` : ''}`;
+        if (!played) {
+          card.querySelectorAll('.pred-score-input').forEach(input => {
+            input.addEventListener('change', () => {
+              const homeInput = card.querySelector('[data-field="home"]');
+              const awayInput = card.querySelector('[data-field="away"]');
+              const hv = homeInput?.value;
+              const av = awayInput?.value;
+              if (hv !== '' && av !== '') {
+                savePrediction(currentUser.uid, m.id, {
+                  homeScorePred: parseInt(hv),
+                  awayScorePred: parseInt(av)
+                }).then(() => {
+                  if (!userPredictions[m.id]) userPredictions[m.id] = {};
+                  userPredictions[m.id].homeScorePred = parseInt(hv);
+                  userPredictions[m.id].awayScorePred = parseInt(av);
+                }).catch(err => console.error('savePrediction failed', err));
+              }
+            });
+          });
+        }
+        section.appendChild(card);
+      });
       container.appendChild(section);
     });
   }
 
-  function buildPredCard(m) {
-    const pred = userPredictions[m.id] || {};
-    const played = m.homeScore != null;
-    const card = document.createElement('div');
-    card.className = 'pred-card';
-    const homeScore = pred.homeScorePred ?? '';
-    const awayScore = pred.awayScorePred ?? '';
-    card.innerHTML = `
-      <div class="pred-card-teams">
-        <span class="pred-flag">${teamFlag(m.home)}</span>
-        <span class="pred-team-name">${teamName(m.home)}</span>
-        <input type="number" class="pred-input" min="0" max="20" value="${homeScore}" placeholder="-" data-field="home">
-        <span class="pred-sep">:</span>
-        <input type="number" class="pred-input" min="0" max="20" value="${awayScore}" placeholder="-" data-field="away">
-        <span class="pred-team-name pred-team-name--away">${teamName(m.away)}</span>
-        <span class="pred-flag">${teamFlag(m.away)}</span>
-      </div>
-      ${played ? `<div class="pred-result-row">Result: <strong>${m.homeScore} \u2013 ${m.awayScore}</strong></div>` : ''}`;
-    const saveInput = async () => {
-      if (!currentUser) return;
-      const h = card.querySelector('[data-field="home"]')?.value;
-      const a = card.querySelector('[data-field="away"]')?.value;
-      if (h === '' && a === '') return;
-      const hs = h !== '' ? parseInt(h) : null;
-      const as = a !== '' ? parseInt(a) : null;
-      await savePrediction(currentUser.uid, m.id, { homeScorePred: hs, awayScorePred: as });
-      userPredictions[m.id] = { homeScorePred: hs, awayScorePred: as };
-    };
-    card.querySelectorAll('.pred-input').forEach(inp => {
-      inp.addEventListener('change', saveInput);
-      inp.addEventListener('blur',   saveInput);
-    });
-    return card;
-  }
-
-  // ─── Predictions: Predicted Group Standings ───────────────────────────────
+  // ─── Predictions: Group Standings ─────────────────────────────────────────
   function renderPredGroupStandings() {
     const container = document.getElementById('pred-group-standings-container');
     if (!container) return;
     if (!currentUser) {
       container.innerHTML = `<div class="auth-prompt"><p>Sign in to see your predicted standings.</p>
-        <button class="btn btn-primary pred-standings-signin-btn">Sign In</button></div>`;
-      container.querySelectorAll('.pred-standings-signin-btn').forEach(b => b.addEventListener('click', openModal));
+        <button class="btn btn-primary pred-signin-btn">Sign In</button></div>`;
+      container.querySelector('.pred-signin-btn')?.addEventListener('click', openModal);
       return;
     }
     container.innerHTML = '';
     WC_GROUPS.forEach(group => {
-      const gm = liveMatches.filter(m => m.group === group.id);
-      const standings = calcPredPoints(group.teams, gm);
-      const hasPreds = standings.some(r => r.played > 0);
+      // Build pseudo-matches using user's predicted scores
+      const gm = liveMatches
+        .filter(m => m.group === group.id)
+        .map(m => {
+          const pred = userPredictions[m.id] || {};
+          return {
+            ...m,
+            homeScore: pred.homeScorePred ?? m.homeScore,
+            awayScore: pred.awayScorePred ?? m.awayScore
+          };
+        });
+      const standings = calcPoints(group.teams, gm);
       const card = document.createElement('div');
-      card.className = 'standings-card';
+      card.className = 'pred-group-card';
       card.innerHTML = `
-        <h3 class="standings-group-title">Group ${group.id} <span style="font-weight:400;font-size:0.75em;color:var(--color-text-muted)">(predicted)</span></h3>
-        ${!hasPreds
-          ? '<p class="empty-filter-msg" style="padding:var(--space-4)">No predictions yet</p>'
-          : `<table class="standings-table">
-              <thead><tr><th>#</th><th>Team</th><th>Pts</th><th>GD</th></tr></thead>
-              <tbody>${standings.map((row, i) => `
-                <tr class="${i < 2 ? 'qualify-row' : 'eliminated-row'}">
-                  <td>${i + 1}</td>
-                  <td><span>${row.team.flag}</span> ${row.team.name}</td>
-                  <td><strong>${row.pts}</strong></td>
-                  <td>${row.gd > 0 ? '+' : ''}${row.gd}</td>
-                </tr>`).join('')}
-              </tbody>
-            </table>`}
-      `;
+        <h3 class="pred-group-title">Group ${group.id}</h3>
+        <table class="pred-group-table">
+          <thead><tr><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th></tr></thead>
+          <tbody>${standings.map((row, i) => `
+            <tr class="${i < 2 ? 'pred-qualify' : 'pred-eliminated'}">
+              <td><span>${row.team.flag}</span> ${row.team.name}</td>
+              <td>${row.played}</td><td>${row.w}</td><td>${row.d}</td><td>${row.l}</td>
+              <td>${row.gd > 0 ? '+' : ''}${row.gd}</td>
+              <td><strong>${row.pts}</strong></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>`;
       container.appendChild(card);
     });
   }
 
-  // ─── Predictions: Leaderboard ─────────────────────────────────────────────
+  // ─── Predictions: Accuracy / Leaderboard ──────────────────────────────────
   function renderPredStandings() {
     const container = document.getElementById('pred-standings-container');
     if (!container) return;
     if (!currentUser) {
       container.innerHTML = `<div class="auth-prompt"><p>Sign in to see the leaderboard.</p>
-        <button class="btn btn-primary pred-standings-signin-btn">Sign In</button></div>`;
-      container.querySelectorAll('.pred-standings-signin-btn').forEach(b => b.addEventListener('click', openModal));
+        <button class="btn btn-primary pred-signin-btn">Sign In</button></div>`;
+      container.querySelector('.pred-signin-btn')?.addEventListener('click', openModal);
       return;
     }
-    const groupMatches = liveMatches.filter(m => m.group && m.homeScore != null);
-    let correct = 0, correctExact = 0, total = 0;
-    groupMatches.forEach(m => {
+    const played = liveMatches.filter(m => m.homeScore != null && m.awayScore != null);
+    if (!played.length) {
+      container.innerHTML = `<div class="empty-state"><p>Accuracy stats will appear once matches are played.</p></div>`;
+      return;
+    }
+    let exact = 0, correct = 0, total = played.length;
+    played.forEach(m => {
       const pred = userPredictions[m.id];
-      if (!pred || pred.homeScorePred == null) return;
-      total++;
-      const predWinner = pred.homeScorePred > pred.awayScorePred ? 'home'
-                       : pred.homeScorePred < pred.awayScorePred ? 'away' : 'draw';
-      const realWinner = m.homeScore > m.awayScore ? 'home'
-                       : m.homeScore < m.awayScore ? 'away' : 'draw';
-      if (predWinner === realWinner) correct++;
-      if (pred.homeScorePred === m.homeScore && pred.awayScorePred === m.awayScore) correctExact++;
+      if (!pred) return;
+      const predHome = pred.homeScorePred, predAway = pred.awayScorePred;
+      if (predHome == null || predAway == null) return;
+      if (predHome === m.homeScore && predAway === m.awayScore) { exact++; correct++; }
+      else {
+        const actualWinner = m.homeScore > m.awayScore ? 'home' : m.awayScore > m.homeScore ? 'away' : 'draw';
+        const predWinner   = predHome > predAway ? 'home' : predAway > predHome ? 'away' : 'draw';
+        if (actualWinner === predWinner) correct++;
+      }
     });
-    const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
     container.innerHTML = `
-      <div class="pred-stats-grid">
-        <div class="pred-stat-card">
-          <div class="pred-stat-value">${total}</div>
-          <div class="pred-stat-label">Matches Predicted</div>
+      <div class="accuracy-banner">
+        <div class="accuracy-stat">
+          <span class="accuracy-num">${correct}</span>
+          <span class="accuracy-label">Correct Results</span>
         </div>
-        <div class="pred-stat-card">
-          <div class="pred-stat-value">${correct}</div>
-          <div class="pred-stat-label">Correct Results</div>
+        <div class="accuracy-stat">
+          <span class="accuracy-num">${exact}</span>
+          <span class="accuracy-label">Exact Scores</span>
         </div>
-        <div class="pred-stat-card">
-          <div class="pred-stat-value">${correctExact}</div>
-          <div class="pred-stat-label">Exact Scores</div>
+        <div class="accuracy-stat">
+          <span class="accuracy-num">${total > 0 ? Math.round(correct / total * 100) : 0}%</span>
+          <span class="accuracy-label">Accuracy</span>
         </div>
-        <div class="pred-stat-card">
-          <div class="pred-stat-value">${pct}%</div>
-          <div class="pred-stat-label">Accuracy</div>
+        <div class="accuracy-stat">
+          <span class="accuracy-num">${total}</span>
+          <span class="accuracy-label">Matches Played</span>
         </div>
+      </div>
+      <div class="accuracy-breakdown">
+        ${played.map(m => {
+          const pred = userPredictions[m.id] || {};
+          const hasPred = pred.homeScorePred != null && pred.awayScorePred != null;
+          const actualWinner = m.homeScore > m.awayScore ? 'home' : m.awayScore > m.homeScore ? 'away' : 'draw';
+          const predWinner   = (pred.homeScorePred || 0) > (pred.awayScorePred || 0) ? 'home' :
+                               (pred.awayScorePred || 0) > (pred.homeScorePred || 0) ? 'away' : 'draw';
+          const isExact   = hasPred && pred.homeScorePred === m.homeScore && pred.awayScorePred === m.awayScore;
+          const isCorrect = hasPred && actualWinner === predWinner;
+          return `<div class="accuracy-row ${isExact ? 'exact' : isCorrect ? 'correct' : hasPred ? 'wrong' : 'no-pred'}">
+            <span class="acc-teams">${teamDisplay(m.home)} v ${teamDisplay(m.away)}</span>
+            <span class="acc-result">Result: ${m.homeScore}\u2013${m.awayScore}</span>
+            <span class="acc-pred">${hasPred ? `Pred: ${pred.homeScorePred}\u2013${pred.awayScorePred}` : 'No pick'}</span>
+            <span class="acc-badge">${isExact ? '\u2605 Exact' : isCorrect ? '\u2713 Correct' : hasPred ? '\u2715 Wrong' : '\u2014'}</span>
+          </div>`;
+        }).join('')}
       </div>`;
   }
 
   // ─── Knockout Bracket ─────────────────────────────────────────────────────
-
-  async function persistBracketPicks() {
-    if (!currentUser) return;
-    await saveBracketPicks(currentUser.uid, bracketPicks);
-  }
-
-  function getActualWinner(matchId) {
-    const m = liveMatches.find(m => m.id === matchId);
-    if (!m || m.homeScore == null || m.awayScore == null) return null;
-    if (m.homeScore > m.awayScore) return 'home';
-    if (m.awayScore > m.homeScore) return 'away';
-    return null;
-  }
-
-  function resolveSlot(slot, mode, depth) {
-    if (depth === undefined) depth = 0;
-    if (depth > 10 || !slot) return null;
-
-    if (typeof slot === 'string') {
-      const groupMatch = slot.match(/^(\d)([A-L])$/);
-      if (groupMatch) {
-        const rank = parseInt(groupMatch[1]);
-        const gid  = groupMatch[2];
-        const group = WC_GROUPS.find(g => g.id === gid);
-        if (!group) return null;
-        const gm = liveMatches.filter(m => m.group === gid);
-        if (mode === 'actual') {
-          if (gm.some(m => m.homeScore == null)) return null;
-          return calcPoints(group.teams, gm)[rank - 1]?.team || null;
-        } else {
-          if (!gm.some(m => userPredictions[m.id]?.homeScorePred != null)) return null;
-          return calcPredPoints(group.teams, gm)[rank - 1]?.team || null;
-        }
-      }
-    }
-
-    const fixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === slot);
-    if (!fixture) return null;
-
-    if (mode === 'actual') {
-      const w = getActualWinner(slot);
-      if (!w) return null;
-      const src = w === 'home' ? fixture.homeSource : fixture.awaySource;
-      if (!src) return w === 'home' ? fixture.home : fixture.away;
-      if (src.type === 'group') return resolveSlot(`${src.pos}${src.group}`, mode, depth + 1);
-      if (src.type === 'winner') return resolveSlot(src.matchId, mode, depth + 1);
-      return w === 'home' ? fixture.home : fixture.away;
-    } else {
-      const pick = bracketPicks[slot];
-      if (!pick) return null;
-      const src = pick === 'home' ? fixture.homeSource : fixture.awaySource;
-      if (!src) return pick === 'home' ? fixture.home : fixture.away;
-      if (src.type === 'group') return resolveSlot(`${src.pos}${src.group}`, mode, depth + 1);
-      if (src.type === 'winner') return resolveSlot(src.matchId, mode, depth + 1);
-      return pick === 'home' ? fixture.home : fixture.away;
-    }
-  }
-
-  function resolveFixtureTeams(fixture, mode) {
-    function resolveSource(src, fallback) {
-      if (!src) return fallback;
-      if (src.type === 'group') return resolveSlot(`${src.pos}${src.group}`, mode) || fallback;
-      if (src.type === 'winner') return resolveSlot(src.matchId, mode) || fallback;
-      return fallback;
-    }
-    return {
-      homeTeam: resolveSource(fixture.homeSource, fixture.home),
-      awayTeam: resolveSource(fixture.awaySource, fixture.away),
-    };
-  }
-
-  function clearDownstreamPicks(matchId) {
-    const queue = [matchId], visited = new Set();
-    while (queue.length) {
-      const id = queue.shift();
-      if (visited.has(id)) continue;
-      visited.add(id);
-      delete bracketPicks[id];
-      WC_KNOCKOUT_FIXTURES.forEach(f => {
-        if (f.homeSource?.matchId === id || f.awaySource?.matchId === id) queue.push(f.id);
-      });
-    }
-  }
-
-  function bracketAccuracy() {
-    let correct = 0, total = 0;
-    WC_KNOCKOUT_FIXTURES.forEach(f => {
-      const actual = getActualWinner(f.id);
-      if (!actual) return;
-      total++;
-      if (bracketPicks[f.id] && bracketPicks[f.id] === actual) correct++;
-    });
-    return { correct, total };
-  }
-
   function renderKnockoutBracket() {
     const container = document.getElementById('pred-bracket-container');
     if (!container) return;
     if (!currentUser) {
       container.innerHTML = `<div class="auth-prompt"><p>Sign in to view your predicted bracket.</p>
-        <button class="btn btn-primary pred-standings-signin-btn">Sign In</button></div>`;
-      container.querySelectorAll('.pred-standings-signin-btn').forEach(b => b.addEventListener('click', openModal));
+        <button class="btn btn-primary pred-signin-btn">Sign In</button></div>`;
+      container.querySelector('.pred-signin-btn')?.addEventListener('click', openModal);
       return;
     }
-    container.innerHTML = '';
 
-    const acc = bracketAccuracy();
-    const totalPossible = WC_KNOCKOUT_FIXTURES.length;
-    const madePicks = WC_KNOCKOUT_FIXTURES.filter(f => bracketPicks[f.id]).length;
-    const pct = totalPossible > 0 ? Math.round((madePicks / totalPossible) * 100) : 0;
-    const accPct = acc.total > 0 ? Math.round((acc.correct / acc.total) * 100) : null;
-
-    const roundDefs = [
-      { label:'R32',   prefix:'r32-' },
-      { label:'R16',   prefix:'r16-' },
-      { label:'QF',    prefix:'qf-'  },
-      { label:'SF',    prefix:'sf-'  },
-      { label:'Final', prefix:'final' },
+    const rounds = [
+      { id: 'r32',    label: 'Round of 32',   matches: WC_KNOCKOUT_FIXTURES.filter(m => m.round === 'r32') },
+      { id: 'r16',    label: 'Round of 16',   matches: WC_KNOCKOUT_FIXTURES.filter(m => m.round === 'r16') },
+      { id: 'qf',     label: 'Quarter-Finals', matches: WC_KNOCKOUT_FIXTURES.filter(m => m.round === 'qf') },
+      { id: 'sf',     label: 'Semi-Finals',    matches: WC_KNOCKOUT_FIXTURES.filter(m => m.round === 'sf') },
+      { id: 'final',  label: 'Final',          matches: WC_KNOCKOUT_FIXTURES.filter(m => m.round === 'final') },
     ];
+
+    const accuracy = (() => {
+      let correct = 0, total = 0;
+      rounds.forEach(r => {
+        r.matches.forEach(m => {
+          const actual = liveMatches.find(lm => lm.id === m.id);
+          if (!actual || actual.homeScore == null) return;
+          total++;
+          const pick = bracketPicks[m.id];
+          if (!pick) return;
+          const winner = actual.homeScore > actual.awayScore ? 'home' : 'away';
+          if (pick === winner) correct++;
+        });
+      });
+      return { correct, total };
+    })();
+
+    container.innerHTML = '';
 
     const banner = document.createElement('div');
     banner.className = 'bracket-accuracy-banner';
     banner.innerHTML = `
-      <div class="bab-main">
-        <div class="bab-picks-group">
-          <span class="bab-icon">&#x1F4CB;</span>
-          <div class="bab-text">
-            <div class="bab-stat-value">${madePicks}<span class="bab-of">/${totalPossible}</span></div>
-            <div class="bab-stat-label">Picks Made</div>
-          </div>
-          <div class="bab-progress-wrap">
-            <div class="bab-progress-bar"><div class="bab-progress-fill" style="width:${pct}%"></div></div>
-            <span class="bab-pct">${pct}%</span>
-          </div>
-        </div>
-        ${acc.total > 0 ? `
-        <div class="bab-divider"></div>
-        <div class="bab-accuracy-group">
-          <span class="bab-icon">&#x1F3AF;</span>
-          <div class="bab-text">
-            <div class="bab-stat-value bab-correct">${acc.correct}<span class="bab-of">/${acc.total}</span></div>
-            <div class="bab-stat-label">Correct</div>
-          </div>
-          ${accPct !== null ? `<div class="bab-accuracy-ring">${accPct}%</div>` : ''}
-        </div>` : ''}
+      <div class="bab-stat">
+        <span class="bab-num">${accuracy.correct}</span>
+        <span class="bab-label">Correct Picks</span>
       </div>
-      <div class="bab-rounds">
-        ${roundDefs.map(({ label, prefix }) => {
-          const ids = prefix === 'final'
-            ? WC_KNOCKOUT_FIXTURES.filter(f => f.id === 'final')
-            : WC_KNOCKOUT_FIXTURES.filter(f => f.id.startsWith(prefix));
-          const done = ids.filter(f => bracketPicks[f.id]).length;
-          const full = done === ids.length && ids.length > 0;
-          return `<span class="bab-round-chip ${full ? 'bab-round-chip--done' : ''}">${label} ${done}/${ids.length}</span>`;
-        }).join('')}
+      <div class="bab-stat">
+        <span class="bab-num">${accuracy.total}</span>
+        <span class="bab-label">Decided Matches</span>
+      </div>
+      <div class="bab-stat">
+        <span class="bab-num">${accuracy.total > 0 ? Math.round(accuracy.correct / accuracy.total * 100) : 0}%</span>
+        <span class="bab-label">Accuracy</span>
       </div>`;
     container.appendChild(banner);
 
     const toolbar = document.createElement('div');
     toolbar.className = 'bracket-toolbar';
     toolbar.innerHTML = `
-      <div class="bracket-view-toggle" role="group" aria-label="Bracket view mode">
-        <button class="bvt-btn${bracketView==='my'?' bvt-active':''}" data-bview="my">My Picks</button>
-        <button class="bvt-btn${bracketView==='actual'?' bvt-active':''}" data-bview="actual">Actual</button>
-        <button class="bvt-btn${bracketView==='overlay'?' bvt-active':''}" data-bview="overlay">Overlay &#x2728;</button>
-      </div>
-      <div class="bracket-actions">
-        <button class="btn btn-sm btn-ghost" id="bracket-seed-btn">Seed from Groups</button>
-        <button class="btn btn-sm btn-ghost" id="bracket-reset-all-btn">Reset All</button>
-      </div>`;
-    container.appendChild(toolbar);
-
-    toolbar.querySelectorAll('.bvt-btn').forEach(btn => {
+      <span class="bracket-toolbar-label">View:</span>
+      ${['my','actual','overlay'].map(v => `
+        <button class="btn btn-sm ${bracketView === v ? 'btn-primary' : 'btn-ghost'} bracket-view-btn" data-bview="${v}">
+          ${v === 'my' ? 'My Picks' : v === 'actual' ? 'Actual' : 'Overlay'}
+        </button>`).join('')}`;
+    toolbar.querySelectorAll('.bracket-view-btn').forEach(btn => {
       btn.addEventListener('click', () => { bracketView = btn.dataset.bview; renderKnockoutBracket(); });
     });
+    container.appendChild(toolbar);
 
-    const scrollWrap = document.createElement('div');
-    scrollWrap.className = 'bracket-scroll';
-    container.appendChild(scrollWrap);
-
-    const bracketEl = document.createElement('div');
-    bracketEl.className = 'bracket';
-    scrollWrap.appendChild(bracketEl);
-
-    const rounds = [
-      { label: 'Round of 32',    ids: ['r32-1','r32-2','r32-3','r32-4','r32-5','r32-6','r32-7','r32-8','r32-9','r32-10','r32-11','r32-12','r32-13','r32-14','r32-15','r32-16'] },
-      { label: 'Round of 16',    ids: ['r16-1','r16-2','r16-3','r16-4','r16-5','r16-6','r16-7','r16-8'] },
-      { label: 'Quarter-Finals', ids: ['qf-1','qf-2','qf-3','qf-4'] },
-      { label: 'Semi-Finals',    ids: ['sf-1','sf-2'] },
-      { label: 'Final',          ids: ['final'] },
-    ];
+    const bracket = document.createElement('div');
+    bracket.className = 'bracket-scroll';
+    const bracketInner = document.createElement('div');
+    bracketInner.className = 'bracket-inner';
 
     rounds.forEach(round => {
-      const roundEl = document.createElement('div');
-      roundEl.className = 'bracket-round';
-      if (round.ids[0] === 'final') roundEl.classList.add('bracket-round--final');
+      const col = document.createElement('div');
+      col.className = 'bracket-round';
+      const header = document.createElement('div');
+      header.className = 'bracket-round-header';
+      header.textContent = round.label;
+      col.appendChild(header);
 
-      const labelEl = document.createElement('div');
-      labelEl.className = 'bracket-round-label';
-      const resetBtn = document.createElement('button');
-      resetBtn.className = 'bracket-reset-round';
-      resetBtn.textContent = '\u21BA';
-      resetBtn.title = `Reset ${round.label}`;
-      resetBtn.addEventListener('click', () => {
-        round.ids.forEach(id => clearDownstreamPicks(id));
-        persistBracketPicks(); renderKnockoutBracket();
-      });
-      labelEl.appendChild(document.createTextNode(round.label));
-      labelEl.appendChild(resetBtn);
-      roundEl.appendChild(labelEl);
+      round.matches.forEach(m => {
+        const actual = liveMatches.find(lm => lm.id === m.id) || m;
+        const pick   = bracketPicks[m.id];
+        const played = actual.homeScore != null;
+        const actualWinner = played
+          ? (actual.homeScore > actual.awayScore ? 'home' : 'away')
+          : null;
+        const pickCorrect = pick && actualWinner && pick === actualWinner;
+        const pickWrong   = pick && actualWinner && pick !== actualWinner;
 
-      const matchesEl = document.createElement('div');
-      matchesEl.className = 'bracket-matches';
-      roundEl.appendChild(matchesEl);
-      bracketEl.appendChild(roundEl);
+        const matchBox = document.createElement('div');
+        matchBox.className = 'bracket-match';
 
-      round.ids.forEach(matchId => {
-        const fixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === matchId);
-        if (!fixture) return;
-
-        const myTeams      = resolveFixtureTeams(fixture, 'pick');
-        const actualTeams  = resolveFixtureTeams(fixture, 'actual');
-        const myPick       = bracketPicks[matchId];
-        const actualResult = getActualWinner(matchId);
-
-        const matchEl = document.createElement('div');
-        matchEl.className = 'bracket-match';
-        if (actualResult) matchEl.classList.add('bracket-match--played');
-        if (bracketView === 'overlay') matchEl.classList.add('bracket-match--overlay');
-
-        const buildTeamRow = (side) => {
-          const myTeam    = side === 'home' ? myTeams.homeTeam    : myTeams.awayTeam;
-          const actTeam   = side === 'home' ? actualTeams.homeTeam : actualTeams.awayTeam;
-          const isMyPick  = myPick === side;
-          const isActWin  = actualResult === side;
-
-          const isTbd = (t) => !t || (t.name && (
-            t.name.startsWith('W ') ||
-            t.name.startsWith('Best') ||
-            /^[12][A-L]$/.test(t.name)
-          ));
-
-          let rowState = '';
-          if (bracketView === 'overlay' && actualResult) {
-            if (isMyPick && isActWin)  rowState = 'correct';
-            else if (isMyPick)         rowState = 'wrong';
-            else if (isActWin)         rowState = 'actual-winner';
-          }
-
-          const row = document.createElement('button');
-          row.className = 'bracket-team bracket-team--' + side;
-          if (isMyPick) row.classList.add('bracket-team--picked');
-          if (isActWin && bracketView !== 'my') row.classList.add('bracket-team--winner');
-          if (rowState) row.classList.add('bracket-team--' + rowState);
-          if (actualResult && !isActWin && bracketView === 'actual') row.classList.add('bracket-team--eliminated');
-
-          if (bracketView === 'overlay') {
-            const myName  = isTbd(myTeam)  ? '\u2014' : teamName(myTeam);
-            const myFlag  = isTbd(myTeam)  ? '' : teamFlag(myTeam);
-            const actName = isTbd(actTeam) ? 'TBD' : teamName(actTeam);
-            const actFlag = isTbd(actTeam) ? '' : teamFlag(actTeam);
+        if (bracketView === 'my') {
+          // Show only the user's picks
+          ['home','away'].forEach(side => {
+            const row = document.createElement('div');
+            row.className = `bracket-team ${pick === side ? 'bracket-team--picked' : ''}`;
             row.innerHTML = `
-              <div class="bt-overlay-row">
-                <div class="bt-pred-side ${isMyPick?'bt-pred-side--picked':''}">
-                  <span class="bt-col-label">Pred</span>
-                  <span class="bt-flag">${myFlag}</span>
-                  <span class="bt-name">${myName}</span>
-                  ${isMyPick ? '<span class="bt-pick-indicator"></span>' : ''}
-                </div>
-                <div class="bt-divider-v"></div>
-                <div class="bt-actual-side ${isActWin?'bt-actual-side--winner':''}">
-                  <span class="bt-col-label">Actual</span>
-                  <span class="bt-flag">${actFlag}</span>
-                  <span class="bt-name">${actName}</span>
-                  ${rowState === 'correct' ? '<span class="bt-result bt-result--correct">&#x2713;</span>' :
-                    rowState === 'wrong'   ? '<span class="bt-result bt-result--wrong">&#x2717;</span>' :
-                    isActWin              ? '<span class="bt-result bt-result--win">W</span>' : ''}
-                </div>
-              </div>`;
-          } else if (bracketView === 'actual') {
-            const name = isTbd(actTeam) ? (side==='home' ? fixture.home?.name : fixture.away?.name) || 'TBD' : teamName(actTeam);
-            const flag = isTbd(actTeam) ? '' : teamFlag(actTeam);
+              <span class="bt-flag">${teamFlag(actual[side])}</span>
+              <span class="bt-name">${teamName(actual[side]) || '?'}</span>
+              ${pick === side ? '<span class="bt-pick-dot"></span>' : ''}`;
+            matchBox.appendChild(row);
+          });
+        } else if (bracketView === 'actual') {
+          // Show actual teams + result
+          ['home','away'].forEach(side => {
+            const row = document.createElement('div');
+            row.className = `bracket-team ${played && actualWinner === side ? 'bracket-team--winner' : ''}`;
             row.innerHTML = `
-              <span class="bracket-flag">${flag}</span>
-              <span class="bracket-name ${isTbd(actTeam)?'bracket-team--tbd':''}">${name}</span>
-              ${isActWin ? '<span class="bracket-check">&#x2713;</span>' : ''}`;
-          } else {
-            const name = isTbd(myTeam) ? (side==='home' ? fixture.home?.name : fixture.away?.name) || 'TBD' : teamName(myTeam);
-            const flag = isTbd(myTeam) ? '' : teamFlag(myTeam);
-            row.innerHTML = `
-              <span class="bracket-flag">${flag}</span>
-              <span class="bracket-name ${isTbd(myTeam)?'bracket-team--tbd':''}">${name}</span>
-              ${isMyPick ? '<span class="bracket-check">&#x2713;</span>' : ''}`;
-          }
+              <span class="bt-flag">${teamFlag(actual[side])}</span>
+              <span class="bt-name">${teamName(actual[side]) || '?'}</span>
+              ${played ? `<span class="bt-score">${side === 'home' ? actual.homeScore : actual.awayScore}</span>` : ''}`;
+            matchBox.appendChild(row);
+          });
+        } else {
+          // Overlay: show both pick and actual with match indicators
+          ['home','away'].forEach(side => {
+            const row = document.createElement('div');
+            const isWinner = played && actualWinner === side;
+            const isPick   = pick === side;
+            row.className = `bracket-team bracket-overlay-row
+              ${isWinner ? 'bracket-team--winner' : ''}
+              ${isPick && pickCorrect ? 'bracket-team--correct' : ''}
+              ${isPick && pickWrong   ? 'bracket-team--wrong'   : ''}`;
 
-          row.addEventListener('click', () => {
-            if (bracketView === 'actual') return;
-            if (bracketPicks[matchId] !== side) clearDownstreamPicks(matchId);
-            bracketPicks[matchId] = side;
+            let badge = '';
+            if (isPick && pickCorrect) badge = '<span class="bt-badge bt-badge--correct">✓</span>';
+            else if (isPick && pickWrong) badge = '<span class="bt-badge bt-badge--wrong">✗</span>';
+            else if (isPick) badge = '<span class="bt-badge bt-badge--pending">★</span>';
+
+            row.innerHTML = `
+              <span class="bt-flag">${teamFlag(actual[side])}</span>
+              <span class="bt-name">${teamName(actual[side]) || '?'}</span>
+              ${played ? `<span class="bt-score">${side === 'home' ? actual.homeScore : actual.awayScore}</span>` : ''}
+              ${badge}`;
+
+            if (!played && !pick) {
+              row.addEventListener('click', () => {
+                bracketPicks[m.id] = side;
+                persistBracketPicks(); renderKnockoutBracket();
+              });
+              row.style.cursor = 'pointer';
+              row.title = `Pick ${teamName(actual[side])}`;
+            }
+            matchBox.appendChild(row);
+          });
+        }
+
+        if (!played && bracketView === 'overlay') {
+          const clearBtn = document.createElement('button');
+          clearBtn.className = 'bracket-clear-btn';
+          clearBtn.textContent = '×';
+          clearBtn.title = 'Clear pick';
+          clearBtn.addEventListener('click', e => {
+            e.stopPropagation();
+            delete bracketPicks[m.id];
             persistBracketPicks(); renderKnockoutBracket();
           });
-          return row;
-        };
-
-        const homeRow = buildTeamRow('home');
-        const vsEl = document.createElement('div');
-        vsEl.className = 'bracket-vs';
-        vsEl.textContent = 'vs';
-        const awayRow = buildTeamRow('away');
-
-        const dateEl = document.createElement('div');
-        dateEl.className = 'bracket-date';
-        if (fixture.date) {
-          const d = new Date(fixture.date + 'T12:00:00');
-          dateEl.textContent = d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+          matchBox.appendChild(clearBtn);
         }
 
-        matchEl.appendChild(homeRow);
-        matchEl.appendChild(vsEl);
-        matchEl.appendChild(awayRow);
-        if (fixture.date) matchEl.appendChild(dateEl);
-        matchesEl.appendChild(matchEl);
+        col.appendChild(matchBox);
       });
+
+      bracketInner.appendChild(col);
     });
 
-    // Champion column
-    const finalFixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === 'final');
-    let myChamp = null, actualChamp = null;
-    if (finalFixture) {
-      const myPick = bracketPicks['final'];
-      if (myPick) {
-        const src = myPick === 'home' ? finalFixture.homeSource : finalFixture.awaySource;
-        if (src?.type === 'winner') myChamp = resolveSlot(src.matchId, 'pick');
-        else if (src?.type === 'group') myChamp = resolveSlot(`${src.pos}${src.group}`, 'pick');
-        if (!myChamp) myChamp = myPick === 'home' ? finalFixture.home : finalFixture.away;
-      }
-      const actualWin = getActualWinner('final');
-      if (actualWin) {
-        const src = actualWin === 'home' ? finalFixture.homeSource : finalFixture.awaySource;
-        if (src?.type === 'winner') actualChamp = resolveSlot(src.matchId, 'actual');
-        else if (src?.type === 'group') actualChamp = resolveSlot(`${src.pos}${src.group}`, 'actual');
-        if (!actualChamp) actualChamp = actualWin === 'home' ? finalFixture.home : finalFixture.away;
-      }
-    }
-
-    const champRound = document.createElement('div');
-    champRound.className = 'bracket-round bracket-round--champion';
-    const champLabel = document.createElement('div');
-    champLabel.className = 'bracket-round-label';
-    champLabel.textContent = 'Champion';
-    champRound.appendChild(champLabel);
-
+    // Champion display
+    const champCol = document.createElement('div');
+    champCol.className = 'bracket-round bracket-champ';
+    champCol.innerHTML = '<div class="bracket-round-header">Champion</div>';
     const champCard = document.createElement('div');
-    champCard.className = 'bracket-champion';
+    champCard.className = 'bracket-champ-card';
+    const finalMatch = WC_KNOCKOUT_FIXTURES.find(m => m.round === 'final');
+    const finalActual = finalMatch ? liveMatches.find(lm => lm.id === finalMatch.id) : null;
+    const finalPick   = finalMatch ? bracketPicks[finalMatch.id] : null;
 
-    if (bracketView === 'overlay') {
-      const myName  = myChamp     ? teamName(myChamp)     : null;
-      const myFlag  = myChamp     ? teamFlag(myChamp)     : '';
-      const actName = actualChamp ? teamName(actualChamp) : null;
-      const actFlag = actualChamp ? teamFlag(actualChamp) : '';
-      const isCorrect = myName && actName && myName === actName;
+    if (finalActual && finalActual.homeScore != null) {
+      const champSide = finalActual.homeScore > finalActual.awayScore ? 'home' : 'away';
+      const actualChamp = finalActual[champSide];
       champCard.innerHTML = `
-        <div class="bracket-champion-trophy">&#x1F3C6;</div>
-        <div class="champion-overlay-grid">
-          <div class="champion-col champion-col--pred">
-            <div class="champion-col-label">Your Pick</div>
-            ${myChamp ? `<div class="champion-flag">${myFlag}</div><div class="champion-name">${myName}</div>` : '<div class="champion-tbd">Make picks &#x2192;</div>'}
-          </div>
-          ${actualChamp ? `
-          <div class="champion-col champion-col--actual">
-            <div class="champion-col-label">Champion &#x1F947;</div>
-            <div class="champion-flag">${actFlag}</div>
-            <div class="champion-name champion-name--actual">${actName}</div>
-            ${isCorrect ? '<div class="champion-correct-badge">&#x1F389; Correct!</div>' : ''}
-          </div>` : ''}
-        </div>`;
-    } else if (bracketView === 'actual') {
-      champCard.innerHTML = actualChamp
-        ? `<div class="bracket-champion-trophy">&#x1F3C6;</div>
-           <div class="bracket-champion-flag">${teamFlag(actualChamp)}</div>
-           <div class="bracket-champion-name">${teamName(actualChamp)}</div>`
-        : `<div class="bracket-champion-trophy" style="opacity:0.3">&#x1F3C6;</div>
-           <div class="bracket-champion-empty">To be determined</div>`;
+        <div class="champ-trophy">🏆</div>
+        <div class="champ-flag">${teamFlag(actualChamp)}</div>
+        <div class="champ-name">${teamName(actualChamp)}</div>
+        <div class="champ-label">World Champion</div>`;
+    } else if (finalPick && finalMatch) {
+      const myChamp = finalMatch[finalPick];
+      champCard.innerHTML = `
+        <div class="champ-trophy">🏆</div>
+        <div class="champ-flag">${teamFlag(myChamp)}</div>
+        <div class="champ-name">${teamName(myChamp)}</div>
+        <div class="champ-label">Your Pick</div>`;
     } else {
-      champCard.innerHTML = myChamp
-        ? `<div class="bracket-champion-trophy">&#x1F3C6;</div>
-           <div class="bracket-champion-flag">${teamFlag(myChamp)}</div>
-           <div class="bracket-champion-name">${teamName(myChamp)}</div>`
-        : `<div class="bracket-champion-trophy" style="opacity:0.3">&#x1F3C6;</div>
-           <div class="bracket-champion-empty">Pick a champion</div>`;
+      champCard.innerHTML = `<div class="champ-tbd">TBD</div>`;
     }
+    champCol.appendChild(champCard);
+    bracketInner.appendChild(champCol);
 
-    champRound.appendChild(champCard);
-    bracketEl.appendChild(champRound);
+    bracket.appendChild(bracketInner);
+    container.appendChild(bracket);
 
-    container.querySelector('#bracket-reset-all-btn')?.addEventListener('click', () => {
-      if (confirm('Reset all bracket picks?')) {
-        bracketPicks = {}; persistBracketPicks(); renderKnockoutBracket();
-      }
+    const resetBtn = document.createElement('button');
+    resetBtn.className = 'btn btn-ghost btn-sm bracket-reset-btn';
+    resetBtn.textContent = 'Reset All Picks';
+    resetBtn.addEventListener('click', () => {
+      bracketPicks = {}; persistBracketPicks(); renderKnockoutBracket();
     });
+    container.appendChild(resetBtn);
 
-    container.querySelector('#bracket-seed-btn')?.addEventListener('click', () => {
-      const r32ids = ['r32-1','r32-2','r32-3','r32-4','r32-5','r32-6','r32-7','r32-8',
-                      'r32-9','r32-10','r32-11','r32-12','r32-13','r32-14','r32-15','r32-16'];
-      r32ids.forEach(id => {
-        if (bracketPicks[id]) return;
-        const fixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === id);
-        if (!fixture) return;
-        const { homeTeam, awayTeam } = resolveFixtureTeams(fixture, 'pick');
-        if (homeTeam && !homeTeam.name?.match(/^[12][A-L]$/) && !homeTeam.name?.startsWith('W ')) {
-          bracketPicks[id] = 'home';
-        } else if (awayTeam && !awayTeam.name?.match(/^[12][A-L]$/) && !awayTeam.name?.startsWith('W ')) {
-          bracketPicks[id] = 'away';
-        } else {
-          bracketPicks[id] = 'home';
-        }
-      });
-      persistBracketPicks(); renderKnockoutBracket();
-    });
+    if (bracketView === 'overlay' && !Object.keys(bracketPicks).length) {
+      const hint = document.createElement('p');
+      hint.className = 'bracket-hint';
+      hint.textContent = 'Click a team in each match to make your bracket picks.';
+      container.insertBefore(hint, bracket);
+    }
+  }
+
+  function persistBracketPicks() {
+    if (currentUser) saveBracketPicks(currentUser.uid, bracketPicks);
   }
 
   // ─── Init ─────────────────────────────────────────────────────────────────
