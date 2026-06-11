@@ -2,7 +2,7 @@
 import { db } from './firebase.js';
 import {
   collection, doc, setDoc, getDoc, getDocs,
-  onSnapshot, serverTimestamp, query, orderBy
+  onSnapshot, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // ============================================================
@@ -11,11 +11,10 @@ import {
 
 /**
  * Watch all matches in Firestore and call cb(matches) on any change.
- * Falls back to static data if collection is empty.
+ * Sorting is handled client-side in app.js.
  */
 export function watchMatches(cb) {
-  const q = query(collection(db, 'matches'), orderBy('date'));
-  return onSnapshot(q, snap => {
+  return onSnapshot(collection(db, 'matches'), snap => {
     if (snap.empty) { cb([]); return; }
     const matches = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     cb(matches);
