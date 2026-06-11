@@ -19,7 +19,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     return [...liveMatches, ...WC_KNOCKOUT_FIXTURES];
   }
 
-  // All matches for the Matches tab = group stage + knockout fixtures
+  // All matches for the Matches tab = group stage only
   function allTabMatches() {
     return liveMatches.slice();
   }
@@ -33,11 +33,8 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
   function teamDisplay(t) { return teamFlag(t) ? `${teamFlag(t)} ${teamName(t)}` : teamName(t); }
 
   // ─── Date formatting ────────────────────────────────────────────────────
-  // Formats an ISO date string (YYYY-MM-DD) as "Weekday, Month Day, Year"
-  // e.g. "2026-06-11" → "Thursday, June 11, 2026"
   function formatDateHeader(isoDate) {
     if (!isoDate) return 'Date TBD';
-    // Parse without timezone shift by splitting manually
     const [year, month, day] = isoDate.split('-').map(Number);
     const d = new Date(year, month - 1, day);
     return d.toLocaleDateString('en-US', {
@@ -90,13 +87,11 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     });
     if (id === 'groups')      renderGroups();
     if (id === 'matches')     renderMatches();
-    if (id === 'standings')   renderStandings();
     if (id === 'predictions') switchPredSubtab(activePredSubtab);
   }
 
   // ─── Auth ─────────────────────────────────────────────────────────────────
   watchAuth(user => {
-    // Tear down any existing predictions listener from a previous user session
     if (unsubPredictions) {
       unsubPredictions();
       unsubPredictions = null;
@@ -116,12 +111,8 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
       authBtn?.setAttribute('hidden', '');
       signOutBtn?.removeAttribute('hidden');
 
-      // Render immediately with whatever predictions we have (may be empty on
-      // first fire — the snapshot below will re-render once data arrives).
       renderAll();
 
-      // Subscribe to real-time predictions — fires immediately with current data,
-      // then re-fires whenever a prediction is saved or changed.
       unsubPredictions = watchUserPredictions(user.uid, preds => {
         userPredictions = preds || {};
         renderAll();
@@ -139,7 +130,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
   function renderAll() {
     if (activeTab === 'groups')      renderGroups();
     if (activeTab === 'matches')     renderMatches();
-    if (activeTab === 'standings')   renderStandings();
     if (activeTab === 'predictions') switchPredSubtab(activePredSubtab);
   }
 
@@ -211,8 +201,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
       const idx = liveMatches.findIndex(m => m.id === um.id);
       if (idx !== -1) liveMatches[idx] = { ...liveMatches[idx], ...um };
     });
-    // Only call renderAll() once auth has resolved — avoids a blank render
-    // before we know whether the user is signed in.
     if (authResolved) renderAll();
   });
 
@@ -275,8 +263,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     const dateEl  = document.getElementById('pred-date-filter');
     const stageEl = document.getElementById('pred-group-filter');
 
-    // Always rebuild the date dropdown so all match dates (including past ones)
-    // are present. Preserve the user's current selection if it still exists.
+    // Always rebuild the date dropdown so all match dates (including past ones) are present.
     if (dateEl) {
       const prevVal = dateEl.value;
       const dates = [...new Set(allPredMatches().map(m => m.date).filter(Boolean))].sort();
@@ -287,13 +274,11 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
 
     // Stage options are static — only build once.
     if (stageEl && stageEl.options.length <= 1) {
-      // Group stage options — value matches m.group (single letter e.g. 'A')
       WC_GROUPS.forEach(g => {
         const opt = document.createElement('option');
         opt.value = g.id; opt.textContent = `Group ${g.id}`;
         stageEl.appendChild(opt);
       });
-      // Knockout stage options — values must match m.stage exactly from data.js
       const stageOrder = ['Round of 32', 'Round of 16', 'Quarterfinals', 'Semifinals', 'Third Place', 'Final'];
       const stageLabelMap = {
         'Round of 32':  'Round of 32',
@@ -313,7 +298,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     }
   }
 
-  // ─── Groups ───────────────────────────────────────────────────────────────
+  // ─── Groups ──────────────────────────────────────────────────────────────
   function renderGroups() {
     const container = document.getElementById('groups-grid');
     if (!container) return;
@@ -344,10 +329,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
   }
 
   // ─── Render by date (shared helper) ──────────────────────────────────────
-  // Sorts matches by date+time ascending, groups them under formatted date
-  // section headers, and appends each card via buildMatchCard(m, isPred).
   function renderByDate(container, matches, isPred) {
-    // Sort by date then time within the same date
     const sorted = matches.slice().sort((a, b) => {
       const da = (a.date || '') + (a.timeLocal || '');
       const db = (b.date || '') + (b.timeLocal || '');
@@ -356,7 +338,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
       return 0;
     });
 
-    // Group into { date → [matches] } preserving sort order
     const groups = [];
     const seen   = {};
     sorted.forEach(m => {
@@ -366,13 +347,11 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     });
 
     groups.forEach(g => {
-      // Date header — formatted as "Weekday, Month Day, Year"
       const hdr = document.createElement('div');
       hdr.className = 'date-group-header';
       hdr.textContent = formatDateHeader(g.date);
       container.appendChild(hdr);
 
-      // Cards for this date
       const group = document.createElement('div');
       group.className = 'date-group';
       g.matches.forEach(m => group.appendChild(buildMatchCard(m, isPred)));
@@ -413,13 +392,11 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     const aFlag      = teamFlag(m.away);
     const isLocked   = m.status === 'ft' || m.status === 'final';
 
-    // ── Status badge
     let statusBadge = '';
     if      (m.status === 'live') statusBadge = '<span class="status-badge status-live"><span class="live-dot"></span>Live</span>';
     else if (m.status === 'ht')   statusBadge = '<span class="status-badge status-ht">HT</span>';
     else if (m.status === 'ft' || m.status === 'final') statusBadge = '<span class="status-badge status-ft">FT</span>';
 
-    // ── Centre score column
     let scoreColHtml = '';
 
     if (isPred && currentUser) {
@@ -496,7 +473,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
         </span>` : ''}
       </div>` : ''}`;
 
-    // ── Event listeners
     if (isPred && currentUser) {
       card.querySelector('.save-pred-btn')?.addEventListener('click', async () => {
         const savingEl = card.querySelector('.pred-saving');
@@ -545,36 +521,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     }
 
     return card;
-  }
-
-  // ─── Standings ────────────────────────────────────────────────────────────
-  function renderStandings() {
-    const container = document.getElementById('standings-grid');
-    if (!container) return;
-    container.innerHTML = '';
-    WC_GROUPS.forEach(group => {
-      const groupMatches = liveMatches.filter(m => m.group === group.id);
-      const standings    = calcPoints(group.teams, groupMatches);
-      const card = document.createElement('div');
-      card.className = 'standings-card';
-      card.innerHTML = `
-        <div class="standings-header">Group ${group.id}</div>
-        <table class="standings-table">
-          <thead><tr>
-            <th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th>
-            <th>GF</th><th>GA</th><th>GD</th><th>Pts</th>
-          </tr></thead>
-          <tbody>${standings.map((s, i) => `
-            <tr class="${i < 2 ? 'qualify' : ''}">
-              <td>${teamDisplay(s.team)}</td><td>${s.played}</td><td>${s.won}</td>
-              <td>${s.drawn}</td><td>${s.lost}</td><td>${s.gf}</td>
-              <td>${s.ga}</td><td>${s.gd >= 0 ? '+' : ''}${s.gd}</td>
-              <td><strong>${s.pts}</strong></td>
-            </tr>`).join('')}
-          </tbody>
-        </table>`;
-      container.appendChild(card);
-    });
   }
 
   // ─── Predictions (My Picks) ───────────────────────────────────────────────
