@@ -21,7 +21,6 @@ const db = admin.firestore();
 const ESPN_URL = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard';
 
 // ─── Team name normalisation ──────────────────────────────────────────────────
-// Maps ESPN displayName values → names used in Firestore match docs.
 const TEAM_NAME_MAP = {
   'Mexico':                   'Mexico',
   'South Africa':             'South Africa',
@@ -88,25 +87,25 @@ function normalise(name) {
   return TEAM_NAME_MAP[name] ?? name;
 }
 
-// ─── Parse ESPN status → app status token ────────────────────────────────────
-// ESPN status type IDs: '1' = pre-match, '2' = in progress, '3' = post/finished
+// ─── Parse ESPN status → app token ─────────────────────────────────────────────
+// ESPN uses status.type.state: 'pre' | 'in' | 'post'
+// status.type.name examples: STATUS_SECOND_HALF, STATUS_HALFTIME, STATUS_FULL_TIME
 function parseStatus(event) {
-  const typeId = event.status?.type?.id;
-  const detail = event.status?.type?.detail ?? '';
-  if (typeId === '3') return 'finished';
-  if (typeId === '2') {
-    if (/half.?time/i.test(detail)) return 'ht';
+  const state = event.status?.type?.state;
+  const name  = event.status?.type?.name ?? '';
+  if (state === 'post') return 'finished';
+  if (state === 'in') {
+    if (name === 'STATUS_HALFTIME') return 'ht';
     return 'live';
   }
   return 'scheduled';
 }
 
-// ESPN provides a displayClock like "23:00" during live matches
+// ESPN clock is like "61'" — strip the prime symbol and parse as int
 function parseMinute(event) {
-  const clock = event.status?.displayClock;
-  if (!clock) return null;
-  const mins = parseInt(clock.split(':')[0], 10);
-  return isNaN(mins) ? null : mins;
+  const clock = event.status?.displayClock ?? '';
+  const mins  = parseInt(clock.replace(/[^0-9]/g, ''), 10);
+  return isNaN(mins) || mins === 0 ? null : mins;
 }
 
 // ─── Main sync ────────────────────────────────────────────────────────────────
@@ -146,7 +145,6 @@ async function syncScores() {
     const status   = parseStatus(event);
     const minute   = parseMinute(event);
 
-    // Skip matches not yet started
     if (status === 'scheduled') {
       console.log(`  Skipping (not started): ${homeTeam} vs ${awayTeam}`);
       continue;
@@ -155,7 +153,6 @@ async function syncScores() {
     const homeScore = parseInt(homeComp.score ?? '0', 10);
     const awayScore = parseInt(awayComp.score ?? '0', 10);
 
-    // Find the Firestore match doc by homeTeam + awayTeam fields
     const snap = await db.collection('matches')
       .where('homeTeam', '==', homeTeam)
       .where('awayTeam', '==', awayTeam)
