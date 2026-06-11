@@ -18,7 +18,6 @@ const RQ_URL   = `${FS_BASE}:runQuery`;
 
 // ─── REST helpers ──────────────────────────────────────────────────────────────
 
-// getIdToken with a hard 5 s timeout so a stalled Auth SDK never blocks saves.
 async function getIdToken(forceRefresh = false) {
   const user = auth.currentUser;
   if (!user) throw new Error('Not authenticated');
@@ -29,7 +28,6 @@ async function getIdToken(forceRefresh = false) {
   return Promise.race([tokenPromise, timeout]);
 }
 
-// On a token timeout, force-refresh once then retry.
 async function getIdTokenWithRetry() {
   try {
     return await getIdToken(false);
@@ -88,7 +86,6 @@ export async function updateMatchResult(matchId, homeScore, awayScore) {
   });
 }
 
-// Uses SDK getDocs polling — no WebChannel, no CORS issues, ad-blocker safe.
 export function watchMatches(callback, intervalMs = 30000) {
   const q = query(collection(db, "matches"), orderBy("date"), orderBy("timeLocal"));
 
@@ -131,6 +128,8 @@ export async function savePrediction(userId, matchId, { homeScorePred, awayScore
   return res.json();
 }
 
+// Returns an array of prediction docs. Callers must convert to a matchId-keyed
+// map if needed: predsArray.reduce((m,p) => { m[p.matchId]=p; return m; }, {})
 export async function getUserPredictions(userId) {
   const token = await getIdTokenWithRetry();
   const res   = await fetch(RQ_URL, {
@@ -198,6 +197,9 @@ export async function getAllPredictions() {
 // ─── BRACKET PICKS (REST) ────────────────────────────────────────────────────
 // Stored as a single document per user: bracketPicks/{userId}
 // Fields: one per knockout match ID, value = 'home' | 'away'
+//
+// Uses updateMask so that fields omitted from `picks` (i.e. reset picks) are
+// explicitly deleted from Firestore rather than left as stale values.
 
 function bracketDocUrl(userId) {
   return `${FS_BASE}/bracketPicks/${encodeURIComponent(userId)}`;
@@ -205,12 +207,18 @@ function bracketDocUrl(userId) {
 
 export async function saveBracketPicks(userId, picks) {
   const token  = await getIdTokenWithRetry();
-  const url    = bracketDocUrl(userId);
   const fields = {};
   for (const [matchId, side] of Object.entries(picks)) {
     fields[matchId] = toFsValue(side);
   }
   fields['updatedAt'] = toFsValue(new Date().toISOString());
+
+  // Build updateMask so Firestore replaces only the listed fields and removes
+  // any previously stored fields that are no longer in `picks`.
+  const fieldPaths = Object.keys(fields);
+  const maskQuery  = fieldPaths.map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
+  const url = `${bracketDocUrl(userId)}?${maskQuery}`;
+
   const res = await fetch(url, {
     method:  'PATCH',
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },

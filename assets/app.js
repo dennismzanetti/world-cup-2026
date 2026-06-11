@@ -12,7 +12,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult, sa
   let activePredSubtab = 'my-picks';
   let userPredictions  = {};  // matchId → {homeScorePred, awayScorePred}
   let liveMatches      = WC_MATCHES.slice(); // mutable working copy
-  let bracketPicks     = {};  // matchId → 'home' | 'away'  (moved up: fixes TDZ ReferenceError)
+  let bracketPicks     = {};  // matchId → 'home' | 'away'
   let bracketView      = 'overlay'; // 'my' | 'actual' | 'overlay'
 
   // ─── Admin UIDs ───────────────────────────────────────────────────────────
@@ -88,7 +88,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult, sa
     } else {
       bar?.setAttribute('hidden', '');
       userPredictions = {};
-      bracketPicks    = {};  // safe: declared at top of State now
+      bracketPicks    = {};
     }
     if (activeTab === 'predictions') switchPredSubtab(activePredSubtab);
   });
@@ -96,10 +96,17 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult, sa
   // ─── Data loading ─────────────────────────────────────────────────────────
   function loadUserData() {
     if (!currentUser) return;
-    getUserPredictions(currentUser.uid).then(preds => {
-      userPredictions = preds || {};
+
+    // getUserPredictions returns an array of docs — convert to a matchId-keyed map
+    getUserPredictions(currentUser.uid).then(predsArray => {
+      const map = {};
+      (predsArray || []).forEach(p => {
+        if (p.matchId) map[p.matchId] = p;
+      });
+      userPredictions = map;
       if (activeTab === 'predictions') switchPredSubtab(activePredSubtab);
     });
+
     getBracketPicks(currentUser.uid).then(picks => {
       bracketPicks = picks || {};
       if (activeTab === 'predictions' && activePredSubtab === 'pred-bracket') renderKnockoutBracket();
@@ -174,7 +181,6 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult, sa
   (function () {
     const toggle = document.querySelector('[data-theme-toggle]');
     const html   = document.documentElement;
-    // Wrap localStorage in try/catch — sandboxed iframes block storage access
     let savedTheme = null;
     try { savedTheme = localStorage.getItem('theme'); } catch(e) {}
     let theme = savedTheme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
@@ -368,7 +374,6 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult, sa
         const awayVal = card.querySelector('[data-field="away"]')?.value;
         const hs = homeVal !== '' ? parseInt(homeVal) : null;
         const as = awayVal !== '' ? parseInt(awayVal) : null;
-        // Fix: pass positional args matching db.js signature updateMatchResult(matchId, homeScore, awayScore)
         updateMatchResult(m.id, hs, as);
       });
     }
@@ -552,27 +557,23 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult, sa
 
   // ─── Knockout Bracket ─────────────────────────────────────────────────────
 
-  // Persist bracket picks to Firestore (replaces localStorage)
   async function persistBracketPicks() {
     if (!currentUser) return;
     await saveBracketPicks(currentUser.uid, bracketPicks);
   }
 
-  // Resolve actual match result from liveMatches
   function getActualWinner(matchId) {
     const m = liveMatches.find(m => m.id === matchId);
     if (!m || m.homeScore == null || m.awayScore == null) return null;
     if (m.homeScore > m.awayScore) return 'home';
     if (m.awayScore > m.homeScore) return 'away';
-    return null; // draw — should not happen in KO
+    return null;
   }
 
-  // Resolve team object for a slot in the bracket
   function resolveSlot(slot, mode, depth) {
     if (depth === undefined) depth = 0;
     if (depth > 10 || !slot) return null;
 
-    // Group slot e.g. '1A', '2B'
     if (typeof slot === 'string') {
       const groupMatch = slot.match(/^(\d)([A-L])$/);
       if (groupMatch) {
@@ -591,7 +592,6 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult, sa
       }
     }
 
-    // Winner slot from a knockout match ID
     const fixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === slot);
     if (!fixture) return null;
 
@@ -614,7 +614,6 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult, sa
     }
   }
 
-  // Resolve both teams that will play in a fixture
   function resolveFixtureTeams(fixture, mode) {
     function resolveSource(src, fallback) {
       if (!src) return fallback;
@@ -663,7 +662,6 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult, sa
     }
     container.innerHTML = '';
 
-    // ── Accuracy banner ──
     const acc = bracketAccuracy();
     const totalPossible = WC_KNOCKOUT_FIXTURES.length;
     const madePicks = WC_KNOCKOUT_FIXTURES.filter(f => bracketPicks[f.id]).length;
@@ -716,7 +714,6 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult, sa
       </div>`;
     container.appendChild(banner);
 
-    // ── View toggle + actions toolbar ──
     const toolbar = document.createElement('div');
     toolbar.className = 'bracket-toolbar';
     toolbar.innerHTML = `
@@ -735,7 +732,6 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult, sa
       btn.addEventListener('click', () => { bracketView = btn.dataset.bview; renderKnockoutBracket(); });
     });
 
-    // ── Bracket scroll wrapper ──
     const scrollWrap = document.createElement('div');
     scrollWrap.className = 'bracket-scroll';
     container.appendChild(scrollWrap);
@@ -885,7 +881,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult, sa
       });
     });
 
-    // ── Champion column ──
+    // Champion column
     const finalFixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === 'final');
     let myChamp = null, actualChamp = null;
     if (finalFixture) {
@@ -955,30 +951,26 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult, sa
     champRound.appendChild(champCard);
     bracketEl.appendChild(champRound);
 
-    // ── Toolbar button handlers ──
     container.querySelector('#bracket-reset-all-btn')?.addEventListener('click', () => {
       if (confirm('Reset all bracket picks?')) {
         bracketPicks = {}; persistBracketPicks(); renderKnockoutBracket();
       }
     });
 
-    // Fix: Seed from Groups now uses resolveFixtureTeams to pick the predicted qualifier
-    // rather than blindly defaulting every slot to 'home'.
     container.querySelector('#bracket-seed-btn')?.addEventListener('click', () => {
       const r32ids = ['r32-1','r32-2','r32-3','r32-4','r32-5','r32-6','r32-7','r32-8',
                       'r32-9','r32-10','r32-11','r32-12','r32-13','r32-14','r32-15','r32-16'];
       r32ids.forEach(id => {
-        if (bracketPicks[id]) return; // don't overwrite existing picks
+        if (bracketPicks[id]) return;
         const fixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === id);
         if (!fixture) return;
         const { homeTeam, awayTeam } = resolveFixtureTeams(fixture, 'pick');
-        // Prefer home if both resolved, otherwise pick whichever side is known
         if (homeTeam && !homeTeam.name?.match(/^[12][A-L]$/) && !homeTeam.name?.startsWith('W ')) {
           bracketPicks[id] = 'home';
         } else if (awayTeam && !awayTeam.name?.match(/^[12][A-L]$/) && !awayTeam.name?.startsWith('W ')) {
           bracketPicks[id] = 'away';
         } else {
-          bracketPicks[id] = 'home'; // fallback if no group predictions yet
+          bracketPicks[id] = 'home';
         }
       });
       persistBracketPicks(); renderKnockoutBracket();
