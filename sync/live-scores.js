@@ -1,12 +1,13 @@
 // sync/live-scores.js
-// Polls football-data.org v4 for live/finished World Cup 2026 scores
+// Polls the ESPN public scoreboard API for live/finished World Cup 2026 scores
 // and writes them into Firestore so the front-end onSnapshot listener
 // can push updates to all connected browsers in real time.
 //
 // Run via GitHub Actions (.github/workflows/sync-scores.yml) every 5 minutes.
-// Requires two environment variables (set as GitHub Secrets):
-//   FOOTBALL_DATA_API_KEY            — free tier key from football-data.org
-//   FIREBASE_SERVICE_ACCOUNT_JSON    — full JSON of a Firebase service account
+// Requires one environment variable (set as GitHub Secret):
+//   FIREBASE_SERVICE_ACCOUNT_JSON  — full JSON of a Firebase service account
+//
+// No API key needed for ESPN.
 
 import fetch from 'node-fetch';
 import admin from 'firebase-admin';
@@ -16,111 +17,145 @@ const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const db = admin.firestore();
 
-// ─── football-data.org API ────────────────────────────────────────────────────
-const API_KEY  = process.env.FOOTBALL_DATA_API_KEY;
-const API_URL  = 'https://api.football-data.org/v4/competitions/WC/matches?status=IN_PLAY,PAUSED,FINISHED';
-
-// Status mapping: football-data.org → app status tokens
-const STATUS_MAP = {
-  IN_PLAY:  'live',
-  PAUSED:   'ht',       // half-time
-  FINISHED: 'finished',
-  TIMED:    'scheduled',
-  SCHEDULED:'scheduled',
-};
+// ─── ESPN public scoreboard API ───────────────────────────────────────────────
+const ESPN_URL = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard';
 
 // ─── Team name normalisation ──────────────────────────────────────────────────
-// Maps football-data.org team names → names used in WC_MATCHES / Firestore.
-// Add entries here if the API uses different spellings.
+// Maps ESPN displayName values → names used in Firestore match docs.
 const TEAM_NAME_MAP = {
-  'Mexico':                     'Mexico',
-  'South Africa':               'South Africa',
-  'Korea Republic':             'South Korea',
-  'Czech Republic':             'Czechia',
-  'Czechia':                    'Czechia',
-  'Canada':                     'Canada',
-  'Bosnia and Herzegovina':     'Bosnia-Herzegovina',
-  'Qatar':                      'Qatar',
-  'Switzerland':                'Switzerland',
-  'Brazil':                     'Brazil',
-  'Morocco':                    'Morocco',
-  'Haiti':                      'Haiti',
-  'Scotland':                   'Scotland',
-  'USA':                        'USA',
-  'United States':              'USA',
-  'Paraguay':                   'Paraguay',
-  'Australia':                  'Australia',
-  'Turkey':                     'Türkiye',
-  'Türkiye':                    'Türkiye',
-  'Germany':                    'Germany',
-  'Curaçao':                    'Curaçao',
-  'Curacao':                    'Curaçao',
-  'Côte d\'Ivoire':             'Ivory Coast',
-  'Ivory Coast':                'Ivory Coast',
-  'Ecuador':                    'Ecuador',
-  'Netherlands':                'Netherlands',
-  'Japan':                      'Japan',
-  'Sweden':                     'Sweden',
-  'Tunisia':                    'Tunisia',
-  'Belgium':                    'Belgium',
-  'Egypt':                      'Egypt',
-  'Iran':                       'Iran',
-  'New Zealand':                'New Zealand',
-  'Spain':                      'Spain',
-  'Cape Verde':                 'Cape Verde',
-  'Saudi Arabia':               'Saudi Arabia',
-  'Uruguay':                    'Uruguay',
-  'France':                     'France',
-  'Senegal':                    'Senegal',
-  'Iraq':                       'Iraq',
-  'Norway':                     'Norway',
-  'Argentina':                  'Argentina',
-  'Algeria':                    'Algeria',
-  'Austria':                    'Austria',
-  'Jordan':                     'Jordan',
-  'Portugal':                   'Portugal',
-  'DR Congo':                   'Congo DR',
-  'Congo DR':                   'Congo DR',
-  'Uzbekistan':                 'Uzbekistan',
-  'Colombia':                   'Colombia',
-  'England':                    'England',
-  'Croatia':                    'Croatia',
-  'Ghana':                      'Ghana',
-  'Panama':                     'Panama',
+  'Mexico':                   'Mexico',
+  'South Africa':             'South Africa',
+  'Korea Republic':           'South Korea',
+  'South Korea':              'South Korea',
+  'Czech Republic':           'Czechia',
+  'Czechia':                  'Czechia',
+  'Canada':                   'Canada',
+  'Bosnia & Herzegovina':     'Bosnia-Herzegovina',
+  'Bosnia and Herzegovina':   'Bosnia-Herzegovina',
+  'Bosnia-Herzegovina':       'Bosnia-Herzegovina',
+  'Qatar':                    'Qatar',
+  'Switzerland':              'Switzerland',
+  'Brazil':                   'Brazil',
+  'Morocco':                  'Morocco',
+  'Haiti':                    'Haiti',
+  'Scotland':                 'Scotland',
+  'USA':                      'USA',
+  'United States':            'USA',
+  'Paraguay':                 'Paraguay',
+  'Australia':                'Australia',
+  'Turkey':                   'Türkiye',
+  'Türkiye':                  'Türkiye',
+  'Germany':                  'Germany',
+  'Curaçao':                  'Curaçao',
+  'Curacao':                  'Curaçao',
+  "Cote d'Ivoire":            'Ivory Coast',
+  "Côte d'Ivoire":            'Ivory Coast',
+  'Ivory Coast':              'Ivory Coast',
+  'Ecuador':                  'Ecuador',
+  'Netherlands':              'Netherlands',
+  'Japan':                    'Japan',
+  'Sweden':                   'Sweden',
+  'Tunisia':                  'Tunisia',
+  'Belgium':                  'Belgium',
+  'Egypt':                    'Egypt',
+  'Iran':                     'Iran',
+  'New Zealand':              'New Zealand',
+  'Spain':                    'Spain',
+  'Cape Verde':               'Cape Verde',
+  'Saudi Arabia':             'Saudi Arabia',
+  'Uruguay':                  'Uruguay',
+  'France':                   'France',
+  'Senegal':                  'Senegal',
+  'Iraq':                     'Iraq',
+  'Norway':                   'Norway',
+  'Argentina':                'Argentina',
+  'Algeria':                  'Algeria',
+  'Austria':                  'Austria',
+  'Jordan':                   'Jordan',
+  'Portugal':                 'Portugal',
+  'DR Congo':                 'Congo DR',
+  'Congo DR':                 'Congo DR',
+  'Congo, DR':                'Congo DR',
+  'Uzbekistan':               'Uzbekistan',
+  'Colombia':                 'Colombia',
+  'England':                  'England',
+  'Croatia':                  'Croatia',
+  'Ghana':                    'Ghana',
+  'Panama':                   'Panama',
 };
 
-function normalise(apiName) {
-  return TEAM_NAME_MAP[apiName] ?? apiName;
+function normalise(name) {
+  return TEAM_NAME_MAP[name] ?? name;
+}
+
+// ─── Parse ESPN status → app status token ────────────────────────────────────
+// ESPN status type IDs: '1' = pre-match, '2' = in progress, '3' = post/finished
+function parseStatus(event) {
+  const typeId = event.status?.type?.id;
+  const detail = event.status?.type?.detail ?? '';
+  if (typeId === '3') return 'finished';
+  if (typeId === '2') {
+    if (/half.?time/i.test(detail)) return 'ht';
+    return 'live';
+  }
+  return 'scheduled';
+}
+
+// ESPN provides a displayClock like "23:00" during live matches
+function parseMinute(event) {
+  const clock = event.status?.displayClock;
+  if (!clock) return null;
+  const mins = parseInt(clock.split(':')[0], 10);
+  return isNaN(mins) ? null : mins;
 }
 
 // ─── Main sync ────────────────────────────────────────────────────────────────
 async function syncScores() {
-  console.log(`[${new Date().toISOString()}] Fetching live/finished matches…`);
+  console.log(`[${new Date().toISOString()}] Fetching scoreboard from ESPN…`);
 
-  const res = await fetch(API_URL, {
-    headers: { 'X-Auth-Token': API_KEY }
+  const res = await fetch(ESPN_URL, {
+    headers: { 'User-Agent': 'world-cup-2026-sync/1.0' }
   });
 
   if (!res.ok) {
-    console.error(`API error: ${res.status} ${res.statusText}`);
+    console.error(`ESPN API error: ${res.status} ${res.statusText}`);
     process.exit(1);
   }
 
-  const { matches } = await res.json();
-  console.log(`  API returned ${matches.length} match(es).`);
+  const data   = await res.json();
+  const events = data.events ?? [];
+  console.log(`  ESPN returned ${events.length} event(s) today.`);
 
-  if (!matches.length) {
-    console.log('  Nothing to update.');
+  if (!events.length) {
+    console.log('  No matches today — nothing to update.');
     return;
   }
 
   let updated = 0;
 
-  for (const m of matches) {
-    const homeTeam = normalise(m.homeTeam.name);
-    const awayTeam = normalise(m.awayTeam.name);
+  for (const event of events) {
+    const comp = event.competitions?.[0];
+    if (!comp) continue;
 
-    // Look up the Firestore document by homeTeam + awayTeam fields
+    const homeComp = comp.competitors?.find(c => c.homeAway === 'home');
+    const awayComp = comp.competitors?.find(c => c.homeAway === 'away');
+    if (!homeComp || !awayComp) continue;
+
+    const homeTeam = normalise(homeComp.team.displayName);
+    const awayTeam = normalise(awayComp.team.displayName);
+    const status   = parseStatus(event);
+    const minute   = parseMinute(event);
+
+    // Skip matches not yet started
+    if (status === 'scheduled') {
+      console.log(`  Skipping (not started): ${homeTeam} vs ${awayTeam}`);
+      continue;
+    }
+
+    const homeScore = parseInt(homeComp.score ?? '0', 10);
+    const awayScore = parseInt(awayComp.score ?? '0', 10);
+
+    // Find the Firestore match doc by homeTeam + awayTeam fields
     const snap = await db.collection('matches')
       .where('homeTeam', '==', homeTeam)
       .where('awayTeam', '==', awayTeam)
@@ -128,21 +163,11 @@ async function syncScores() {
       .get();
 
     if (snap.empty) {
-      console.warn(`  No Firestore doc found for: ${homeTeam} vs ${awayTeam}`);
+      console.warn(`  ⚠ No Firestore doc found for: ${homeTeam} vs ${awayTeam}`);
       continue;
     }
 
-    const docRef = snap.docs[0].ref;
-    const status  = STATUS_MAP[m.status] ?? 'scheduled';
-
-    // Prefer full-time score; fall back to half-time score during HT
-    const homeScore = m.score?.fullTime?.home ?? m.score?.halfTime?.home ?? null;
-    const awayScore = m.score?.fullTime?.away ?? m.score?.halfTime?.away ?? null;
-
-    // minute is provided by the API during IN_PLAY
-    const minute = m.minute ?? null;
-
-    await docRef.update({
+    await snap.docs[0].ref.update({
       homeScore,
       awayScore,
       status,
@@ -150,7 +175,7 @@ async function syncScores() {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    console.log(`  Updated: ${homeTeam} ${homeScore ?? '-'} : ${awayScore ?? '-'} ${awayTeam}  [${status}${minute ? ` ${minute}'` : ''}]`);
+    console.log(`  ✓ ${homeTeam} ${homeScore} : ${awayScore} ${awayTeam}  [${status}${minute ? ` ${minute}'` : ''}]`);
     updated++;
   }
 

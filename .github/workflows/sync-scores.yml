@@ -1,13 +1,14 @@
 # .github/workflows/sync-scores.yml
-# Polls football-data.org for live/finished World Cup 2026 scores
+# Polls the ESPN public API for live/finished World Cup 2026 scores
 # and writes them to Firestore so the web app updates in real time.
 #
 # Schedule: every 5 minutes (GitHub Actions minimum cron interval).
 #
-# Required GitHub Secrets:
-#   FOOTBALL_DATA_API_KEY           — from football-data.org (free tier)
+# Required GitHub Secret:
 #   FIREBASE_SERVICE_ACCOUNT_JSON   — full JSON of a Firebase service account
 #                                     with Firestore read/write permissions
+#
+# No FOOTBALL_DATA_API_KEY needed anymore — ESPN API is public.
 
 name: Sync Live Scores
 
@@ -43,5 +44,4 @@ jobs:
         working-directory: sync
         run: node live-scores.js
         env:
-          FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
           FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
