@@ -98,6 +98,10 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
       authBtn?.setAttribute('hidden', '');
       signOutBtn?.removeAttribute('hidden');
 
+      // Render immediately with whatever predictions we have (may be empty on
+      // first fire — the snapshot below will re-render once data arrives).
+      renderAll();
+
       // Subscribe to real-time predictions — fires immediately with current data,
       // then re-fires whenever a prediction is saved or changed.
       unsubPredictions = watchUserPredictions(user.uid, preds => {
@@ -189,7 +193,8 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
       const idx = liveMatches.findIndex(m => m.id === um.id);
       if (idx !== -1) liveMatches[idx] = { ...liveMatches[idx], ...um };
     });
-    // Only call renderAll() if auth has already resolved.
+    // Only call renderAll() once auth has resolved — avoids a blank render
+    // before we know whether the user is signed in.
     if (authResolved) renderAll();
   });
 
