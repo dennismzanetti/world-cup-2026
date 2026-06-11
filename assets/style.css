@@ -654,6 +654,8 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
 
 /* ---- EMPTY / LOADING ---- */
 .empty-filter-msg { text-align: center; color: var(--color-text-muted); padding: var(--space-12) var(--space-4); font-size: var(--text-sm); }
+#predictions-list .match-card { margin-bottom: var(--space-5); }
+#matches-list .match-card { margin-bottom: var(--space-5); }
 
 /* ---- RESPONSIVE ---- */
 @media (max-width: 600px) {
