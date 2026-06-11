@@ -70,12 +70,12 @@ export function watchUserPredictions(uid, cb) {
 }
 
 // ============================================================
-// BRACKET PICKS
+// BRACKET PICKS (Firestore — no localStorage)
 // ============================================================
 
 /**
  * Save bracket picks object for a user.
- * picks = { 'fixtureId_home': 'TeamName', 'fixtureId_away': 'TeamName', ... }
+ * picks = { 'r32-1': 'home', 'r32-2': 'away', ... }
  */
 export async function saveBracketPicks(uid, picks) {
   const ref = doc(db, 'users', uid, 'bracket', 'picks');
@@ -83,7 +83,8 @@ export async function saveBracketPicks(uid, picks) {
 }
 
 /**
- * Load bracket picks for a user.
+ * Load bracket picks for a user (one-time fetch).
+ * Returns { matchId: 'home'|'away', ... }
  */
 export async function getBracketPicks(uid) {
   const ref  = doc(db, 'users', uid, 'bracket', 'picks');

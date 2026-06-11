@@ -184,9 +184,14 @@ const WC_FIXTURE_META = {
 };
 
 // Generates a stable, URL-safe match ID from date + team names.
+// Uses NFD normalization to strip diacritics so accented characters
+// (e.g. ç in Curaçao, ü in Türkiye) produce consistent ASCII slugs.
 function makeMatchId(date, homeName, awayName) {
   function slug(s) {
-    return s.toLowerCase()
+    return s
+      .normalize('NFD')              // decompose accented chars → base + combining mark
+      .replace(/[\u0300-\u036f]/g, '') // strip combining diacritical marks
+      .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
   }
