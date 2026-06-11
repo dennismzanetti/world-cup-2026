@@ -1,11 +1,11 @@
 // World Cup 2026 App — Firebase-connected
 import { WC_GROUPS, WC_MATCHES, WC_KNOCKOUT_FIXTURES } from './data.js';
 import { signUp, signIn, logOut, watchAuth } from './auth.js';
-import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult } from './db.js';
+import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, saveBracketPicks, getBracketPicks } from './db.js';
 
 (function () {
 
-  // ─── State ────────────────────────────────────────────────────────────────
+  // ─── State ───────────────────────────────────────────────────────────────
   let currentUser      = null;
   let authResolved     = false;
   let activeTab        = 'groups';
@@ -13,6 +13,9 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
   let userPredictions  = {};  // matchId → {home, away}
   let liveMatches      = WC_MATCHES.slice(); // mutable working copy (group stage)
   let unsubPredictions = null; // unsubscribe handle for watchUserPredictions
+  let bracketPicks     = {};   // matchId → 'home'|'away'  (loaded from Firestore)
+  let bracketPicksDirty = false; // pending save debounce
+  let bracketSaveTimer  = null;
 
   // All matches for predictions = group stage + knockout fixtures
   function allPredMatches() {
@@ -24,7 +27,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     return liveMatches.slice();
   }
 
-  // ─── Admin UIDs ───────────────────────────────────────────────────────────
+  // ─── Admin UIDs ─────────────────────────────────────────────────────────
   const ADMIN_UIDS = ['EAi3lYhlSFYGaqm9F87BdJb1Vrg1'];
 
   // ─── Team name helper ─────────────────────────────────────────────────────
@@ -32,7 +35,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
   function teamFlag(t) { return (t && typeof t === 'object') ? (t.flag || '') : ''; }
   function teamDisplay(t) { return teamFlag(t) ? `${teamFlag(t)} ${teamName(t)}` : teamName(t); }
 
-  // ─── Date formatting ────────────────────────────────────────────────────
+  // ─── Date formatting ──────────────────────────────────────────────────
   function formatDateHeader(isoDate) {
     if (!isoDate) return 'Date TBD';
     const [year, month, day] = isoDate.split('-').map(Number);
@@ -42,7 +45,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     });
   }
 
-  // ─── Modal helpers ────────────────────────────────────────────────────────
+  // ─── Modal helpers ───────────────────────────────────────────────────
   function openModal() {
     document.getElementById('auth-modal')?.removeAttribute('hidden');
     document.getElementById('auth-backdrop')?.removeAttribute('hidden');
@@ -52,7 +55,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     document.getElementById('auth-backdrop')?.setAttribute('hidden', '');
   }
 
-  // ─── Sub-tab switching ────────────────────────────────────────────────────
+  // ─── Sub-tab switching ────────────────────────────────────────────────
   function switchPredSubtab(id) {
     activePredSubtab = id;
     document.querySelectorAll('.sub-tab').forEach(btn => {
@@ -74,7 +77,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     if (id === 'pred-bracket')         renderKnockoutBracket();
   }
 
-  // ─── Main tab switching ───────────────────────────────────────────────────
+  // ─── Main tab switching ───────────────────────────────────────────────
   function switchTab(id) {
     activeTab = id;
     document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -91,7 +94,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
   }
 
   // ─── Auth ─────────────────────────────────────────────────────────────────
-  watchAuth(user => {
+  watchAuth(async user => {
     if (unsubPredictions) {
       unsubPredictions();
       unsubPredictions = null;
@@ -111,6 +114,9 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
       authBtn?.setAttribute('hidden', '');
       signOutBtn?.removeAttribute('hidden');
 
+      // Load bracket picks from Firestore on sign-in
+      bracketPicks = await getBracketPicks(user.uid);
+
       renderAll();
 
       unsubPredictions = watchUserPredictions(user.uid, preds => {
@@ -123,6 +129,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
       authBtn?.removeAttribute('hidden', '');
       signOutBtn?.setAttribute('hidden', '');
       userPredictions = {};
+      bracketPicks    = {};
       renderAll();
     }
   });
@@ -133,7 +140,20 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     if (activeTab === 'predictions') switchPredSubtab(activePredSubtab);
   }
 
-  // ─── Event Listeners ──────────────────────────────────────────────────────
+  // ─── Bracket picks persistence (Firestore, debounced) ───────────────────
+  function persistBracketPicks() {
+    if (!currentUser) return;
+    clearTimeout(bracketSaveTimer);
+    bracketSaveTimer = setTimeout(async () => {
+      try {
+        await saveBracketPicks(currentUser.uid, bracketPicks);
+      } catch (err) {
+        console.warn('[app] saveBracketPicks error', err);
+      }
+    }, 600); // debounce rapid pick changes
+  }
+
+  // ─── Event Listeners ────────────────────────────────────────────────
   document.querySelectorAll('.nav-btn').forEach(btn =>
     btn.addEventListener('click', () => switchTab(btn.dataset.view)));
   document.querySelectorAll('.sub-tab').forEach(btn =>
@@ -184,18 +204,18 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     }
   });
 
-  // ─── Match filters (Matches tab) ──────────────────────────────────────────
+  // ─── Match filters (Matches tab) ─────────────────────────────────────
   document.getElementById('match-date-filter')?.addEventListener('change', renderMatches);
   document.getElementById('match-group-filter')?.addEventListener('change', renderMatches);
   document.getElementById('match-venue-filter')?.addEventListener('change', renderMatches);
   document.getElementById('match-team-filter')?.addEventListener('input', renderMatches);
 
-  // ─── Prediction filters (Predictions tab) ─────────────────────────────────
+  // ─── Prediction filters (Predictions tab) ──────────────────────────
   document.getElementById('pred-date-filter')?.addEventListener('change', renderPredictions);
   document.getElementById('pred-group-filter')?.addEventListener('change', renderPredictions);
   document.getElementById('pred-team-filter')?.addEventListener('input', renderPredictions);
 
-  // ─── Live match data ──────────────────────────────────────────────────────
+  // ─── Live match data ────────────────────────────────────────────────
   watchMatches(allMatches => {
     allMatches.forEach(um => {
       const idx = liveMatches.findIndex(m => m.id === um.id);
@@ -204,7 +224,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     if (authResolved) renderAll();
   });
 
-  // ─── Points calculator ────────────────────────────────────────────────────
+  // ─── Points calculator ────────────────────────────────────────────────
   function calcPoints(teams, matches) {
     const stats = {};
     teams.forEach(t => {
@@ -229,14 +249,14 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
       teamName(a.team).localeCompare(teamName(b.team)));
   }
 
-  // ─── Stage label ──────────────────────────────────────────────────────────
+  // ─── Stage label ─────────────────────────────────────────────────────────
   const stageKeyToLabel = key => ({
     R32: 'Round of 32', R16: 'Round of 16',
     QF: 'Quarter-Finals', SF: 'Semi-Finals',
     '3P': 'Third Place', F: 'Final'
   }[key] || (/^[A-Z]$/.test(key) ? `Group ${key}` : key));
 
-  // ─── Populate filters (Matches tab) ───────────────────────────────────────
+  // ─── Populate filters (Matches tab) ─────────────────────────────────
   function populateMatchFilters() {
     const dateEl  = document.getElementById('match-date-filter');
     const stageEl = document.getElementById('match-group-filter');
@@ -258,7 +278,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     }
   }
 
-  // ─── Populate filters (Predictions tab) ───────────────────────────────────
+  // ─── Populate filters (Predictions tab) ───────────────────────────
   function populatePredFilters() {
     const dateEl  = document.getElementById('pred-date-filter');
     const stageEl = document.getElementById('pred-group-filter');
@@ -298,7 +318,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     }
   }
 
-  // ─── Groups ──────────────────────────────────────────────────────────────
+  // ─── Groups ────────────────────────────────────────────────────────────────
   function renderGroups() {
     const container = document.getElementById('groups-grid');
     if (!container) return;
@@ -328,7 +348,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     });
   }
 
-  // ─── Render by date (shared helper) ──────────────────────────────────────
+  // ─── Render by date (shared helper) ──────────────────────────────────
   function renderByDate(container, matches, isPred) {
     const sorted = matches.slice().sort((a, b) => {
       const da = (a.date || '') + (a.timeLocal || '');
@@ -359,7 +379,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     });
   }
 
-  // ─── Matches ──────────────────────────────────────────────────────────────
+  // ─── Matches ────────────────────────────────────────────────────────────
   function renderMatches() {
     const container = document.getElementById('matches-list');
     if (!container) return;
@@ -523,7 +543,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     return card;
   }
 
-  // ─── Predictions (My Picks) ───────────────────────────────────────────────
+  // ─── Predictions (My Picks) ─────────────────────────────────────────────
   function renderPredictions() {
     const container  = document.getElementById('predictions-list');
     const authPrompt = document.getElementById('predictions-auth-prompt');
@@ -568,7 +588,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     renderByDate(container, matches, true);
   }
 
-  // ─── Predicted Group Standings ────────────────────────────────────────────
+  // ─── Predicted Group Standings ─────────────────────────────────────────────
   function calcPredPoints(teams, matches) {
     const stats = {};
     teams.forEach(t => {
@@ -630,7 +650,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     });
   }
 
-  // ─── Prediction Accuracy ──────────────────────────────────────────────────
+  // ─── Prediction Accuracy ────────────────────────────────────────────────
   function renderPredStandings() {
     const container  = document.getElementById('pred-standings-container');
     const authPrompt = document.getElementById('pred-standings-auth-prompt');
@@ -677,20 +697,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
       </div>`;
   }
 
-  // ─── Knockout Bracket ─────────────────────────────────────────────────────
-  let bracketPicks = {};
-
-  function saveBracketPicks() {
-    if (!currentUser) return;
-    try { localStorage.setItem(`bracketPicks_${currentUser.uid}`, JSON.stringify(bracketPicks)); } catch(e) {}
-  }
-  function loadBracketPicks() {
-    if (!currentUser) return;
-    try {
-      const raw = localStorage.getItem(`bracketPicks_${currentUser.uid}`);
-      bracketPicks = raw ? JSON.parse(raw) : {};
-    } catch(e) { bracketPicks = {}; }
-  }
+  // ─── Knockout Bracket ───────────────────────────────────────────────────────
 
   function getActualGroupFinisher(groupId, rank) {
     const group = WC_GROUPS.find(g => g.id === groupId);
@@ -751,7 +758,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
       container.querySelectorAll('.pred-standings-signin-btn').forEach(b => b.addEventListener('click', openModal));
       return;
     }
-    loadBracketPicks();
     const rounds = [
       { label: 'Round of 32',    ids: [49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64] },
       { label: 'Round of 16',    ids: [65,66,67,68,69,70,71,72] },
@@ -789,7 +795,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
       resetBtn.textContent = 'Reset';
       resetBtn.addEventListener('click', () => {
         round.ids.forEach(id => clearDownstreamPicks(id));
-        saveBracketPicks(); renderKnockoutBracket();
+        persistBracketPicks(); renderKnockoutBracket();
       });
       labelEl.appendChild(resetBtn);
       roundEl.appendChild(labelEl);
@@ -807,7 +813,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
         homeEl.addEventListener('click', () => {
           if (bracketPicks[matchId] !== 'home') clearDownstreamPicks(matchId);
           bracketPicks[matchId] = 'home';
-          saveBracketPicks(); renderKnockoutBracket();
+          persistBracketPicks(); renderKnockoutBracket();
         });
         const awayEl = document.createElement('div');
         awayEl.className = 'bracket-team' + (pick === 'away' ? ' picked' : '');
@@ -815,7 +821,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
         awayEl.addEventListener('click', () => {
           if (bracketPicks[matchId] !== 'away') clearDownstreamPicks(matchId);
           bracketPicks[matchId] = 'away';
-          saveBracketPicks(); renderKnockoutBracket();
+          persistBracketPicks(); renderKnockoutBracket();
         });
         matchEl.appendChild(homeEl);
         matchEl.appendChild(awayEl);
@@ -840,15 +846,15 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
         : '<span class="muted">TBD</span>'}</div>`;
     scrollArea.appendChild(champEl);
     container.querySelector('#bracket-reset-all-btn')?.addEventListener('click', () => {
-      bracketPicks = {}; saveBracketPicks(); renderKnockoutBracket();
+      bracketPicks = {}; persistBracketPicks(); renderKnockoutBracket();
     });
     container.querySelector('#bracket-seed-btn')?.addEventListener('click', () => {
       WC_KNOCKOUT_FIXTURES.forEach(f => { if (!bracketPicks[f.id]) bracketPicks[f.id] = 'home'; });
-      saveBracketPicks(); renderKnockoutBracket();
+      persistBracketPicks(); renderKnockoutBracket();
     });
   }
 
-  // ─── Init ─────────────────────────────────────────────────────────────────
+  // ─── Init ────────────────────────────────────────────────────────────────────
   function init() {
     populateMatchFilters();
     populatePredFilters();
