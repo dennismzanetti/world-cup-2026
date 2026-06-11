@@ -59,550 +59,226 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     document.querySelectorAll('.nav-btn').forEach(btn => {
       const active = btn.dataset.view === id;
       btn.classList.toggle('active', active);
-      btn.setAttribute('aria-selected', String(active));
+      btn.setAttribute('aria-selected', active ? 'true' : 'false');
     });
-    document.querySelectorAll('.view').forEach(panel => {
-      panel.classList.toggle('active', panel.id === `view-${id}`);
+    document.querySelectorAll('.view').forEach(view => {
+      const active = view.id === `view-${id}`;
+      view.classList.toggle('active', active);
     });
     if (id === 'groups')      renderGroups();
     if (id === 'matches')     renderMatches();
     if (id === 'standings')   renderStandings();
-    if (id === 'predictions') switchPredSubtab(activePredSubtab);
+    if (id === 'predictions') {
+      switchPredSubtab(activePredSubtab);
+    }
   }
 
-  // ─── Auth ─────────────────────────────────────────────────────────────────
-  watchAuth(async (user) => {
-    currentUser  = user;
+  // ─── Auth watcher ─────────────────────────────────────────────────────────
+  watchAuth(user => {
+    currentUser = user;
     authResolved = true;
-    const userGreeting = document.getElementById('user-greeting');
-    const userBar      = document.getElementById('user-bar');
-    const authBtn      = document.getElementById('auth-btn');
-    const signOutBtn   = document.getElementById('sign-out-btn');
+    const bar  = document.getElementById('user-bar');
+    const greet = document.getElementById('user-greeting');
+    const signOutBtn = document.getElementById('sign-out-btn');
     if (user) {
-      if (userGreeting) userGreeting.textContent = user.email;
-      userBar?.removeAttribute('hidden');
-      authBtn?.setAttribute('hidden', '');
-      signOutBtn?.removeAttribute('hidden');
-      try {
-        const preds = await getUserPredictions(user.uid);
-        userPredictions = {};
-        (preds || []).forEach(p => { userPredictions[p.matchId] = p; });
-      } catch (e) {
-        console.warn('[app] getUserPredictions error', e);
-      }
-      renderAll();
+      bar?.removeAttribute('hidden');
+      if (greet) greet.textContent = `Hello, ${user.displayName || user.email}`;
+      loadUserData();
     } else {
-      if (userGreeting) userGreeting.textContent = '';
-      userBar?.setAttribute('hidden', '');
-      authBtn?.removeAttribute('hidden');
-      signOutBtn?.setAttribute('hidden', '');
+      bar?.setAttribute('hidden', '');
       userPredictions = {};
-      renderAll();
+      bracketPicks    = {};
     }
+    if (activeTab === 'predictions') switchPredSubtab(activePredSubtab);
   });
 
-  function renderAll() {
-    if (activeTab === 'groups')      renderGroups();
-    if (activeTab === 'matches')     renderMatches();
-    if (activeTab === 'standings')   renderStandings();
-    if (activeTab === 'predictions') switchPredSubtab(activePredSubtab);
+  // ─── Data loading ─────────────────────────────────────────────────────────
+  function loadUserData() {
+    if (!currentUser) return;
+    getUserPredictions(currentUser.uid).then(preds => {
+      userPredictions = preds || {};
+      if (activeTab === 'predictions') switchPredSubtab(activePredSubtab);
+    });
   }
 
-  // ─── Event Listeners ──────────────────────────────────────────────────────
-  document.querySelectorAll('.nav-btn').forEach(btn =>
-    btn.addEventListener('click', () => switchTab(btn.dataset.view)));
-  document.querySelectorAll('.sub-tab').forEach(btn =>
-    btn.addEventListener('click', () => switchPredSubtab(btn.dataset.subtab)));
+  watchMatches(matches => {
+    liveMatches = matches;
+    if (activeTab === 'matches')   renderMatches();
+    if (activeTab === 'standings') renderStandings();
+    if (activeTab === 'groups')    renderGroups();
+    if (activeTab === 'predictions') switchPredSubtab(activePredSubtab);
+  });
 
-  document.getElementById('auth-btn')?.addEventListener('click', openModal);
-  document.getElementById('predict-signin-btn')?.addEventListener('click', openModal);
-  document.getElementById('sign-out-btn')?.addEventListener('click', () => logOut());
-  document.querySelectorAll('.pred-standings-signin-btn').forEach(btn =>
-    btn.addEventListener('click', openModal));
-  document.getElementById('auth-close')?.addEventListener('click', closeModal);
+  // ─── Nav buttons ─────────────────────────────────────────────────────────
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.view));
+  });
+  document.querySelectorAll('.sub-tab').forEach(btn => {
+    btn.addEventListener('click', () => switchPredSubtab(btn.dataset.subtab));
+  });
+
+  // ─── Auth form ────────────────────────────────────────────────────────────
+  const signInForm  = document.getElementById('sign-in-form');
+  const signUpForm  = document.getElementById('sign-up-form');
+  const authError   = document.getElementById('auth-error');
+  const authToggle  = document.getElementById('auth-toggle-link');
+  const authSubmit  = document.getElementById('auth-submit-btn');
+  const authHeading = document.getElementById('auth-heading');
+  let authMode = 'signin';
+
+  document.getElementById('auth-open-btn')?.addEventListener('click', openModal);
+  document.getElementById('auth-close-btn')?.addEventListener('click', closeModal);
   document.getElementById('auth-backdrop')?.addEventListener('click', closeModal);
+  document.getElementById('sign-out-btn')?.addEventListener('click', () => logOut());
 
-  const authForm = document.getElementById('auth-form');
-  let authFormMode = 'signin';
-  authForm?.addEventListener('submit', async e => {
+  authToggle?.addEventListener('click', e => {
     e.preventDefault();
-    const email    = document.getElementById('auth-email').value.trim();
-    const password = document.getElementById('auth-password').value;
-    const errEl    = document.getElementById('auth-error');
-    if (errEl) errEl.textContent = '';
+    authMode = authMode === 'signin' ? 'signup' : 'signin';
+    signInForm?.classList.toggle('hidden', authMode !== 'signin');
+    signUpForm?.classList.toggle('hidden', authMode !== 'signup');
+    if (authHeading) authHeading.textContent = authMode === 'signin' ? 'Sign In' : 'Create Account';
+    if (authSubmit)  authSubmit.textContent  = authMode === 'signin' ? 'Sign In' : 'Sign Up';
+    if (authToggle)  authToggle.textContent  = authMode === 'signin' ? "Don't have an account? Sign Up" : 'Already have an account? Sign In';
+    if (authError)   authError.textContent   = '';
+  });
+
+  document.getElementById('auth-form')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (authError) authError.textContent = '';
+    if (authSubmit) authSubmit.disabled = true;
     try {
-      if (authFormMode === 'signup') await signUp(email, password);
-      else                           await signIn(email, password);
+      if (authMode === 'signin') {
+        const email = document.getElementById('signin-email')?.value.trim();
+        const pass  = document.getElementById('signin-password')?.value;
+        await signIn(email, pass);
+      } else {
+        const name  = document.getElementById('signup-name')?.value.trim();
+        const email = document.getElementById('signup-email')?.value.trim();
+        const pass  = document.getElementById('signup-password')?.value;
+        await signUp(email, pass, name);
+      }
       closeModal();
     } catch (err) {
-      if (errEl) errEl.textContent = err.message;
+      if (authError) authError.textContent = err.message || 'Authentication failed';
+    } finally {
+      if (authSubmit) authSubmit.disabled = false;
     }
   });
 
-  document.getElementById('auth-switch')?.addEventListener('click', () => {
-    const submitBtn = document.getElementById('auth-submit');
-    const toggleBtn = document.getElementById('auth-switch');
-    const titleEl   = document.getElementById('auth-title');
-    const subEl     = document.getElementById('auth-sub');
-    if (authFormMode === 'signin') {
-      authFormMode = 'signup';
-      if (titleEl)   titleEl.textContent   = 'Create Account';
-      if (subEl)     subEl.textContent     = 'Create an account to save your predictions.';
-      if (submitBtn) submitBtn.textContent = 'Sign Up';
-      if (toggleBtn) toggleBtn.textContent = 'Already have an account? Sign in';
-    } else {
-      authFormMode = 'signin';
-      if (titleEl)   titleEl.textContent   = 'Sign In';
-      if (subEl)     subEl.textContent     = 'Sign in to save your predictions.';
-      if (submitBtn) submitBtn.textContent = 'Sign In';
-      if (toggleBtn) toggleBtn.textContent = "Don't have an account? Sign up";
+  // ─── Theme toggle ─────────────────────────────────────────────────────────
+  (function () {
+    const toggle = document.querySelector('[data-theme-toggle]');
+    const html   = document.documentElement;
+    let theme = localStorage.getItem('theme') ||
+                (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    html.setAttribute('data-theme', theme);
+    function updateIcon() {
+      if (!toggle) return;
+      toggle.innerHTML = theme === 'dark'
+        ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>'
+        : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+      toggle.setAttribute('aria-label', `Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`);
     }
-  });
-
-  // ─── Match filters (Matches tab) ───────────────────────────────────────────────
-  document.getElementById('match-date-filter')?.addEventListener('change', renderMatches);
-  document.getElementById('match-group-filter')?.addEventListener('change', renderMatches);
-  document.getElementById('match-venue-filter')?.addEventListener('change', renderMatches);
-  document.getElementById('match-team-filter')?.addEventListener('input', renderMatches);
-
-  // ─── Prediction filters (Predictions tab) ─────────────────────────────────────
-  document.getElementById('pred-date-filter')?.addEventListener('change', renderPredictions);
-  document.getElementById('pred-group-filter')?.addEventListener('change', renderPredictions);
-  document.getElementById('pred-team-filter')?.addEventListener('input', renderPredictions);
-
-  // ─── Live match data ──────────────────────────────────────────────────────
-  watchMatches(allMatches => {
-    allMatches.forEach(um => {
-      const idx = liveMatches.findIndex(m => m.id === um.id);
-      if (idx !== -1) liveMatches[idx] = { ...liveMatches[idx], ...um };
+    updateIcon();
+    toggle?.addEventListener('click', () => {
+      theme = theme === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', theme);
+      try { localStorage.setItem('theme', theme); } catch(e) {}
+      updateIcon();
     });
-    renderAll();
+  })();
+
+  // ─── Match filter helpers ──────────────────────────────────────────────────
+  let matchFilters = { group: 'all', date: 'all', search: '' };
+  let predFilters  = { group: 'all', status: 'all' };
+
+  function populateMatchFilters() {
+    const sel = document.getElementById('match-group-filter');
+    if (!sel) return;
+    WC_GROUPS.forEach(g => {
+      const opt = document.createElement('option');
+      opt.value = g.id; opt.textContent = `Group ${g.id}`;
+      sel.appendChild(opt);
+    });
+  }
+  function populatePredFilters() {
+    const sel = document.getElementById('pred-group-filter');
+    if (!sel) return;
+    WC_GROUPS.forEach(g => {
+      const opt = document.createElement('option');
+      opt.value = g.id; opt.textContent = `Group ${g.id}`;
+      sel.appendChild(opt);
+    });
+  }
+
+  document.getElementById('match-group-filter')?.addEventListener('change', e => {
+    matchFilters.group = e.target.value; renderMatches();
+  });
+  document.getElementById('match-date-filter')?.addEventListener('change', e => {
+    matchFilters.date = e.target.value; renderMatches();
+  });
+  document.getElementById('match-search')?.addEventListener('input', e => {
+    matchFilters.search = e.target.value.toLowerCase(); renderMatches();
+  });
+  document.getElementById('pred-group-filter')?.addEventListener('change', e => {
+    predFilters.group = e.target.value; renderPredictions();
+  });
+  document.getElementById('pred-status-filter')?.addEventListener('change', e => {
+    predFilters.status = e.target.value; renderPredictions();
   });
 
-  // ─── Points calculator ────────────────────────────────────────────────────
+  // ─── Groups tab ───────────────────────────────────────────────────────────
   function calcPoints(teams, matches) {
-    const stats = {};
-    teams.forEach(t => {
-      const n = teamName(t);
-      stats[n] = { team: t, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, pts: 0 };
-    });
+    const table = {};
+    teams.forEach(t => { table[t.name] = { team: t, pts: 0, gd: 0, gf: 0, ga: 0, played: 0, w: 0, d: 0, l: 0 }; });
     matches.forEach(m => {
       if (m.homeScore == null || m.awayScore == null) return;
-      const hn = teamName(m.home), an = teamName(m.away);
-      if (!stats[hn] || !stats[an]) return;
-      const h = m.homeScore, a = m.awayScore;
-      stats[hn].played++; stats[an].played++;
-      stats[hn].gf += h;  stats[an].gf += a;
-      stats[hn].ga += a;  stats[an].ga += h;
-      if (h > a)      { stats[hn].won++;   stats[hn].pts += 3; stats[an].lost++; }
-      else if (h < a) { stats[an].won++;   stats[an].pts += 3; stats[hn].lost++; }
-      else            { stats[hn].drawn++; stats[hn].pts++;    stats[an].drawn++; stats[an].pts++; }
+      const h = table[teamName(m.home)], a = table[teamName(m.away)];
+      if (!h || !a) return;
+      h.gf += m.homeScore; h.ga += m.awayScore; h.gd = h.gf - h.ga; h.played++;
+      a.gf += m.awayScore; a.ga += m.homeScore; a.gd = a.gf - a.ga; a.played++;
+      if (m.homeScore > m.awayScore) { h.pts += 3; h.w++; a.l++; }
+      else if (m.homeScore < m.awayScore) { a.pts += 3; a.w++; h.l++; }
+      else { h.pts += 1; a.pts += 1; h.d++; a.d++; }
     });
-    Object.values(stats).forEach(s => s.gd = s.gf - s.ga);
-    return Object.values(stats).sort((a, b) =>
-      b.pts - a.pts || b.gd - a.gd || b.gf - a.gf ||
-      teamName(a.team).localeCompare(teamName(b.team)));
+    return Object.values(table).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
   }
 
-  // ─── Stage label ──────────────────────────────────────────────────────────
-  const stageKeyToLabel = key => ({
-    R32: 'Round of 32', R16: 'Round of 16',
-    QF: 'Quarter-Finals', SF: 'Semi-Finals',
-    '3P': 'Third Place', F: 'Final'
-  }[key] || (/^[A-Z]$/.test(key) ? `Group ${key}` : key));
-
-  // ─── Populate filters (Matches tab) ─────────────────────────────────────────────
-  function populateMatchFilters() {
-    const dateEl  = document.getElementById('match-date-filter');
-    const stageEl = document.getElementById('match-group-filter');
-    const venueEl = document.getElementById('match-venue-filter');
-    if (dateEl) {
-      const dates = [...new Set(liveMatches.map(m => m.date).filter(Boolean))].sort();
-      dateEl.innerHTML = '<option value="all">All Dates</option>' +
-        dates.map(d => `<option value="${d}">${d}</option>`).join('');
-    }
-    if (stageEl) {
-      const stages = [...new Set(liveMatches.map(m => m.group || m.stage).filter(Boolean))];
-      stageEl.innerHTML = '<option value="all">All Matches</option>' +
-        stages.map(s => `<option value="${s}">${stageKeyToLabel(s)}</option>`).join('');
-    }
-    if (venueEl) {
-      const venues = [...new Set(liveMatches.map(m => m.venue).filter(Boolean))].sort();
-      venueEl.innerHTML = '<option value="all">All Venues</option>' +
-        venues.map(v => `<option value="${v}">${v}</option>`).join('');
-    }
-  }
-
-  // ─── Populate filters (Predictions tab) ───────────────────────────────────────
-  // Option values for knockout stages MUST match the `stage` strings used in data.js
-  // e.g. 'Round of 32', 'Round of 16', 'Quarterfinals', 'Semifinals', 'Third Place', 'Final'
-  // Group options use the group letter (e.g. 'A'), matching m.group on group-stage matches.
-  function populatePredFilters() {
-    const dateEl  = document.getElementById('pred-date-filter');
-    const stageEl = document.getElementById('pred-group-filter');
-
-    if (dateEl && !dateEl.dataset.populated) {
-      const dates = [...new Set(liveMatches.map(m => m.date).filter(Boolean))].sort();
-      dates.forEach(d => {
-        const opt = document.createElement('option');
-        opt.value = d;
-        opt.textContent = d;
-        dateEl.appendChild(opt);
-      });
-      dateEl.dataset.populated = '1';
-    }
-
-    if (stageEl && !stageEl.dataset.populated) {
-      // Groups A–L  (value = group letter, matches m.group)
-      WC_GROUPS.forEach(g => {
-        const opt = document.createElement('option');
-        opt.value = g.id;
-        opt.textContent = `Group ${g.id}`;
-        stageEl.appendChild(opt);
-      });
-      // Knockout stages — values must exactly match the `stage` field in data.js
-      [
-        ['Round of 32',   'Round of 32'],
-        ['Round of 16',   'Round of 16'],
-        ['Quarterfinals', 'Quarter-Finals'],
-        ['Semifinals',    'Semi-Finals'],
-        ['Third Place',   'Third Place'],
-        ['Final',         'Final'],
-      ].forEach(([val, label]) => {
-        const opt = document.createElement('option');
-        opt.value = val;    // matches m.stage exactly
-        opt.textContent = label;
-        stageEl.appendChild(opt);
-      });
-      stageEl.dataset.populated = '1';
-    }
-  }
-
-  // ─── Groups ──────────────────────────────────────────────────────────────
-  function renderGroups() {
-    const container = document.getElementById('groups-grid');
-    if (!container) return;
-    container.innerHTML = '';
-    WC_GROUPS.forEach(group => {
-      const groupMatches = liveMatches.filter(m => m.group === group.id);
-      const standings    = calcPoints(group.teams, groupMatches);
-      const card = document.createElement('div');
-      card.className = 'standings-card';
-      card.innerHTML = `
-        <div class="standings-header">Group ${group.id}</div>
-        <table class="standings-table">
-          <thead><tr>
-            <th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th>
-            <th>GF</th><th>GA</th><th>GD</th><th>Pts</th>
-          </tr></thead>
-          <tbody>${standings.map((s, i) => `
-            <tr class="${i < 2 ? 'qualify' : ''}">
-              <td>${teamDisplay(s.team)}</td><td>${s.played}</td><td>${s.won}</td>
-              <td>${s.drawn}</td><td>${s.lost}</td><td>${s.gf}</td>
-              <td>${s.ga}</td><td>${s.gd >= 0 ? '+' : ''}${s.gd}</td>
-              <td><strong>${s.pts}</strong></td>
-            </tr>`).join('')}
-          </tbody>
-        </table>`;
-      container.appendChild(card);
-    });
-  }
-
-  // ─── Matches ──────────────────────────────────────────────────────────────
-  function renderMatches() {
-    const container = document.getElementById('matches-list');
-    if (!container) return;
-    const dateVal  = document.getElementById('match-date-filter')?.value  || 'all';
-    const stageVal = document.getElementById('match-group-filter')?.value || 'all';
-    const venueVal = document.getElementById('match-venue-filter')?.value || 'all';
-    const teamVal  = (document.getElementById('match-team-filter')?.value || '').toLowerCase().trim();
-    let matches = liveMatches.slice();
-    if (dateVal  !== 'all') matches = matches.filter(m => m.date === dateVal);
-    if (stageVal !== 'all') matches = matches.filter(m => (m.group || m.stage) === stageVal);
-    if (venueVal !== 'all') matches = matches.filter(m => m.venue === venueVal);
-    if (teamVal)            matches = matches.filter(m =>
-      teamName(m.home).toLowerCase().includes(teamVal) ||
-      teamName(m.away).toLowerCase().includes(teamVal));
-    container.innerHTML = '';
-    if (!matches.length) { container.innerHTML = '<p class="empty-filter-msg">No matches found.</p>'; return; }
-    matches.forEach(m => container.appendChild(buildMatchCard(m, false)));
-  }
-
-  // ─── Match card ───────────────────────────────────────────────────────────
-  function buildMatchCard(m, isPred) {
-    const card     = document.createElement('div');
-    card.className = 'match-card' + (m.status === 'live' ? ' match-card-live' : '');
-
-    const stageLabel = m.group ? `Group ${m.group}` : stageKeyToLabel(m.stage || '');
-    const isAdmin    = currentUser && ADMIN_UIDS.includes(currentUser.uid);
-    const hn         = teamName(m.home);
-    const an         = teamName(m.away);
-    const hFlag      = teamFlag(m.home);
-    const aFlag      = teamFlag(m.away);
-    const isLocked   = m.status === 'ft' || m.status === 'final';
-
-    // ── Status badge
-    let statusBadge = '';
-    if      (m.status === 'live') statusBadge = '<span class="status-badge status-live"><span class="live-dot"></span>Live</span>';
-    else if (m.status === 'ht')   statusBadge = '<span class="status-badge status-ht">HT</span>';
-    else if (m.status === 'ft' || m.status === 'final') statusBadge = '<span class="status-badge status-ft">FT</span>';
-
-    // ── Centre score column
-    let scoreColHtml = '';
-
-    if (isPred && currentUser) {
-      const pred = userPredictions[m.id] || {};
-      const hVal = pred.homeScorePred !== undefined ? pred.homeScorePred : '';
-      const aVal = pred.awayScorePred !== undefined ? pred.awayScorePred : '';
-      scoreColHtml = `
-        <div class="card-score-col">
-          <div class="score-inputs-wrap">
-            <input type="number" class="score-input" min="0" max="99"
-              data-match="${m.id}" data-side="home" value="${hVal}"
-              aria-label="${hn} predicted score"${isLocked ? ' disabled' : ''}>
-            <span class="score-sep">–</span>
-            <input type="number" class="score-input" min="0" max="99"
-              data-match="${m.id}" data-side="away" value="${aVal}"
-              aria-label="${an} predicted score"${isLocked ? ' disabled' : ''}>
-          </div>
-          ${!isLocked ? `<button class="btn-save pred-btn save-pred-btn" data-match="${m.id}">Save</button>` : ''}
-          <span class="pred-saving" hidden>Saving…</span>
-          <span class="pred-saved" hidden>Saved ✓</span>
-          <span class="pred-error" hidden></span>
-        </div>`;
-    } else if (!isPred && isAdmin) {
-      scoreColHtml = `
-        <div class="card-score-col">
-          <div class="score-inputs-wrap">
-            <input type="number" class="score-input" min="0" max="99"
-              data-match="${m.id}" data-side="home"
-              value="${m.homeScore != null ? m.homeScore : ''}" aria-label="${hn} score">
-            <span class="score-sep">–</span>
-            <input type="number" class="score-input" min="0" max="99"
-              data-match="${m.id}" data-side="away"
-              value="${m.awayScore != null ? m.awayScore : ''}" aria-label="${an} score">
-          </div>
-          <button class="btn-save save-score-btn" data-match="${m.id}">Save</button>
-          <span class="result-saved" style="display:none">Saved ✓</span>
-        </div>`;
-    } else {
-      const hs  = m.homeScore != null ? m.homeScore : '–';
-      const as_ = m.awayScore != null ? m.awayScore : '–';
-      const cls = m.status === 'live'  ? 'score-final score-live'
-                : m.homeScore != null  ? 'score-final'
-                                       : 'score-final score-pending';
-      scoreColHtml = `<div class="card-score-col"><span class="${cls}">${hs} – ${as_}</span></div>`;
-    }
-
-    // ── Date/time string
-    const dtStr = [m.date, m.timeLocal, m.tz].filter(Boolean).join(' ');
-
-    // ── Card HTML
-    card.innerHTML = `
-      <div class="card-header">
-        <span class="card-header-group">${stageLabel}</span>
-        ${statusBadge}
-      </div>
-      <div class="card-teams">
-        <div class="card-team home-team">
-          ${hFlag ? `<span class="team-flag" aria-hidden="true">${hFlag}</span>` : ''}
-          <span class="card-team-name">${hn}</span>
-        </div>
-        ${scoreColHtml}
-        <div class="card-team away-team">
-          <span class="card-team-name">${an}</span>
-          ${aFlag ? `<span class="team-flag" aria-hidden="true">${aFlag}</span>` : ''}
-        </div>
-      </div>
-      ${(m.venue || dtStr) ? `
-      <div class="card-meta">
-        ${m.venue ? `<span class="card-meta-item">
-          <svg class="meta-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/><path d="M13 6c0 4.5-5 8.5-5 8.5S3 10.5 3 6a5 5 0 0 1 10 0z"/></svg>
-          ${m.venue}${m.city ? ', ' + m.city : ''}
-        </span>` : ''}
-        ${dtStr ? `<span class="card-meta-item">
-          <svg class="meta-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M5 1.5v3M11 1.5v3M2 7h12"/></svg>
-          ${dtStr}
-        </span>` : ''}
-      </div>` : ''}`;
-
-    // ── Event listeners
-    if (isPred && currentUser) {
-      card.querySelector('.save-pred-btn')?.addEventListener('click', async () => {
-        const savingEl = card.querySelector('.pred-saving');
-        const savedEl  = card.querySelector('.pred-saved');
-        const errEl    = card.querySelector('.pred-error');
-        const btn      = card.querySelector('.save-pred-btn');
-        const homeVal  = parseInt(card.querySelector('[data-side="home"]')?.value);
-        const awayVal  = parseInt(card.querySelector('[data-side="away"]')?.value);
-        if (isNaN(homeVal) || isNaN(awayVal)) {
-          if (errEl) { errEl.textContent = 'Enter both scores.'; errEl.hidden = false; }
-          return;
-        }
-        if (errEl)    errEl.hidden    = true;
-        if (savingEl) savingEl.hidden = false;
-        if (btn)      btn.disabled    = true;
-        userPredictions[m.id] = { homeScorePred: homeVal, awayScorePred: awayVal };
-        try {
-          await savePrediction(currentUser.uid, m.id, { homeScorePred: homeVal, awayScorePred: awayVal });
-          if (savingEl) savingEl.hidden = true;
-          if (savedEl)  { savedEl.hidden = false; setTimeout(() => { savedEl.hidden = true; }, 2000); }
-        } catch (err) {
-          if (savingEl) savingEl.hidden = true;
-          if (errEl)    { errEl.textContent = 'Save failed.'; errEl.hidden = false; }
-          console.warn('[app] savePrediction error', err);
-        }
-        if (btn) btn.disabled = false;
-      });
-    }
-
-    if (!isPred && isAdmin) {
-      card.querySelector('.save-score-btn')?.addEventListener('click', async () => {
-        const btn     = card.querySelector('.save-score-btn');
-        const savedEl = card.querySelector('.result-saved');
-        const homeVal = parseInt(card.querySelector('[data-side="home"]')?.value);
-        const awayVal = parseInt(card.querySelector('[data-side="away"]')?.value);
-        if (isNaN(homeVal) || isNaN(awayVal)) return;
-        if (btn) btn.disabled = true;
-        try {
-          await updateMatchResult(m.id, { homeScore: homeVal, awayScore: awayVal, status: 'ft' });
-          if (savedEl) { savedEl.style.display = 'inline'; setTimeout(() => { savedEl.style.display = 'none'; if (btn) btn.disabled = false; }, 2000); }
-        } catch (err) {
-          console.warn('[app] updateMatchResult error', err);
-          if (btn) btn.disabled = false;
-        }
-      });
-    }
-
-    return card;
-  }
-
-  // ─── Standings ────────────────────────────────────────────────────────────
-  function renderStandings() {
-    const container = document.getElementById('standings-grid');
-    if (!container) return;
-    container.innerHTML = '';
-    WC_GROUPS.forEach(group => {
-      const groupMatches = liveMatches.filter(m => m.group === group.id);
-      const standings    = calcPoints(group.teams, groupMatches);
-      const card = document.createElement('div');
-      card.className = 'standings-card';
-      card.innerHTML = `
-        <div class="standings-header">Group ${group.id}</div>
-        <table class="standings-table">
-          <thead><tr>
-            <th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th>
-            <th>GF</th><th>GA</th><th>GD</th><th>Pts</th>
-          </tr></thead>
-          <tbody>${standings.map((s, i) => `
-            <tr class="${i < 2 ? 'qualify' : ''}">
-              <td>${teamDisplay(s.team)}</td><td>${s.played}</td><td>${s.won}</td>
-              <td>${s.drawn}</td><td>${s.lost}</td><td>${s.gf}</td>
-              <td>${s.ga}</td><td>${s.gd >= 0 ? '+' : ''}${s.gd}</td>
-              <td><strong>${s.pts}</strong></td>
-            </tr>`).join('')}
-          </tbody>
-        </table>`;
-      container.appendChild(card);
-    });
-  }
-
-  // ─── Predictions (My Picks) ───────────────────────────────────────────────
-  function renderPredictions() {
-    const container  = document.getElementById('predictions-list');
-    const authPrompt = document.getElementById('predictions-auth-prompt');
-    const filtersBar = document.getElementById('pred-filters');
-    if (!container) return;
-
-    if (!currentUser) {
-      authPrompt?.removeAttribute('hidden');
-      if (filtersBar) filtersBar.hidden = true;
-      container.innerHTML = '';
-      return;
-    }
-
-    authPrompt?.setAttribute('hidden', '');
-    if (filtersBar) filtersBar.hidden = false;
-
-    // Populate dropdowns exactly once (guarded by data-populated)
-    populatePredFilters();
-
-    // Read current filter values
-    const dateVal  = document.getElementById('pred-date-filter')?.value  || 'all';
-    const stageVal = document.getElementById('pred-group-filter')?.value || 'all';
-    const teamVal  = (document.getElementById('pred-team-filter')?.value || '').toLowerCase().trim();
-
-    // Apply filters — group-stage matches use m.group; knockout matches use m.stage
-    let matches = liveMatches.slice();
-    if (dateVal  !== 'all') matches = matches.filter(m => m.date === dateVal);
-    if (stageVal !== 'all') matches = matches.filter(m => (m.group || m.stage) === stageVal);
-    if (teamVal)            matches = matches.filter(m =>
-      teamName(m.home).toLowerCase().includes(teamVal) ||
-      teamName(m.away).toLowerCase().includes(teamVal));
-
-    container.innerHTML = '';
-    if (!matches.length) {
-      container.innerHTML = '<p class="empty-filter-msg">No matches found.</p>';
-      return;
-    }
-    matches.forEach(m => container.appendChild(buildMatchCard(m, true)));
-  }
-
-  // ─── Predicted Group Standings ────────────────────────────────────────────
   function calcPredPoints(teams, matches) {
-    const stats = {};
-    teams.forEach(t => {
-      const n = teamName(t);
-      stats[n] = { team: t, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, pts: 0 };
-    });
+    const table = {};
+    teams.forEach(t => { table[t.name] = { team: t, pts: 0, gd: 0, gf: 0, ga: 0, played: 0 }; });
     matches.forEach(m => {
       const pred = userPredictions[m.id];
       if (!pred || pred.homeScorePred == null || pred.awayScorePred == null) return;
-      const hn = teamName(m.home), an = teamName(m.away);
-      if (!stats[hn] || !stats[an]) return;
-      const h = pred.homeScorePred, a = pred.awayScorePred;
-      stats[hn].played++; stats[an].played++;
-      stats[hn].gf += h;  stats[an].gf += a;
-      stats[hn].ga += a;  stats[an].ga += h;
-      if (h > a)      { stats[hn].won++;   stats[hn].pts += 3; stats[an].lost++; }
-      else if (h < a) { stats[an].won++;   stats[an].pts += 3; stats[hn].lost++; }
-      else            { stats[hn].drawn++; stats[hn].pts++;    stats[an].drawn++; stats[an].pts++; }
+      const h = table[teamName(m.home)], a = table[teamName(m.away)];
+      if (!h || !a) return;
+      const hs = pred.homeScorePred, as = pred.awayScorePred;
+      h.gf += hs; h.ga += as; h.gd = h.gf - h.ga; h.played++;
+      a.gf += as; a.ga += hs; a.gd = a.gf - a.ga; a.played++;
+      if (hs > as) { h.pts += 3; } else if (hs < as) { a.pts += 3; } else { h.pts += 1; a.pts += 1; }
     });
-    Object.values(stats).forEach(s => s.gd = s.gf - s.ga);
-    return Object.values(stats).sort((a, b) =>
-      b.pts - a.pts || b.gd - a.gd || b.gf - a.gf ||
-      teamName(a.team).localeCompare(teamName(b.team)));
+    return Object.values(table).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
   }
 
-  function renderPredGroupStandings() {
-    const container  = document.getElementById('pred-group-standings-container');
-    const authPrompt = document.getElementById('pred-group-standings-auth-prompt');
+  function renderGroups() {
+    const container = document.getElementById('groups-container');
     if (!container) return;
-    if (!currentUser) {
-      authPrompt?.removeAttribute('hidden');
-      container.innerHTML = '';
-      return;
-    }
-    authPrompt?.setAttribute('hidden', '');
     container.innerHTML = '';
     WC_GROUPS.forEach(group => {
-      const groupMatches = liveMatches.filter(m => m.group === group.id);
-      const standings    = calcPredPoints(group.teams, groupMatches);
+      const gm = liveMatches.filter(m => m.group === group.id);
+      const standings = calcPoints(group.teams, gm);
       const card = document.createElement('div');
-      card.className = 'standings-card';
+      card.className = 'group-card';
       card.innerHTML = `
-        <div class="standings-header">Group ${group.id}</div>
-        <table class="standings-table">
-          <thead><tr>
-            <th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th>
-            <th>GF</th><th>GA</th><th>GD</th><th>Pts</th>
-          </tr></thead>
-          <tbody>${standings.map((s, i) => `
+        <h3 class="group-title">Group ${group.id}</h3>
+        <table class="group-table">
+          <thead><tr><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th></tr></thead>
+          <tbody>${standings.map((row, i) => `
             <tr class="${i < 2 ? 'qualify' : ''}">
-              <td>${teamDisplay(s.team)}</td><td>${s.played}</td><td>${s.won}</td>
-              <td>${s.drawn}</td><td>${s.lost}</td><td>${s.gf}</td>
-              <td>${s.ga}</td><td>${s.gd >= 0 ? '+' : ''}${s.gd}</td>
-              <td><strong>${s.pts}</strong></td>
+              <td class="team-cell"><span class="team-flag">${row.team.flag}</span>${row.team.name}</td>
+              <td>${row.played}</td><td>${row.w}</td><td>${row.d}</td><td>${row.l}</td>
+              <td>${row.gd > 0 ? '+' : ''}${row.gd}</td>
+              <td class="pts-cell">${row.pts}</td>
             </tr>`).join('')}
           </tbody>
         </table>`;
@@ -610,34 +286,241 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     });
   }
 
-  // ─── Prediction Accuracy ──────────────────────────────────────────────────
-  function renderPredStandings() {
-    const container  = document.getElementById('pred-standings-container');
-    const authPrompt = document.getElementById('pred-standings-auth-prompt');
+  // ─── Matches tab ──────────────────────────────────────────────────────────
+  function renderMatches() {
+    const container = document.getElementById('matches-container');
     if (!container) return;
-    if (!authResolved || !currentUser) {
-      authPrompt?.removeAttribute('hidden');
-      container.innerHTML = '';
+    let matches = liveMatches.filter(m => m.group); // group stage only in matches tab
+    if (matchFilters.group !== 'all') matches = matches.filter(m => m.group === matchFilters.group);
+    if (matchFilters.date !== 'all')  matches = matches.filter(m => m.date === matchFilters.date);
+    if (matchFilters.search) {
+      matches = matches.filter(m =>
+        teamName(m.home).toLowerCase().includes(matchFilters.search) ||
+        teamName(m.away).toLowerCase().includes(matchFilters.search)
+      );
+    }
+    if (!matches.length) {
+      container.innerHTML = '<div class="empty-filter-msg">No matches found.</div>';
       return;
     }
-    authPrompt?.setAttribute('hidden', '');
-    let correctExact = 0, correctResult = 0, total = 0;
-    liveMatches.forEach(match => {
-      const pred = userPredictions[match.id];
-      if (!pred || pred.homeScorePred == null || pred.awayScorePred == null) return;
-      if (match.homeScore == null || match.awayScore == null) return;
-      total++;
-      const predResult   = pred.homeScorePred > pred.awayScorePred ? 'H'
-                         : pred.homeScorePred < pred.awayScorePred ? 'A' : 'D';
-      const actualResult = match.homeScore > match.awayScore ? 'H'
-                         : match.homeScore < match.awayScore ? 'A' : 'D';
-      if (pred.homeScorePred === match.homeScore && pred.awayScorePred === match.awayScore) {
-        correctExact++; correctResult++;
-      } else if (predResult === actualResult) {
-        correctResult++;
-      }
+    const byDate = {};
+    matches.forEach(m => { (byDate[m.date] = byDate[m.date] || []).push(m); });
+    container.innerHTML = '';
+    Object.keys(byDate).sort().forEach(date => {
+      const section = document.createElement('div');
+      section.className = 'match-date-section';
+      const d = new Date(date + 'T12:00:00');
+      section.innerHTML = `<h3 class="match-date-header">${d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</h3>`;
+      byDate[date].forEach(m => section.appendChild(buildMatchCard(m)));
+      container.appendChild(section);
     });
-    const pct = total > 0 ? Math.round((correctResult / total) * 100) : 0;
+  }
+
+  function buildMatchCard(m) {
+    const pred = userPredictions[m.id] || {};
+    const played = m.homeScore != null;
+    const isAdmin = currentUser && ADMIN_UIDS.includes(currentUser.uid);
+    const card = document.createElement('div');
+    card.className = 'match-card' + (played ? ' match-played' : '');
+    const broadcastHtml = [
+      ...(m.tvEnglish||[]).map(ch=>`<span class="bc-chip bc-tv">${ch}</span>`),
+      ...(m.tvSpanish||[]).map(ch=>`<span class="bc-chip bc-esp">${ch}</span>`),
+      ...(m.streaming||[]).map(s=>`<span class="bc-chip bc-stream">${s}</span>`),
+    ].join('');
+    card.innerHTML = `
+      <div class="match-meta">
+        <span class="match-group-badge">Group ${m.group}</span>
+        <span class="match-time">${m.timeLocal} ${m.tz}</span>
+        <span class="match-venue">${m.venue}, ${m.city}</span>
+      </div>
+      <div class="match-teams">
+        <div class="match-team match-team--home">
+          <span class="match-flag">${teamFlag(m.home)}</span>
+          <span class="match-name">${teamName(m.home)}</span>
+        </div>
+        <div class="match-score-block">
+          ${played
+            ? `<span class="match-score">${m.homeScore} – ${m.awayScore}</span>`
+            : `<span class="match-score-dash">vs</span>`}
+        </div>
+        <div class="match-team match-team--away">
+          <span class="match-name">${teamName(m.away)}</span>
+          <span class="match-flag">${teamFlag(m.away)}</span>
+        </div>
+      </div>
+      ${broadcastHtml ? `<div class="match-broadcast">${broadcastHtml}</div>` : ''}
+      ${isAdmin ? `<div class="match-admin" data-match-id="${m.id}">
+        <input type="number" class="score-input" placeholder="Home" min="0" value="${m.homeScore ?? ''}" data-field="home">
+        <span>–</span>
+        <input type="number" class="score-input" placeholder="Away" min="0" value="${m.awayScore ?? ''}" data-field="away">
+        <button class="btn btn-sm btn-primary save-score-btn">Save</button>
+      </div>` : ''}`;
+    if (isAdmin) {
+      card.querySelector('.save-score-btn')?.addEventListener('click', () => {
+        const homeVal = card.querySelector('[data-field="home"]')?.value;
+        const awayVal = card.querySelector('[data-field="away"]')?.value;
+        const hs = homeVal !== '' ? parseInt(homeVal) : null;
+        const as = awayVal !== '' ? parseInt(awayVal) : null;
+        updateMatchResult(m.id, hs, as);
+      });
+    }
+    return card;
+  }
+
+  // ─── Standings tab ────────────────────────────────────────────────────────
+  function renderStandings() {
+    const container = document.getElementById('standings-container');
+    if (!container) return;
+    container.innerHTML = '';
+    WC_GROUPS.forEach(group => {
+      const gm = liveMatches.filter(m => m.group === group.id);
+      const standings = calcPoints(group.teams, gm);
+      const card = document.createElement('div');
+      card.className = 'standings-card';
+      card.innerHTML = `
+        <h3 class="standings-group-title">Group ${group.id}</h3>
+        <table class="standings-table">
+          <thead><tr><th>#</th><th>Team</th><th>Pts</th><th>GD</th></tr></thead>
+          <tbody>${standings.map((row, i) => `
+            <tr class="${i < 2 ? 'qualify-row' : 'eliminated-row'}">
+              <td>${i + 1}</td>
+              <td><span>${row.team.flag}</span> ${row.team.name}</td>
+              <td><strong>${row.pts}</strong></td>
+              <td>${row.gd > 0 ? '+' : ''}${row.gd}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>`;
+      container.appendChild(card);
+    });
+  }
+
+  // ─── Predictions: My Picks ────────────────────────────────────────────────
+  function renderPredictions() {
+    const container = document.getElementById('pred-picks-container');
+    if (!container) return;
+    if (!currentUser) {
+      container.innerHTML = `<div class="auth-prompt"><p>Sign in to make predictions.</p>
+        <button class="btn btn-primary pred-signin-btn">Sign In</button></div>`;
+      container.querySelector('.pred-signin-btn')?.addEventListener('click', openModal);
+      return;
+    }
+    let matches = liveMatches.filter(m => m.group);
+    if (predFilters.group !== 'all') matches = matches.filter(m => m.group === predFilters.group);
+    if (predFilters.status === 'unpredicted') matches = matches.filter(m => !userPredictions[m.id]);
+    if (predFilters.status === 'predicted')   matches = matches.filter(m =>  userPredictions[m.id]);
+    if (!matches.length) {
+      container.innerHTML = '<div class="empty-filter-msg">No matches to show.</div>';
+      return;
+    }
+    const byDate = {};
+    matches.forEach(m => { (byDate[m.date] = byDate[m.date] || []).push(m); });
+    container.innerHTML = '';
+    Object.keys(byDate).sort().forEach(date => {
+      const section = document.createElement('div');
+      section.className = 'pred-date-section';
+      const d = new Date(date + 'T12:00:00');
+      section.innerHTML = `<h3 class="pred-date-header">${d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</h3>`;
+      byDate[date].forEach(m => section.appendChild(buildPredCard(m)));
+      container.appendChild(section);
+    });
+  }
+
+  function buildPredCard(m) {
+    const pred = userPredictions[m.id] || {};
+    const played = m.homeScore != null;
+    const card = document.createElement('div');
+    card.className = 'pred-card';
+    const homeScore = pred.homeScorePred ?? '';
+    const awayScore = pred.awayScorePred ?? '';
+    card.innerHTML = `
+      <div class="pred-card-teams">
+        <span class="pred-flag">${teamFlag(m.home)}</span>
+        <span class="pred-team-name">${teamName(m.home)}</span>
+        <input type="number" class="pred-input" min="0" max="20" value="${homeScore}" placeholder="-" data-field="home">
+        <span class="pred-sep">:</span>
+        <input type="number" class="pred-input" min="0" max="20" value="${awayScore}" placeholder="-" data-field="away">
+        <span class="pred-team-name pred-team-name--away">${teamName(m.away)}</span>
+        <span class="pred-flag">${teamFlag(m.away)}</span>
+      </div>
+      ${played ? `<div class="pred-result-row">Result: <strong>${m.homeScore} – ${m.awayScore}</strong></div>` : ''}`;
+    const saveInput = async () => {
+      if (!currentUser) return;
+      const h = card.querySelector('[data-field="home"]')?.value;
+      const a = card.querySelector('[data-field="away"]')?.value;
+      if (h === '' && a === '') return;
+      const hs = h !== '' ? parseInt(h) : null;
+      const as = a !== '' ? parseInt(a) : null;
+      await savePrediction(currentUser.uid, m.id, hs, as);
+      userPredictions[m.id] = { homeScorePred: hs, awayScorePred: as };
+    };
+    card.querySelectorAll('.pred-input').forEach(inp => {
+      inp.addEventListener('change', saveInput);
+      inp.addEventListener('blur',   saveInput);
+    });
+    return card;
+  }
+
+  // ─── Predictions: Predicted Group Standings ───────────────────────────────
+  function renderPredGroupStandings() {
+    const container = document.getElementById('pred-group-standings-container');
+    if (!container) return;
+    if (!currentUser) {
+      container.innerHTML = `<div class="auth-prompt"><p>Sign in to see your predicted standings.</p>
+        <button class="btn btn-primary pred-standings-signin-btn">Sign In</button></div>`;
+      container.querySelectorAll('.pred-standings-signin-btn').forEach(b => b.addEventListener('click', openModal));
+      return;
+    }
+    container.innerHTML = '';
+    WC_GROUPS.forEach(group => {
+      const gm = liveMatches.filter(m => m.group === group.id);
+      const standings = calcPredPoints(group.teams, gm);
+      const hasPreds = standings.some(r => r.played > 0);
+      const card = document.createElement('div');
+      card.className = 'standings-card';
+      card.innerHTML = `
+        <h3 class="standings-group-title">Group ${group.id} <span style="font-weight:400;font-size:0.75em;color:var(--color-text-muted)">(predicted)</span></h3>
+        ${!hasPreds
+          ? '<p class="empty-filter-msg" style="padding:var(--space-4)">No predictions yet</p>'
+          : `<table class="standings-table">
+              <thead><tr><th>#</th><th>Team</th><th>Pts</th><th>GD</th></tr></thead>
+              <tbody>${standings.map((row, i) => `
+                <tr class="${i < 2 ? 'qualify-row' : 'eliminated-row'}">
+                  <td>${i + 1}</td>
+                  <td><span>${row.team.flag}</span> ${row.team.name}</td>
+                  <td><strong>${row.pts}</strong></td>
+                  <td>${row.gd > 0 ? '+' : ''}${row.gd}</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>`}
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  // ─── Predictions: Leaderboard ─────────────────────────────────────────────
+  function renderPredStandings() {
+    const container = document.getElementById('pred-standings-container');
+    if (!container) return;
+    if (!currentUser) {
+      container.innerHTML = `<div class="auth-prompt"><p>Sign in to see the leaderboard.</p>
+        <button class="btn btn-primary pred-standings-signin-btn">Sign In</button></div>`;
+      container.querySelectorAll('.pred-standings-signin-btn').forEach(b => b.addEventListener('click', openModal));
+      return;
+    }
+    const groupMatches = liveMatches.filter(m => m.group && m.homeScore != null);
+    let correct = 0, correctExact = 0, total = 0;
+    groupMatches.forEach(m => {
+      const pred = userPredictions[m.id];
+      if (!pred || pred.homeScorePred == null) return;
+      total++;
+      const predWinner = pred.homeScorePred > pred.awayScorePred ? 'home'
+                       : pred.homeScorePred < pred.awayScorePred ? 'away' : 'draw';
+      const realWinner = m.homeScore > m.awayScore ? 'home'
+                       : m.homeScore < m.awayScore ? 'away' : 'draw';
+      if (predWinner === realWinner) correct++;
+      if (pred.homeScorePred === m.homeScore && pred.awayScorePred === m.awayScore) correctExact++;
+    });
+    const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
     container.innerHTML = `
       <div class="pred-stats-grid">
         <div class="pred-stat-card">
@@ -645,7 +528,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
           <div class="pred-stat-label">Matches Predicted</div>
         </div>
         <div class="pred-stat-card">
-          <div class="pred-stat-value">${correctResult}</div>
+          <div class="pred-stat-value">${correct}</div>
           <div class="pred-stat-label">Correct Results</div>
         </div>
         <div class="pred-stat-card">
@@ -660,7 +543,8 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
   }
 
   // ─── Knockout Bracket ─────────────────────────────────────────────────────
-  let bracketPicks = {};
+  let bracketPicks = {};   // matchId → 'home' | 'away'
+  let bracketView  = 'overlay'; // 'my' | 'actual' | 'overlay'
 
   function saveBracketPicks() {
     if (!currentUser) return;
@@ -674,158 +558,416 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     } catch(e) { bracketPicks = {}; }
   }
 
-  function getActualGroupFinisher(groupId, rank) {
-    const group = WC_GROUPS.find(g => g.id === groupId);
-    if (!group) return null;
-    const gm = liveMatches.filter(m => m.group === groupId);
-    if (gm.some(m => m.homeScore == null)) return null;
-    const standings = calcPoints(group.teams, gm);
-    return standings[rank - 1]?.team || null;
+  // Resolve actual match result from liveMatches
+  function getActualWinner(matchId) {
+    const m = liveMatches.find(m => m.id === matchId);
+    if (!m || m.homeScore == null || m.awayScore == null) return null;
+    if (m.homeScore > m.awayScore) return 'home';
+    if (m.awayScore > m.homeScore) return 'away';
+    return null; // draw — should not happen in KO
   }
 
-  function getPredictedGroupFinisher(groupId, rank) {
-    const group = WC_GROUPS.find(g => g.id === groupId);
-    if (!group) return null;
-    const gm = liveMatches.filter(m => m.group === groupId);
-    if (!gm.some(m => userPredictions[m.id]?.homeScorePred != null)) return null;
-    return calcPredPoints(group.teams, gm)[rank - 1]?.team || null;
+  // Resolve team object for a slot in the bracket
+  // mode: 'pick' = user predictions, 'actual' = real results
+  function resolveSlot(slot, mode, depth) {
+    if (depth === undefined) depth = 0;
+    if (depth > 10 || !slot) return null;
+
+    // Group slot e.g. '1A', '2B'
+    if (typeof slot === 'string') {
+      const groupMatch = slot.match(/^(\d)([A-L])$/);
+      if (groupMatch) {
+        const rank = parseInt(groupMatch[1]);
+        const gid  = groupMatch[2];
+        const group = WC_GROUPS.find(g => g.id === gid);
+        if (!group) return null;
+        const gm = liveMatches.filter(m => m.group === gid);
+        if (mode === 'actual') {
+          if (gm.some(m => m.homeScore == null)) return null;
+          return calcPoints(group.teams, gm)[rank - 1]?.team || null;
+        } else {
+          if (!gm.some(m => userPredictions[m.id]?.homeScorePred != null)) return null;
+          return calcPredPoints(group.teams, gm)[rank - 1]?.team || null;
+        }
+      }
+    }
+
+    // Winner slot from a knockout match ID
+    const fixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === slot);
+    if (!fixture) return null;
+
+    if (mode === 'actual') {
+      const w = getActualWinner(slot);
+      if (!w) return null;
+      const src = w === 'home' ? fixture.homeSource : fixture.awaySource;
+      if (!src) return w === 'home' ? fixture.home : fixture.away;
+      if (src.type === 'group') return resolveSlot(`${src.pos}${src.group}`, mode, depth + 1);
+      if (src.type === 'winner') return resolveSlot(src.matchId, mode, depth + 1);
+      return w === 'home' ? fixture.home : fixture.away;
+    } else {
+      const pick = bracketPicks[slot];
+      if (!pick) return null;
+      const src = pick === 'home' ? fixture.homeSource : fixture.awaySource;
+      if (!src) return pick === 'home' ? fixture.home : fixture.away;
+      if (src.type === 'group') return resolveSlot(`${src.pos}${src.group}`, mode, depth + 1);
+      if (src.type === 'winner') return resolveSlot(src.matchId, mode, depth + 1);
+      return pick === 'home' ? fixture.home : fixture.away;
+    }
   }
 
-  function resolveKnockoutTeam(slot, depth = 0) {
-    if (depth > 10 || !slot) return slot;
-    const groupMatch = slot.match(/^(\d)([A-Z])$/);
-    if (groupMatch) {
-      const t = getActualGroupFinisher(groupMatch[2], parseInt(groupMatch[1]))
-             || getPredictedGroupFinisher(groupMatch[2], parseInt(groupMatch[1]));
-      return t ? teamName(t) : slot;
+  // Resolve both teams that will play in a fixture
+  function resolveFixtureTeams(fixture, mode) {
+    function resolveSource(src, fallback) {
+      if (!src) return fallback;
+      if (src.type === 'group') return resolveSlot(`${src.pos}${src.group}`, mode) || fallback;
+      if (src.type === 'winner') return resolveSlot(src.matchId, mode) || fallback;
+      return fallback;
     }
-    const winnerMatch = slot.match(/^W(\d+)$/);
-    if (winnerMatch) {
-      const matchId = parseInt(winnerMatch[1]);
-      const fixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === matchId);
-      const pick    = bracketPicks[matchId];
-      if (!fixture || !pick) return slot;
-      return pick === 'home'
-        ? resolveKnockoutTeam(fixture.home, depth + 1)
-        : resolveKnockoutTeam(fixture.away, depth + 1);
-    }
-    return slot;
+    return {
+      homeTeam: resolveSource(fixture.homeSource, fixture.home),
+      awayTeam: resolveSource(fixture.awaySource, fixture.away),
+    };
   }
 
   function clearDownstreamPicks(matchId) {
-    const toVisit = [matchId], visited = new Set();
-    while (toVisit.length) {
-      const id = toVisit.pop();
+    const queue = [matchId], visited = new Set();
+    while (queue.length) {
+      const id = queue.shift();
       if (visited.has(id)) continue;
       visited.add(id);
       delete bracketPicks[id];
       WC_KNOCKOUT_FIXTURES.forEach(f => {
-        if (f.home === `W${id}` || f.away === `W${id}`) toVisit.push(f.id);
+        if (f.homeSource?.matchId === id || f.awaySource?.matchId === id) queue.push(f.id);
       });
     }
+  }
+
+  function bracketAccuracy() {
+    let correct = 0, total = 0;
+    WC_KNOCKOUT_FIXTURES.forEach(f => {
+      const actual = getActualWinner(f.id);
+      if (!actual) return;
+      total++;
+      if (bracketPicks[f.id] && bracketPicks[f.id] === actual) correct++;
+    });
+    return { correct, total };
   }
 
   function renderKnockoutBracket() {
     const container = document.getElementById('pred-bracket-container');
     if (!container) return;
     if (!currentUser) {
-      container.innerHTML = `<div class="auth-prompt"><p>Sign in to view your predicted bracket.</p><button class="btn btn-primary pred-standings-signin-btn">Sign In</button></div>`;
+      container.innerHTML = `<div class="auth-prompt"><p>Sign in to view your predicted bracket.</p>
+        <button class="btn btn-primary pred-standings-signin-btn">Sign In</button></div>`;
       container.querySelectorAll('.pred-standings-signin-btn').forEach(b => b.addEventListener('click', openModal));
       return;
     }
     loadBracketPicks();
-    const rounds = [
-      { label: 'Round of 32',    ids: [49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64] },
-      { label: 'Round of 16',    ids: [65,66,67,68,69,70,71,72] },
-      { label: 'Quarter-Finals', ids: [73,74,75,76] },
-      { label: 'Semi-Finals',    ids: [77,78] },
-      { label: 'Final',          ids: [79] },
-    ];
-    const totalPicks = rounds.reduce((s, r) => s + r.ids.length, 0);
-    const madePicks  = rounds.reduce((s, r) => s + r.ids.filter(id => bracketPicks[id]).length, 0);
-    const pct        = Math.round((madePicks / totalPicks) * 100);
     container.innerHTML = '';
-    const header = document.createElement('div');
-    header.className = 'bracket-header';
-    header.innerHTML = `
-      <div class="bracket-progress">
-        <span>${madePicks}/${totalPicks} picks made</span>
-        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+
+    // ── Accuracy banner ──
+    const acc = bracketAccuracy();
+    const totalPossible = WC_KNOCKOUT_FIXTURES.length;
+    const madePicks = WC_KNOCKOUT_FIXTURES.filter(f => bracketPicks[f.id]).length;
+    const pct = totalPossible > 0 ? Math.round((madePicks / totalPossible) * 100) : 0;
+    const accPct = acc.total > 0 ? Math.round((acc.correct / acc.total) * 100) : null;
+
+    const roundDefs = [
+      { label:'R32',   prefix:'r32-' },
+      { label:'R16',   prefix:'r16-' },
+      { label:'QF',    prefix:'qf-'  },
+      { label:'SF',    prefix:'sf-'  },
+      { label:'Final', prefix:'final' },
+    ];
+
+    const banner = document.createElement('div');
+    banner.className = 'bracket-accuracy-banner';
+    banner.innerHTML = `
+      <div class="bab-main">
+        <div class="bab-picks-group">
+          <span class="bab-icon">📋</span>
+          <div class="bab-text">
+            <div class="bab-stat-value">${madePicks}<span class="bab-of">/${totalPossible}</span></div>
+            <div class="bab-stat-label">Picks Made</div>
+          </div>
+          <div class="bab-progress-wrap">
+            <div class="bab-progress-bar"><div class="bab-progress-fill" style="width:${pct}%"></div></div>
+            <span class="bab-pct">${pct}%</span>
+          </div>
+        </div>
+        ${acc.total > 0 ? `
+        <div class="bab-divider"></div>
+        <div class="bab-accuracy-group">
+          <span class="bab-icon">🎯</span>
+          <div class="bab-text">
+            <div class="bab-stat-value bab-correct">${acc.correct}<span class="bab-of">/${acc.total}</span></div>
+            <div class="bab-stat-label">Correct</div>
+          </div>
+          ${accPct !== null ? `<div class="bab-accuracy-ring">${accPct}%</div>` : ''}
+        </div>` : ''}
+      </div>
+      <div class="bab-rounds">
+        ${roundDefs.map(({ label, prefix }) => {
+          const ids = prefix === 'final'
+            ? WC_KNOCKOUT_FIXTURES.filter(f => f.id === 'final')
+            : WC_KNOCKOUT_FIXTURES.filter(f => f.id.startsWith(prefix));
+          const done = ids.filter(f => bracketPicks[f.id]).length;
+          const full = done === ids.length && ids.length > 0;
+          return `<span class="bab-round-chip ${full ? 'bab-round-chip--done' : ''}">${label} ${done}/${ids.length}</span>`;
+        }).join('')}
+      </div>`;
+    container.appendChild(banner);
+
+    // ── View toggle + actions toolbar ──
+    const toolbar = document.createElement('div');
+    toolbar.className = 'bracket-toolbar';
+    toolbar.innerHTML = `
+      <div class="bracket-view-toggle" role="group" aria-label="Bracket view mode">
+        <button class="bvt-btn${bracketView==='my'?' bvt-active':''}" data-bview="my">My Picks</button>
+        <button class="bvt-btn${bracketView==='actual'?' bvt-active':''}" data-bview="actual">Actual</button>
+        <button class="bvt-btn${bracketView==='overlay'?' bvt-active':''}" data-bview="overlay">Overlay ✨</button>
       </div>
       <div class="bracket-actions">
-        <button class="btn btn-sm btn-ghost" id="bracket-seed-btn">Seed from Results</button>
+        <button class="btn btn-sm btn-ghost" id="bracket-seed-btn">Seed from Groups</button>
         <button class="btn btn-sm btn-ghost" id="bracket-reset-all-btn">Reset All</button>
       </div>`;
-    container.appendChild(header);
-    const scrollArea = document.createElement('div');
-    scrollArea.className = 'bracket-scroll';
-    container.appendChild(scrollArea);
+    container.appendChild(toolbar);
+
+    toolbar.querySelectorAll('.bvt-btn').forEach(btn => {
+      btn.addEventListener('click', () => { bracketView = btn.dataset.bview; renderKnockoutBracket(); });
+    });
+
+    // ── Bracket scroll wrapper ──
+    const scrollWrap = document.createElement('div');
+    scrollWrap.className = 'bracket-scroll';
+    container.appendChild(scrollWrap);
+
+    const bracketEl = document.createElement('div');
+    bracketEl.className = 'bracket';
+    scrollWrap.appendChild(bracketEl);
+
+    const rounds = [
+      { label: 'Round of 32',    ids: ['r32-1','r32-2','r32-3','r32-4','r32-5','r32-6','r32-7','r32-8','r32-9','r32-10','r32-11','r32-12','r32-13','r32-14','r32-15','r32-16'] },
+      { label: 'Round of 16',    ids: ['r16-1','r16-2','r16-3','r16-4','r16-5','r16-6','r16-7','r16-8'] },
+      { label: 'Quarter-Finals', ids: ['qf-1','qf-2','qf-3','qf-4'] },
+      { label: 'Semi-Finals',    ids: ['sf-1','sf-2'] },
+      { label: 'Final',          ids: ['final'] },
+    ];
+
     rounds.forEach(round => {
-      const roundEl  = document.createElement('div');
+      const roundEl = document.createElement('div');
       roundEl.className = 'bracket-round';
+      if (round.ids[0] === 'final') roundEl.classList.add('bracket-round--final');
+
       const labelEl = document.createElement('div');
       labelEl.className = 'bracket-round-label';
-      labelEl.textContent = round.label;
       const resetBtn = document.createElement('button');
-      resetBtn.className = 'btn btn-xs btn-ghost bracket-round-reset';
-      resetBtn.textContent = 'Reset';
+      resetBtn.className = 'bracket-reset-round';
+      resetBtn.textContent = '↺';
+      resetBtn.title = `Reset ${round.label}`;
       resetBtn.addEventListener('click', () => {
         round.ids.forEach(id => clearDownstreamPicks(id));
         saveBracketPicks(); renderKnockoutBracket();
       });
+      labelEl.appendChild(document.createTextNode(round.label));
       labelEl.appendChild(resetBtn);
       roundEl.appendChild(labelEl);
+
+      const matchesEl = document.createElement('div');
+      matchesEl.className = 'bracket-matches';
+      roundEl.appendChild(matchesEl);
+      bracketEl.appendChild(roundEl);
+
       round.ids.forEach(matchId => {
-        const fixture  = WC_KNOCKOUT_FIXTURES.find(f => f.id === matchId);
+        const fixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === matchId);
         if (!fixture) return;
-        const homeTeam = resolveKnockoutTeam(fixture.home);
-        const awayTeam = resolveKnockoutTeam(fixture.away);
-        const pick     = bracketPicks[matchId];
-        const matchEl  = document.createElement('div');
+
+        const myTeams      = resolveFixtureTeams(fixture, 'pick');
+        const actualTeams  = resolveFixtureTeams(fixture, 'actual');
+        const myPick       = bracketPicks[matchId];
+        const actualResult = getActualWinner(matchId);
+
+        const matchEl = document.createElement('div');
         matchEl.className = 'bracket-match';
-        const homeEl = document.createElement('div');
-        homeEl.className = 'bracket-team' + (pick === 'home' ? ' picked' : '');
-        homeEl.textContent = homeTeam || fixture.home;
-        homeEl.addEventListener('click', () => {
-          if (bracketPicks[matchId] !== 'home') clearDownstreamPicks(matchId);
-          bracketPicks[matchId] = 'home';
-          saveBracketPicks(); renderKnockoutBracket();
-        });
-        const awayEl = document.createElement('div');
-        awayEl.className = 'bracket-team' + (pick === 'away' ? ' picked' : '');
-        awayEl.textContent = awayTeam || fixture.away;
-        awayEl.addEventListener('click', () => {
-          if (bracketPicks[matchId] !== 'away') clearDownstreamPicks(matchId);
-          bracketPicks[matchId] = 'away';
-          saveBracketPicks(); renderKnockoutBracket();
-        });
-        matchEl.appendChild(homeEl);
-        matchEl.appendChild(awayEl);
-        roundEl.appendChild(matchEl);
+        if (actualResult) matchEl.classList.add('bracket-match--played');
+        if (bracketView === 'overlay') matchEl.classList.add('bracket-match--overlay');
+
+        const buildTeamRow = (side) => {
+          const myTeam    = side === 'home' ? myTeams.homeTeam    : myTeams.awayTeam;
+          const actTeam   = side === 'home' ? actualTeams.homeTeam : actualTeams.awayTeam;
+          const isMyPick  = myPick === side;
+          const isActWin  = actualResult === side;
+
+          const isTbd = (t) => !t || (t.name && (
+            t.name.startsWith('W ') ||
+            t.name.startsWith('Best') ||
+            /^[12][A-L]$/.test(t.name)
+          ));
+
+          // Correctness state for overlay
+          let rowState = '';
+          if (bracketView === 'overlay' && actualResult) {
+            if (isMyPick && isActWin)  rowState = 'correct';
+            else if (isMyPick)         rowState = 'wrong';
+            else if (isActWin)         rowState = 'actual-winner';
+          }
+
+          const row = document.createElement('button');
+          row.className = 'bracket-team bracket-team--' + side;
+          if (isMyPick) row.classList.add('bracket-team--picked');
+          if (isActWin && bracketView !== 'my') row.classList.add('bracket-team--winner');
+          if (rowState) row.classList.add('bracket-team--' + rowState);
+          if (actualResult && !isActWin && bracketView === 'actual') row.classList.add('bracket-team--eliminated');
+
+          if (bracketView === 'overlay') {
+            const myName  = isTbd(myTeam)  ? '—' : teamName(myTeam);
+            const myFlag  = isTbd(myTeam)  ? '' : teamFlag(myTeam);
+            const actName = isTbd(actTeam) ? 'TBD' : teamName(actTeam);
+            const actFlag = isTbd(actTeam) ? '' : teamFlag(actTeam);
+            row.innerHTML = `
+              <div class="bt-overlay-row">
+                <div class="bt-pred-side ${isMyPick?'bt-pred-side--picked':''}">
+                  <span class="bt-col-label">Pred</span>
+                  <span class="bt-flag">${myFlag}</span>
+                  <span class="bt-name">${myName}</span>
+                  ${isMyPick ? '<span class="bt-pick-indicator"></span>' : ''}
+                </div>
+                <div class="bt-divider-v"></div>
+                <div class="bt-actual-side ${isActWin?'bt-actual-side--winner':''}">
+                  <span class="bt-col-label">Actual</span>
+                  <span class="bt-flag">${actFlag}</span>
+                  <span class="bt-name">${actName}</span>
+                  ${rowState === 'correct' ? '<span class="bt-result bt-result--correct">✓</span>' :
+                    rowState === 'wrong'   ? '<span class="bt-result bt-result--wrong">✗</span>' :
+                    isActWin              ? '<span class="bt-result bt-result--win">W</span>' : ''}
+                </div>
+              </div>`;
+          } else if (bracketView === 'actual') {
+            const name = isTbd(actTeam) ? (side==='home' ? fixture.home?.name : fixture.away?.name) || 'TBD' : teamName(actTeam);
+            const flag = isTbd(actTeam) ? '' : teamFlag(actTeam);
+            row.innerHTML = `
+              <span class="bracket-flag">${flag}</span>
+              <span class="bracket-name ${isTbd(actTeam)?'bracket-team--tbd':''}">${name}</span>
+              ${isActWin ? '<span class="bracket-check">✓</span>' : ''}`;
+          } else {
+            const name = isTbd(myTeam) ? (side==='home' ? fixture.home?.name : fixture.away?.name) || 'TBD' : teamName(myTeam);
+            const flag = isTbd(myTeam) ? '' : teamFlag(myTeam);
+            row.innerHTML = `
+              <span class="bracket-flag">${flag}</span>
+              <span class="bracket-name ${isTbd(myTeam)?'bracket-team--tbd':''}">${name}</span>
+              ${isMyPick ? '<span class="bracket-check">✓</span>' : ''}`;
+          }
+
+          row.addEventListener('click', () => {
+            if (bracketView === 'actual') return;
+            if (bracketPicks[matchId] !== side) clearDownstreamPicks(matchId);
+            bracketPicks[matchId] = side;
+            saveBracketPicks(); renderKnockoutBracket();
+          });
+          return row;
+        };
+
+        const homeRow = buildTeamRow('home');
+        const vsEl = document.createElement('div');
+        vsEl.className = 'bracket-vs';
+        vsEl.textContent = 'vs';
+        const awayRow = buildTeamRow('away');
+
+        const dateEl = document.createElement('div');
+        dateEl.className = 'bracket-date';
+        if (fixture.date) {
+          const d = new Date(fixture.date + 'T12:00:00');
+          dateEl.textContent = d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+        }
+
+        matchEl.appendChild(homeRow);
+        matchEl.appendChild(vsEl);
+        matchEl.appendChild(awayRow);
+        if (fixture.date) matchEl.appendChild(dateEl);
+        matchesEl.appendChild(matchEl);
       });
-      scrollArea.appendChild(roundEl);
     });
-    const finalPick    = bracketPicks[79];
-    const finalFixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === 79);
-    let champion = null;
-    if (finalPick && finalFixture) {
-      champion = finalPick === 'home'
-        ? resolveKnockoutTeam(finalFixture.home)
-        : resolveKnockoutTeam(finalFixture.away);
+
+    // ── Champion column ──
+    const finalFixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === 'final');
+    let myChamp = null, actualChamp = null;
+    if (finalFixture) {
+      const myPick = bracketPicks['final'];
+      if (myPick) {
+        const src = myPick === 'home' ? finalFixture.homeSource : finalFixture.awaySource;
+        if (src?.type === 'winner') myChamp = resolveSlot(src.matchId, 'pick');
+        else if (src?.type === 'group') myChamp = resolveSlot(`${src.pos}${src.group}`, 'pick');
+        if (!myChamp) myChamp = myPick === 'home' ? finalFixture.home : finalFixture.away;
+      }
+      const actualWin = getActualWinner('final');
+      if (actualWin) {
+        const src = actualWin === 'home' ? finalFixture.homeSource : finalFixture.awaySource;
+        if (src?.type === 'winner') actualChamp = resolveSlot(src.matchId, 'actual');
+        else if (src?.type === 'group') actualChamp = resolveSlot(`${src.pos}${src.group}`, 'actual');
+        if (!actualChamp) actualChamp = actualWin === 'home' ? finalFixture.home : finalFixture.away;
+      }
     }
-    const champEl = document.createElement('div');
-    champEl.className = 'bracket-round bracket-champion';
-    champEl.innerHTML = `
-      <div class="bracket-round-label">Champion</div>
-      <div class="champion-card">${champion
-        ? `<span class="trophy">🏆</span><span>${champion}</span>`
-        : '<span class="muted">TBD</span>'}</div>`;
-    scrollArea.appendChild(champEl);
+
+    const champRound = document.createElement('div');
+    champRound.className = 'bracket-round bracket-round--champion';
+    const champLabel = document.createElement('div');
+    champLabel.className = 'bracket-round-label';
+    champLabel.textContent = 'Champion';
+    champRound.appendChild(champLabel);
+
+    const champCard = document.createElement('div');
+    champCard.className = 'bracket-champion';
+
+    if (bracketView === 'overlay') {
+      const myName  = myChamp     ? teamName(myChamp)     : null;
+      const myFlag  = myChamp     ? teamFlag(myChamp)     : '';
+      const actName = actualChamp ? teamName(actualChamp) : null;
+      const actFlag = actualChamp ? teamFlag(actualChamp) : '';
+      const isCorrect = myName && actName && myName === actName;
+      champCard.innerHTML = `
+        <div class="bracket-champion-trophy">🏆</div>
+        <div class="champion-overlay-grid">
+          <div class="champion-col champion-col--pred">
+            <div class="champion-col-label">Your Pick</div>
+            ${myChamp ? `<div class="champion-flag">${myFlag}</div><div class="champion-name">${myName}</div>` : '<div class="champion-tbd">Make picks →</div>'}
+          </div>
+          ${actualChamp ? `
+          <div class="champion-col champion-col--actual">
+            <div class="champion-col-label">Champion 🥇</div>
+            <div class="champion-flag">${actFlag}</div>
+            <div class="champion-name champion-name--actual">${actName}</div>
+            ${isCorrect ? '<div class="champion-correct-badge">🎉 Correct!</div>' : ''}
+          </div>` : ''}
+        </div>`;
+    } else if (bracketView === 'actual') {
+      champCard.innerHTML = actualChamp
+        ? `<div class="bracket-champion-trophy">🏆</div>
+           <div class="bracket-champion-flag">${teamFlag(actualChamp)}</div>
+           <div class="bracket-champion-name">${teamName(actualChamp)}</div>`
+        : `<div class="bracket-champion-trophy" style="opacity:0.3">🏆</div>
+           <div class="bracket-champion-empty">To be determined</div>`;
+    } else {
+      champCard.innerHTML = myChamp
+        ? `<div class="bracket-champion-trophy">🏆</div>
+           <div class="bracket-champion-flag">${teamFlag(myChamp)}</div>
+           <div class="bracket-champion-name">${teamName(myChamp)}</div>`
+        : `<div class="bracket-champion-trophy" style="opacity:0.3">🏆</div>
+           <div class="bracket-champion-empty">Pick a champion</div>`;
+    }
+
+    champRound.appendChild(champCard);
+    bracketEl.appendChild(champRound);
+
+    // ── Toolbar button handlers ──
     container.querySelector('#bracket-reset-all-btn')?.addEventListener('click', () => {
-      bracketPicks = {}; saveBracketPicks(); renderKnockoutBracket();
+      if (confirm('Reset all bracket picks?')) {
+        bracketPicks = {}; saveBracketPicks(); renderKnockoutBracket();
+      }
     });
     container.querySelector('#bracket-seed-btn')?.addEventListener('click', () => {
-      WC_KNOCKOUT_FIXTURES.forEach(f => { if (!bracketPicks[f.id]) bracketPicks[f.id] = 'home'; });
+      const r32ids = ['r32-1','r32-2','r32-3','r32-4','r32-5','r32-6','r32-7','r32-8',
+                      'r32-9','r32-10','r32-11','r32-12','r32-13','r32-14','r32-15','r32-16'];
+      r32ids.forEach(id => { if (!bracketPicks[id]) bracketPicks[id] = 'home'; });
       saveBracketPicks(); renderKnockoutBracket();
     });
   }
@@ -833,8 +975,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
   // ─── Init ─────────────────────────────────────────────────────────────────
   function init() {
     populateMatchFilters();
-    // Note: populatePredFilters() is NOT called here — it runs lazily
-    // inside renderPredictions() the first time the user visits that tab.
+    populatePredFilters();
     renderGroups();
   }
   init();
