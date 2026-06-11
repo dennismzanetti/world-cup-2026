@@ -5,13 +5,13 @@
 // Requires: FIREBASE_SERVICE_ACCOUNT_JSON (GitHub Secret)
 
 import fetch from 'node-fetch';
-import admin from 'firebase-admin';
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
 // ─── Firebase Admin Init ─────────────────────────────────────────────────────
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
-admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-const db = admin.firestore();
-db.settings({ databaseId: 'wc2026' });
+const app = initializeApp({ credential: cert(serviceAccount) });
+const db  = getFirestore(app, 'wc2026');
 
 const HEADERS = { 'User-Agent': 'world-cup-2026-sync/1.0' };
 
