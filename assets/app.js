@@ -212,6 +212,10 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     '3P': 'Third Place', F: 'Final'
   }[key] || (/^[A-Z]$/.test(key) ? `Group ${key}` : key));
 
+  // ─── Stage key extractor ─────────────────────────────────────────────────
+  // Returns the filter key used in dropdowns and filtering
+  function matchStageKey(m) { return m.group || m.stage || null; }
+
   // ─── Populate filters ─────────────────────────────────────────────────────
   function populateMatchFilters() {
     const dateEl  = document.getElementById('match-date-filter');
@@ -223,7 +227,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
         dates.map(d => `<option value="${d}">${d}</option>`).join('');
     }
     if (stageEl) {
-      const stages = [...new Set(liveMatches.map(m => m.group || m.stage).filter(Boolean))];
+      const stages = [...new Set(liveMatches.map(m => matchStageKey(m)).filter(Boolean))];
       stageEl.innerHTML = '<option value="all">All Stages</option>' +
         stages.map(s => `<option value="${s}">${stageKeyToLabel(s)}</option>`).join('');
     }
@@ -237,13 +241,24 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
   function populatePredFilters() {
     const dateEl  = document.getElementById('pred-date-filter');
     const stageEl = document.getElementById('pred-group-filter');
+
+    // Build the full combined match list for filter population
+    const knockoutMatches = WC_KNOCKOUT_FIXTURES.map(f => buildKnockoutPredMatch(f));
+    const allPredMatches  = [...liveMatches, ...knockoutMatches];
+
     if (dateEl) {
-      const dates = [...new Set(liveMatches.map(m => m.date).filter(Boolean))].sort();
+      const dates = [...new Set(allPredMatches.map(m => m.date).filter(Boolean))].sort();
       dateEl.innerHTML = '<option value="all">All Dates</option>' +
         dates.map(d => `<option value="${d}">${d}</option>`).join('');
     }
     if (stageEl) {
-      const stages = [...new Set(liveMatches.map(m => m.group || m.stage).filter(Boolean))];
+      // Group stages first (A–L), then knockout stages in order
+      const groupStages   = [...new Set(liveMatches.filter(m => m.group).map(m => m.group))];
+      const knockoutOrder = ['R32','R16','QF','SF','3P','F'];
+      const stages = [
+        ...groupStages,
+        ...knockoutOrder.filter(s => WC_KNOCKOUT_FIXTURES.some(f => (f.stage || stageFromId(f.id)) === s)),
+      ];
       stageEl.innerHTML = '<option value="all">All Stages</option>' +
         stages.map(s => `<option value="${s}">${stageKeyToLabel(s)}</option>`).join('');
     }
@@ -331,7 +346,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     const teamVal  = (document.getElementById('match-team-filter')?.value || '').toLowerCase().trim();
     let matches = liveMatches.slice();
     if (dateVal  !== 'all') matches = matches.filter(m => m.date === dateVal);
-    if (stageVal !== 'all') matches = matches.filter(m => (m.group || m.stage) === stageVal);
+    if (stageVal !== 'all') matches = matches.filter(m => matchStageKey(m) === stageVal);
     if (venueVal !== 'all') matches = matches.filter(m => m.venue === venueVal);
     if (teamVal)            matches = matches.filter(m =>
       teamName(m.home).toLowerCase().includes(teamVal) ||
@@ -369,69 +384,60 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     return calcPredPoints(group.teams, gm)[rank - 1]?.team || null;
   }
 
-  // ─── Resolve a knockout slot to a team name ───────────────────────────────
-  // source: 'actual' | 'predicted' | 'bracket'
-  // 'actual'    → use real scores only
-  // 'predicted' → use userPredictions for group stage, bracketPicks for knockout
-  // 'bracket'   → bracketPicks only (for bracket display)
+  // ─── Resolve a knockout slot to a team ───────────────────────────────────
   function resolveSlot(slot, source = 'bracket', depth = 0) {
     if (depth > 10 || !slot) return null;
-
-    // Static team object or name
     if (typeof slot === 'object') return slot;
-    if (!slot.match(/^[0-9W]/)) return slot; // literal team name string
+    if (!slot.match(/^[0-9W]/)) return slot;
 
-    // Group finisher slot: e.g. "1A" = 1st place Group A
     const groupMatch = slot.match(/^(\d)([A-Z])$/);
     if (groupMatch) {
       const rank = parseInt(groupMatch[1]);
       const gid  = groupMatch[2];
-      if (source === 'actual') {
-        return getActualGroupFinisher(gid, rank);
-      }
-      // For both 'predicted' and 'bracket': prefer actual results, fall back to predictions
+      if (source === 'actual') return getActualGroupFinisher(gid, rank);
       return getActualGroupFinisher(gid, rank) || getPredictedGroupFinisher(gid, rank);
     }
 
-    // Knockout winner slot: e.g. "W49" = winner of match 49
     const winnerMatch = slot.match(/^W(\d+)$/);
     if (winnerMatch) {
       const matchId = parseInt(winnerMatch[1]);
       const fixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === matchId);
       if (!fixture) return null;
-
-      // Check actual match result first
       const actual = liveMatches.find(m => m.id === matchId);
       if (actual && actual.homeScore != null && actual.awayScore != null && actual.status === 'ft') {
         const winSide = actual.homeScore > actual.awayScore ? fixture.home : fixture.away;
         return resolveSlot(winSide, source, depth + 1);
       }
-
-      // Fall back to bracket pick
       const pick = bracketPicks[matchId];
       if (!pick) return null;
-      const pickedSlot = pick === 'home' ? fixture.home : fixture.away;
-      return resolveSlot(pickedSlot, source, depth + 1);
+      return resolveSlot(pick === 'home' ? fixture.home : fixture.away, source, depth + 1);
     }
 
     return slot;
   }
 
-  // ─── Resolve slot to display string ──────────────────────────────────────
   function resolveSlotDisplay(slot, source = 'bracket') {
     const t = resolveSlot(slot, source);
     if (!t) return typeof slot === 'string' ? slot : '?';
     return typeof t === 'object' ? teamName(t) : t;
   }
 
-  // ─── Resolve slot to team object/name (for card building) ─────────────────
   function resolveSlotTeam(slot, source = 'predicted') {
-    const t = resolveSlot(slot, source);
-    return t || null;
+    return resolveSlot(slot, source) || null;
+  }
+
+  // ─── Stage from fixture id ────────────────────────────────────────────────
+  function stageFromId(id) {
+    if (id >= 49 && id <= 64) return 'R32';
+    if (id >= 65 && id <= 72) return 'R16';
+    if (id >= 73 && id <= 76) return 'QF';
+    if (id >= 77 && id <= 78) return 'SF';
+    if (id === 79)             return 'F';
+    if (id === 80)             return '3P';
+    return 'KO';
   }
 
   // ─── Build a knockout match card for predictions ──────────────────────────
-  // Returns a synthetic match object with resolved team names for buildMatchCard
   function buildKnockoutPredMatch(fixture) {
     const homeResolved = resolveSlotTeam(fixture.home, 'predicted');
     const awayResolved = resolveSlotTeam(fixture.away, 'predicted');
@@ -441,7 +447,6 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     const awayName = awayResolved
       ? (typeof awayResolved === 'object' ? awayResolved : { name: awayResolved })
       : { name: fixture.away };
-    // Find in liveMatches if it exists (has real data/date/venue)
     const live = liveMatches.find(m => m.id === fixture.id);
     return {
       id:        fixture.id,
@@ -459,16 +464,6 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     };
   }
 
-  function stageFromId(id) {
-    if (id >= 49 && id <= 64) return 'R32';
-    if (id >= 65 && id <= 72) return 'R16';
-    if (id >= 73 && id <= 76) return 'QF';
-    if (id >= 77 && id <= 78) return 'SF';
-    if (id === 79)             return 'F';
-    if (id === 80)             return '3P';
-    return 'KO';
-  }
-
   // ─── Match card ───────────────────────────────────────────────────────────
   function buildMatchCard(m, isPred) {
     const card     = document.createElement('div');
@@ -482,15 +477,12 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     const aFlag      = teamFlag(m.away);
     const isLocked   = m.status === 'ft' || m.status === 'final';
 
-    // ── Status badge ────────────────────────────────────────────────────────
     let statusBadge = '';
     if      (m.status === 'live') statusBadge = '<span class="status-badge status-live"><span class="live-dot"></span>Live</span>';
     else if (m.status === 'ht')   statusBadge = '<span class="status-badge status-ht">HT</span>';
     else if (m.status === 'ft' || m.status === 'final') statusBadge = '<span class="status-badge status-ft">FT</span>';
 
-    // ── Centre score column ──────────────────────────────────────────────────
     let scoreColHtml = '';
-
     if (isPred && currentUser) {
       const pred = userPredictions[m.id] || {};
       const hVal = pred.homeScorePred !== undefined ? pred.homeScorePred : '';
@@ -535,10 +527,8 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
       scoreColHtml = `<div class="card-score-col"><span class="${cls}">${hs} – ${as_}</span></div>`;
     }
 
-    // ── Date/time string ────────────────────────────────────────────────────
     const dtStr = [m.date, m.timeLocal, m.tz].filter(Boolean).join(' ');
 
-    // ── Card HTML ────────────────────────────────────────────────────────────
     card.innerHTML = `
       <div class="card-header">
         <span class="card-header-group">${stageLabel}</span>
@@ -567,7 +557,6 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
         </span>` : ''}
       </div>` : ''}`;
 
-    // ── Event listeners ──────────────────────────────────────────────────────
     if (isPred && currentUser) {
       card.querySelector('.save-pred-btn')?.addEventListener('click', async () => {
         const savingEl = card.querySelector('.pred-saving');
@@ -665,18 +654,18 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     const stageVal = document.getElementById('pred-group-filter')?.value || 'all';
     const teamVal  = (document.getElementById('pred-team-filter')?.value || '').toLowerCase().trim();
 
-    // Build group stage matches
+    // Group stage matches
     let groupMatches = liveMatches.filter(m => m.group);
 
-    // Build knockout matches with resolved team names
+    // Knockout matches with resolved team names
     const knockoutMatches = WC_KNOCKOUT_FIXTURES.map(f => buildKnockoutPredMatch(f));
 
-    // Combine all matches
+    // Combine
     let matches = [...groupMatches, ...knockoutMatches];
 
-    // Apply filters
+    // Apply filters — use matchStageKey for consistent stage filtering
     if (dateVal  !== 'all') matches = matches.filter(m => m.date === dateVal);
-    if (stageVal !== 'all') matches = matches.filter(m => (m.group || m.stage) === stageVal);
+    if (stageVal !== 'all') matches = matches.filter(m => matchStageKey(m) === stageVal);
     if (teamVal)            matches = matches.filter(m =>
       teamName(m.home).toLowerCase().includes(teamVal) ||
       teamName(m.away).toLowerCase().includes(teamVal));
