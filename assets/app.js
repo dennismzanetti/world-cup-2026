@@ -28,15 +28,15 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     { label: 'Final',          ids: ['final'] },
   ];
 
-  // ─── Admin UIDs ──────────────────────────────────────────────────────────
+  // ─── Admin UIDs ───────────────────────────────────────────────────────────
   const ADMIN_UIDS = ['EAi3lYhlSFYGaqm9F87BdJb1Vrg1'];
 
-  // ─── Team helpers ────────────────────────────────────────────────────────
+  // ─── Team helpers ─────────────────────────────────────────────────────────
   function teamName(t)    { return (t && typeof t === 'object') ? t.name : (t || ''); }
   function teamFlag(t)    { return (t && typeof t === 'object') ? (t.flag || '') : ''; }
   function teamDisplay(t) { return teamFlag(t) ? `${teamFlag(t)} ${teamName(t)}` : teamName(t); }
 
-  // ─── Date formatting ─────────────────────────────────────────────────────
+  // ─── Date formatting ──────────────────────────────────────────────────────
   function formatDateHeader(isoDate) {
     if (!isoDate) return 'Date TBD';
     const [year, month, day] = isoDate.split('-').map(Number);
@@ -44,11 +44,11 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     return d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   }
 
-  // ─── Modal helpers ───────────────────────────────────────────────────────
+  // ─── Modal helpers ────────────────────────────────────────────────────────
   function openModal()  { document.getElementById('auth-modal')?.removeAttribute('hidden'); document.getElementById('auth-backdrop')?.removeAttribute('hidden'); }
   function closeModal() { document.getElementById('auth-modal')?.setAttribute('hidden', ''); document.getElementById('auth-backdrop')?.setAttribute('hidden', ''); }
 
-  // ─── Sub-tab switching ───────────────────────────────────────────────────
+  // ─── Sub-tab switching ────────────────────────────────────────────────────
   function switchPredSubtab(id) {
     activePredSubtab = id;
     document.querySelectorAll('.sub-tab').forEach(btn => {
@@ -70,7 +70,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     if (id === 'pred-bracket')         renderKnockoutBracket();
   }
 
-  // ─── Main tab switching ──────────────────────────────────────────────────
+  // ─── Main tab switching ───────────────────────────────────────────────────
   function switchTab(id) {
     activeTab = id;
     document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -86,7 +86,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     if (id === 'predictions') switchPredSubtab(activePredSubtab);
   }
 
-  // ─── Auth ────────────────────────────────────────────────────────────────
+  // ─── Auth ─────────────────────────────────────────────────────────────────
   watchAuth(async user => {
     if (unsubPredictions) { unsubPredictions(); unsubPredictions = null; }
     currentUser  = user;
@@ -136,7 +136,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     }, 600);
   }
 
-  // ─── Event Listeners ─────────────────────────────────────────────────────
+  // ─── Event Listeners ──────────────────────────────────────────────────────
   document.querySelectorAll('.nav-btn').forEach(btn =>
     btn.addEventListener('click', () => switchTab(btn.dataset.view)));
   document.querySelectorAll('.sub-tab').forEach(btn =>
@@ -212,7 +212,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       stats[hn].played++; stats[an].played++;
       stats[hn].gf += h;  stats[an].gf += a;
       stats[hn].ga += a;  stats[an].ga += h;
-      if (h > a)      { stats[hn].won++;   stats[hn].pts += 3; stats[an].lost++; }\
+      if (h > a)      { stats[hn].won++;   stats[hn].pts += 3; stats[an].lost++; }
       else if (h < a) { stats[an].won++;   stats[an].pts += 3; stats[hn].lost++; }
       else            { stats[hn].drawn++; stats[hn].pts++;    stats[an].drawn++; stats[an].pts++; }
     });
@@ -225,7 +225,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     R32:'Round of 32', R16:'Round of 16', QF:'Quarter-Finals', SF:'Semi-Finals', '3P':'Third Place', F:'Final'
   }[key] || (/^[A-Z]$/.test(key) ? `Group ${key}` : key));
 
-  // ─── Populate filters (Matches tab) ───────────────────────────────────────
+  // ─── Populate filters (Matches tab) ──────────────────────────────────────
   function populateMatchFilters() {
     const dateEl  = document.getElementById('match-date-filter');
     const stageEl = document.getElementById('match-group-filter');
@@ -352,7 +352,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     card.className = 'match-card' + (m.status === 'live' ? ' match-card-live' : '');
     const stageLabel = m.group ? `Group ${m.group}` : stageKeyToLabel(m.stage || '');
     const isAdmin    = currentUser && ADMIN_UIDS.includes(currentUser.uid);
-    const isKnockout = !!m.homeSource; // knockout fixtures have homeSource/awaySource
+    const isKnockout = !!m.homeSource;
     // For knockout fixtures on the predictions tab, resolve names from predicted standings
     const hn = isKnockout && isPred
       ? (resolveKnockoutTeamForPreds(m.homeSource || m.home) || slotLabel(m.homeSource))
@@ -641,7 +641,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       else {
         const wm = name.replace(/\s+/g, '').match(/^[Ww](.+)$/);
         if (wm) source = { type: 'winner', matchId: wm[1].toLowerCase() };
-        else return name; // literal team name, already resolved
+        else return name;
       }
     }
     if (source.type === 'group') {
@@ -724,7 +724,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       round.ids.forEach(matchId => {
         const fixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === matchId);
         if (!fixture) return;
-        // Resolve via structured homeSource/awaySource
         const homeTeam = resolveKnockoutTeamForPreds(fixture.homeSource || fixture.home);
         const awayTeam = resolveKnockoutTeamForPreds(fixture.awaySource || fixture.away);
         const pick     = bracketPicks[matchId];
@@ -753,7 +752,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       scrollArea.appendChild(roundEl);
     });
 
-    // Champion display
     const finalId      = 'final';
     const finalFixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === finalId);
     const finalPick    = bracketPicks[finalId];
