@@ -18,10 +18,10 @@ console.log(`[init] Firestore DB : wc2026`);
 
 const app = initializeApp({ credential: cert(serviceAccount) });
 
-// Use settings() to specify the named database — more reliable than
-// the getFirestore(app, databaseId) overload across firebase-admin versions.
-const db = getFirestore(app);
-db.settings({ databaseId: 'wc2026' });
+// Pass the named database ID directly to getFirestore — this is the correct
+// approach for firebase-admin. Calling settings({ databaseId }) after the fact
+// is unreliable and causes gRPC NOT_FOUND errors.
+const db = getFirestore(app, 'wc2026');
 
 const HEADERS = { 'User-Agent': 'world-cup-2026-sync/1.0' };
 
