@@ -369,7 +369,6 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     card.innerHTML = `
       <div class="card-header">
         <span class="card-header-group">${stageLabel}</span>
-        ${dtStr ? `<span class="card-header-date">${dtStr}</span>` : ''}
         ${statusBadge}
       </div>
       <div class="card-teams">
@@ -383,12 +382,16 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
           ${aFlag ? `<span class="team-flag" aria-hidden="true">${aFlag}</span>` : ''}
         </div>
       </div>
-      ${m.venue ? `
+      ${(m.venue || dtStr) ? `
       <div class="card-meta">
-        <span class="card-meta-item">
+        ${m.venue ? `<span class="card-meta-item">
           <svg class="meta-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/><path d="M13 6c0 4.5-5 8.5-5 8.5S3 10.5 3 6a5 5 0 0 1 10 0z"/></svg>
           ${m.venue}${m.city ? ', ' + m.city : ''}
-        </span>
+        </span>` : ''}
+        ${dtStr ? `<span class="card-meta-item">
+          <svg class="meta-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 1.5"/></svg>
+          ${dtStr}
+        </span>` : ''}
       </div>` : ''}`;
 
     // ── Event listeners ──────────────────────────────────────────────────────
