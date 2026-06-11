@@ -1,7 +1,7 @@
 // World Cup 2026 App — Firebase-connected
 import { WC_GROUPS, WC_MATCHES, WC_KNOCKOUT_FIXTURES } from './data.js';
 import { signUp, signIn, logOut, watchAuth } from './auth.js';
-import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } from './db.js';
+import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult } from './db.js';
 
 (function () {
 
@@ -12,6 +12,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
   let activePredSubtab = 'my-picks';
   let userPredictions  = {};  // matchId → {home, away}
   let liveMatches      = WC_MATCHES.slice(); // mutable working copy (group stage)
+  let unsubPredictions = null; // unsubscribe handle for watchUserPredictions
 
   // All matches for predictions = group stage + knockout fixtures
   function allPredMatches() {
@@ -76,26 +77,33 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
   }
 
   // ─── Auth ─────────────────────────────────────────────────────────────────
-  watchAuth(async (user) => {
+  watchAuth(user => {
+    // Tear down any existing predictions listener from a previous user session
+    if (unsubPredictions) {
+      unsubPredictions();
+      unsubPredictions = null;
+    }
+
     currentUser  = user;
     authResolved = true;
+
     const userGreeting = document.getElementById('user-greeting');
     const userBar      = document.getElementById('user-bar');
     const authBtn      = document.getElementById('auth-btn');
     const signOutBtn   = document.getElementById('sign-out-btn');
+
     if (user) {
       if (userGreeting) userGreeting.textContent = user.email;
       userBar?.removeAttribute('hidden');
       authBtn?.setAttribute('hidden', '');
       signOutBtn?.removeAttribute('hidden');
-      try {
-        const preds = await getUserPredictions(user.uid);
+
+      // Subscribe to real-time predictions — fires immediately with current data,
+      // then re-fires whenever a prediction is saved or changed.
+      unsubPredictions = watchUserPredictions(user.uid, preds => {
         userPredictions = preds || {};
-      } catch (e) {
-        console.warn('[app] getUserPredictions error', e);
-        userPredictions = {};
-      }
-      renderAll();
+        renderAll();
+      });
     } else {
       if (userGreeting) userGreeting.textContent = '';
       userBar?.setAttribute('hidden', '');
@@ -181,9 +189,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
       const idx = liveMatches.findIndex(m => m.id === um.id);
       if (idx !== -1) liveMatches[idx] = { ...liveMatches[idx], ...um };
     });
-    // BUG FIX: Only call renderAll() if auth has already resolved.
-    // If watchMatches fires before watchAuth finishes awaiting getUserPredictions,
-    // rendering predictions here would show empty inputs over saved values.
+    // Only call renderAll() if auth has already resolved.
     if (authResolved) renderAll();
   });
 
@@ -260,10 +266,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
         opt.value = g.id; opt.textContent = `Group ${g.id}`;
         stageEl.appendChild(opt);
       });
-      // BUG FIX: Knockout stage option VALUES must match m.stage exactly.
-      // Previously used short keys (R32, QF...) which never matched m.stage
-      // full strings ('Round of 32', 'Quarterfinals'...).
-      // Derive values directly from WC_KNOCKOUT_FIXTURES to stay in sync with data.js.
+      // Knockout stage options — values must match m.stage exactly from data.js
       const stageOrder = ['Round of 32', 'Round of 16', 'Quarterfinals', 'Semifinals', 'Third Place', 'Final'];
       const stageLabelMap = {
         'Round of 32':  'Round of 32',
@@ -517,9 +520,6 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     const filtersBar = document.getElementById('pred-filters');
     if (!container) return;
 
-    // BUG FIX: Don't render predictions until auth has resolved.
-    // watchMatches fires before watchAuth finishes awaiting getUserPredictions,
-    // which would cause this to render with userPredictions = {} and blank inputs.
     if (!authResolved) {
       authPrompt?.setAttribute('hidden', '');
       if (filtersBar) filtersBar.hidden = true;
