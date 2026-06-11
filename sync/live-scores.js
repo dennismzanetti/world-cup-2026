@@ -11,6 +11,7 @@ import admin from 'firebase-admin';
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const db = admin.firestore();
+db.settings({ databaseId: 'wc2026' });
 
 const HEADERS = { 'User-Agent': 'world-cup-2026-sync/1.0' };
 
@@ -112,7 +113,6 @@ async function syncScores() {
     const eventId = event.id;
     console.log(`  Fetching summary for event ${eventId} (${event.name})…`);
 
-    // Always fetch the summary — it has fresher status than the scoreboard cache
     const sumRes = await fetch(SUMMARY_URL(eventId), { headers: HEADERS });
     if (!sumRes.ok) { console.warn(`  Summary error ${sumRes.status} for event ${eventId}`); continue; }
     const sumData = await sumRes.json();
