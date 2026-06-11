@@ -25,26 +25,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check tournament window
-        id: window
-        run: |
-          TODAY=$(date -u +%Y-%m-%d)
-          START="2026-06-11"
-          END="2026-07-20"
-          if [[ "$TODAY" < "$START" || "$TODAY" > "$END" ]]; then
-            echo "in_window=false" >> $GITHUB_OUTPUT
-            echo "Today ($TODAY) is outside the tournament window — skipping sync."
-          else
-            echo "in_window=true" >> $GITHUB_OUTPUT
-            echo "Today ($TODAY) is within the tournament window — proceeding."
-          fi
-
       - name: Checkout repository
-        if: steps.window.outputs.in_window == 'true' || github.event_name == 'workflow_dispatch'
         uses: actions/checkout@v4
 
       - name: Set up Node.js
-        if: steps.window.outputs.in_window == 'true' || github.event_name == 'workflow_dispatch'
         uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -52,12 +36,10 @@ jobs:
           cache-dependency-path: sync/package.json
 
       - name: Install sync dependencies
-        if: steps.window.outputs.in_window == 'true' || github.event_name == 'workflow_dispatch'
         working-directory: sync
         run: npm install
 
       - name: Run live-scores sync
-        if: steps.window.outputs.in_window == 'true' || github.event_name == 'workflow_dispatch'
         working-directory: sync
         run: node live-scores.js
         env:
