@@ -117,7 +117,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     }
   });
 
-  // Change 1: renderAll() also keeps bracket fresh when on predictions tab
   function renderAll() {
     if (activeTab === 'groups')      renderGroups();
     if (activeTab === 'matches')     renderMatches();
@@ -611,9 +610,13 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     return slot;
   }
 
-  // Change 2: predictions-only resolver — never falls back to actual results
+  // Predictions-only resolver — never falls back to actual results
   function resolveKnockoutTeamForPreds(slot, depth = 0) {
-    if (depth > 10 || !slot) return slot;
+    if (depth > 10 || slot == null) return null;
+    // Accept team objects or raw strings
+    if (typeof slot === 'object') slot = slot.name || '';
+    // Normalize 'W R32-1' → 'Wr32-1' to match fixture IDs like 'r32-1'
+    slot = slot.replace(/^W\s+/i, 'W').replace(/^W([A-Z])/, (_, c) => 'W' + c.toLowerCase());
     const groupMatch = slot.match(/^(\d)([A-Z])$/);
     if (groupMatch) {
       const t = getPredictedGroupFinisher(groupMatch[2], parseInt(groupMatch[1]));
@@ -621,8 +624,9 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     }
     const winnerMatch = slot.match(/^W(.+)$/);
     if (winnerMatch) {
-      const fixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === winnerMatch[1]);
-      const pick    = bracketPicks[winnerMatch[1]];
+      const fixtureId = winnerMatch[1]; // e.g. 'r32-1'
+      const fixture   = WC_KNOCKOUT_FIXTURES.find(f => f.id === fixtureId);
+      const pick      = bracketPicks[fixtureId];
       if (!fixture || !pick) return null;
       return pick === 'home'
         ? resolveKnockoutTeamForPreds(fixture.home, depth + 1)
@@ -695,7 +699,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       round.ids.forEach(matchId => {
         const fixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === matchId);
         if (!fixture) return;
-        // Change 3: use predictions-only resolver; add .tbd class when unresolved
+        // Resolve team names using predictions-only resolver; objects are normalized inside
         const homeTeam = resolveKnockoutTeamForPreds(fixture.home);
         const awayTeam = resolveKnockoutTeamForPreds(fixture.away);
         const pick     = bracketPicks[matchId];
@@ -703,7 +707,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
         matchEl.className = 'bracket-match';
         const homeEl = document.createElement('div');
         homeEl.className = 'bracket-team' + (pick === 'home' ? ' picked' : '') + (homeTeam ? '' : ' tbd');
-        homeEl.textContent = homeTeam || fixture.home;
+        homeEl.textContent = homeTeam || teamName(fixture.home);
         homeEl.addEventListener('click', () => {
           if (bracketPicks[matchId] !== 'home') clearDownstreamPicks(matchId);
           bracketPicks[matchId] = 'home';
@@ -711,7 +715,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
         });
         const awayEl = document.createElement('div');
         awayEl.className = 'bracket-team' + (pick === 'away' ? ' picked' : '') + (awayTeam ? '' : ' tbd');
-        awayEl.textContent = awayTeam || fixture.away;
+        awayEl.textContent = awayTeam || teamName(fixture.away);
         awayEl.addEventListener('click', () => {
           if (bracketPicks[matchId] !== 'away') clearDownstreamPicks(matchId);
           bracketPicks[matchId] = 'away';
