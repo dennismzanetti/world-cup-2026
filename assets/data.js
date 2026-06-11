@@ -98,128 +98,147 @@ const WC_FIXTURE_META = {
   'Canada|Bosnia-Herzegovina': { date:'2026-06-12', timeLocal:'15:00', tz:'ET', venue:'BMO Field',                  city:'Toronto, Canada',                ...BC.fox },
   'Qatar|Switzerland':         { date:'2026-06-13', timeLocal:'15:00', tz:'ET', venue:"Levi's Stadium",             city:'Santa Clara, CA',                ...BC.fox },
   'Switzerland|Bosnia-Herzegovina': { date:'2026-06-18', timeLocal:'15:00', tz:'ET', venue:'SoFi Stadium',          city:'Inglewood, CA',                  ...BC.fox },
-  'Canada|Qatar':              { date:'2026-06-18', timeLocal:'18:00', tz:'ET', venue:'Arrowhead Stadium',          city:'Kansas City, MO',                ...BC.fs1 },
-  'Bosnia-Herzegovina|Qatar':  { date:'2026-06-24', timeLocal:'15:00', tz:'ET', venue:'Lincoln Financial Field',    city:'Philadelphia, PA',               ...BC.fox },
-  'Switzerland|Canada':        { date:'2026-06-24', timeLocal:'18:00', tz:'ET', venue:'Gillette Stadium',           city:'Foxborough, MA',                 ...BC.fs1 },
+  'Canada|Qatar':              { date:'2026-06-18', timeLocal:'18:00', tz:'ET', venue:'BC Place',                   city:'Vancouver, Canada',              ...BC.fs1 },
+  'Switzerland|Canada':        { date:'2026-06-24', timeLocal:'15:00', tz:'ET', venue:'BC Place',                   city:'Vancouver, Canada',              ...BC.fox },
+  'Bosnia-Herzegovina|Qatar':  { date:'2026-06-24', timeLocal:'15:00', tz:'ET', venue:'Lumen Field',                city:'Seattle, WA',                    ...BC.fs1 },
 
   // ── GROUP C ──────────────────────────────────────────────────────────────
-  'Brazil|Haiti':              { date:'2026-06-12', timeLocal:'18:00', tz:'ET', venue:'SoFi Stadium',               city:'Inglewood, CA',                  ...BC.fox },
-  'Morocco|Scotland':          { date:'2026-06-12', timeLocal:'21:00', tz:'ET', venue:'MetLife Stadium',            city:'East Rutherford, NJ',            ...BC.fs1 },
-  'Brazil|Morocco':            { date:'2026-06-19', timeLocal:'15:00', tz:'ET', venue:'AT&T Stadium',               city:'Arlington, TX',                  ...BC.fox },
-  'Scotland|Haiti':            { date:'2026-06-19', timeLocal:'18:00', tz:'ET', venue:"Levi's Stadium",             city:'Santa Clara, CA',                ...BC.fs1 },
-  'Haiti|Morocco':             { date:'2026-06-25', timeLocal:'15:00', tz:'ET', venue:'NRG Stadium',                city:'Houston, TX',                    ...BC.fox },
-  'Scotland|Brazil':           { date:'2026-06-25', timeLocal:'18:00', tz:'ET', venue:'Rose Bowl',                  city:'Pasadena, CA',                   ...BC.fs1 },
+  'Brazil|Morocco':            { date:'2026-06-13', timeLocal:'18:00', tz:'ET', venue:'MetLife Stadium',            city:'East Rutherford, NJ',            ...BC.fs1 },
+  'Haiti|Scotland':            { date:'2026-06-13', timeLocal:'21:00', tz:'ET', venue:'Gillette Stadium',           city:'Foxborough, MA',                 ...BC.fs1 },
+  'Scotland|Morocco':          { date:'2026-06-19', timeLocal:'18:00', tz:'ET', venue:'Gillette Stadium',           city:'Foxborough, MA',                 ...BC.fox },
+  'Brazil|Haiti':              { date:'2026-06-19', timeLocal:'21:00', tz:'ET', venue:'Lincoln Financial Field',    city:'Philadelphia, PA',               ...BC.fox },
+  'Scotland|Brazil':           { date:'2026-06-24', timeLocal:'18:00', tz:'ET', venue:'Hard Rock Stadium',          city:'Miami Gardens, FL',              ...BC.fox },
+  'Morocco|Haiti':             { date:'2026-06-24', timeLocal:'18:00', tz:'ET', venue:'Mercedes-Benz Stadium',      city:'Atlanta, GA',                    ...BC.fs1 },
 
   // ── GROUP D ──────────────────────────────────────────────────────────────
-  'USA|Türkiye':               { date:'2026-06-12', timeLocal:'21:00', tz:'ET', venue:'MetLife Stadium',            city:'East Rutherford, NJ',            ...BC.fox },
-  'Paraguay|Australia':        { date:'2026-06-13', timeLocal:'12:00', tz:'ET', venue:'Hard Rock Stadium',          city:'Miami Gardens, FL',              ...BC.fs1 },
-  'USA|Paraguay':              { date:'2026-06-19', timeLocal:'21:00', tz:'ET', venue:'SoFi Stadium',               city:'Inglewood, CA',                  ...BC.fox },
-  'Australia|Türkiye':         { date:'2026-06-20', timeLocal:'12:00', tz:'ET', venue:'Lumen Field',                city:'Seattle, WA',                    ...BC.fs1 },
-  'Türkiye|Paraguay':          { date:'2026-06-25', timeLocal:'21:00', tz:'ET', venue:'Arrowhead Stadium',          city:'Kansas City, MO',                ...BC.fox },
-  'Australia|USA':             { date:'2026-06-26', timeLocal:'12:00', tz:'ET', venue:'BC Place',                   city:'Vancouver, Canada',              ...BC.fs1 },
+  'USA|Paraguay':              { date:'2026-06-12', timeLocal:'21:00', tz:'ET', venue:'SoFi Stadium',               city:'Inglewood, CA',                  ...BC.fox },
+  'Australia|Türkiye':         { date:'2026-06-13', timeLocal:'00:00', tz:'ET', venue:'BC Place',                   city:'Vancouver, Canada',              ...BC.fs1 },
+  'USA|Australia':             { date:'2026-06-19', timeLocal:'15:00', tz:'ET', venue:'Lumen Field',                city:'Seattle, WA',                    ...BC.fox },
+  'Türkiye|Paraguay':          { date:'2026-06-19', timeLocal:'23:00', tz:'ET', venue:"Levi's Stadium",             city:'Santa Clara, CA',                ...BC.fs1 },
+  'Türkiye|USA':               { date:'2026-06-25', timeLocal:'22:00', tz:'ET', venue:'SoFi Stadium',               city:'Inglewood, CA',                  ...BC.fox },
+  'Paraguay|Australia':        { date:'2026-06-25', timeLocal:'22:00', tz:'ET', venue:"Levi's Stadium",             city:'Santa Clara, CA',                ...BC.fs1 },
 
   // ── GROUP E ──────────────────────────────────────────────────────────────
-  'Germany|Ivory Coast':       { date:'2026-06-13', timeLocal:'18:00', tz:'ET', venue:'MetLife Stadium',            city:'East Rutherford, NJ',            ...BC.fox },
-  'Curaçao|Ecuador':           { date:'2026-06-13', timeLocal:'21:00', tz:'ET', venue:'Rose Bowl',                  city:'Pasadena, CA',                   ...BC.fs1 },
-  'Germany|Curaçao':           { date:'2026-06-20', timeLocal:'15:00', tz:'ET', venue:'Gillette Stadium',           city:'Foxborough, MA',                 ...BC.fox },
-  'Ecuador|Ivory Coast':       { date:'2026-06-20', timeLocal:'18:00', tz:'ET', venue:'Mercedes-Benz Stadium',      city:'Atlanta, GA',                    ...BC.fs1 },
-  'Curaçao|Ivory Coast':       { date:'2026-06-26', timeLocal:'15:00', tz:'ET', venue:'AT&T Stadium',               city:'Arlington, TX',                  ...BC.fox },
-  'Ecuador|Germany':           { date:'2026-06-26', timeLocal:'18:00', tz:'ET', venue:'Hard Rock Stadium',          city:'Miami Gardens, FL',              ...BC.fs1 },
+  'Germany|Curaçao':           { date:'2026-06-14', timeLocal:'13:00', tz:'ET', venue:'NRG Stadium',                city:'Houston, TX',                    ...BC.fox },
+  'Ivory Coast|Ecuador':       { date:'2026-06-14', timeLocal:'19:00', tz:'ET', venue:'Lincoln Financial Field',    city:'Philadelphia, PA',               ...BC.fs1 },
+  'Germany|Ivory Coast':       { date:'2026-06-20', timeLocal:'16:00', tz:'ET', venue:'BMO Field',                  city:'Toronto, Canada',                ...BC.fox },
+  'Ecuador|Curaçao':           { date:'2026-06-20', timeLocal:'20:00', tz:'ET', venue:'Arrowhead Stadium',          city:'Kansas City, MO',                ...BC.fs1 },
+  'Curaçao|Ivory Coast':       { date:'2026-06-25', timeLocal:'16:00', tz:'ET', venue:'Lincoln Financial Field',    city:'Philadelphia, PA',               ...BC.fs1 },
+  'Ecuador|Germany':           { date:'2026-06-25', timeLocal:'16:00', tz:'ET', venue:'MetLife Stadium',            city:'East Rutherford, NJ',            ...BC.fox },
 
   // ── GROUP F ──────────────────────────────────────────────────────────────
-  'Netherlands|Tunisia':       { date:'2026-06-14', timeLocal:'12:00', tz:'ET', venue:'Lincoln Financial Field',    city:'Philadelphia, PA',               ...BC.fox },
-  'Japan|Sweden':              { date:'2026-06-14', timeLocal:'15:00', tz:'ET', venue:'Lumen Field',                city:'Seattle, WA',                    ...BC.fs1 },
-  'Netherlands|Japan':         { date:'2026-06-20', timeLocal:'21:00', tz:'ET', venue:'BC Place',                   city:'Vancouver, Canada',              ...BC.fox },
-  'Sweden|Tunisia':            { date:'2026-06-21', timeLocal:'12:00', tz:'ET', venue:'Arrowhead Stadium',          city:'Kansas City, MO',                ...BC.fs1 },
-  'Sweden|Netherlands':        { date:'2026-06-27', timeLocal:'15:00', tz:'ET', venue:'NRG Stadium',                city:'Houston, TX',                    ...BC.fox },
-  'Tunisia|Japan':             { date:'2026-06-27', timeLocal:'18:00', tz:'ET', venue:"Levi's Stadium",             city:'Santa Clara, CA',                ...BC.fs1 },
+  'Netherlands|Japan':         { date:'2026-06-14', timeLocal:'16:00', tz:'ET', venue:"AT&T Stadium",               city:'Arlington, TX',                  ...BC.fox },
+  'Sweden|Tunisia':            { date:'2026-06-14', timeLocal:'22:00', tz:'ET', venue:'Estadio BBVA',               city:'Monterrey, Mexico',              ...BC.fs1 },
+  'Netherlands|Sweden':        { date:'2026-06-20', timeLocal:'13:00', tz:'ET', venue:'NRG Stadium',                city:'Houston, TX',                    ...BC.fox },
+  'Tunisia|Japan':             { date:'2026-06-20', timeLocal:'00:00', tz:'ET', venue:'Estadio BBVA',               city:'Monterrey, Mexico',              ...BC.fs1 },
+  'Japan|Sweden':              { date:'2026-06-25', timeLocal:'19:00', tz:'ET', venue:"AT&T Stadium",               city:'Arlington, TX',                  ...BC.fox },
+  'Tunisia|Netherlands':       { date:'2026-06-25', timeLocal:'19:00', tz:'ET', venue:'Arrowhead Stadium',          city:'Kansas City, MO',                ...BC.fs1 },
 
   // ── GROUP G ──────────────────────────────────────────────────────────────
-  'Belgium|New Zealand':       { date:'2026-06-14', timeLocal:'18:00', tz:'ET', venue:'Rose Bowl',                  city:'Pasadena, CA',                   ...BC.fox },
-  'Egypt|Iran':                { date:'2026-06-14', timeLocal:'21:00', tz:'ET', venue:'SoFi Stadium',               city:'Inglewood, CA',                  ...BC.fs1 },
-  'Belgium|Egypt':             { date:'2026-06-21', timeLocal:'15:00', tz:'ET', venue:'Gillette Stadium',           city:'Foxborough, MA',                 ...BC.fox },
-  'Iran|New Zealand':          { date:'2026-06-21', timeLocal:'18:00', tz:'ET', venue:'MetLife Stadium',            city:'East Rutherford, NJ',            ...BC.fs1 },
-  'Iran|Belgium':              { date:'2026-06-27', timeLocal:'21:00', tz:'ET', venue:'Mercedes-Benz Stadium',      city:'Atlanta, GA',                    ...BC.fox },
-  'New Zealand|Egypt':         { date:'2026-06-28', timeLocal:'12:00', tz:'ET', venue:'Hard Rock Stadium',          city:'Miami Gardens, FL',              ...BC.fs1 },
+  'Belgium|Egypt':             { date:'2026-06-15', timeLocal:'15:00', tz:'ET', venue:'Lumen Field',                city:'Seattle, WA',                    ...BC.fox },
+  'Iran|New Zealand':          { date:'2026-06-15', timeLocal:'21:00', tz:'ET', venue:'SoFi Stadium',               city:'Inglewood, CA',                  ...BC.fs1 },
+  'Belgium|Iran':              { date:'2026-06-21', timeLocal:'15:00', tz:'ET', venue:'SoFi Stadium',               city:'Inglewood, CA',                  ...BC.fox },
+  'New Zealand|Egypt':         { date:'2026-06-21', timeLocal:'21:00', tz:'ET', venue:'AT&T Stadium',               city:'Arlington, TX',                  ...BC.fs1 },
+  'Egypt|Iran':                { date:'2026-06-27', timeLocal:'15:00', tz:'ET', venue:'Hard Rock Stadium',          city:'Miami Gardens, FL',              ...BC.fox },
+  'Belgium|New Zealand':       { date:'2026-06-27', timeLocal:'15:00', tz:'ET', venue:'Rose Bowl',                  city:'Pasadena, CA',                   ...BC.fs1 },
 
   // ── GROUP H ──────────────────────────────────────────────────────────────
-  'Spain|Uruguay':             { date:'2026-06-15', timeLocal:'15:00', tz:'ET', venue:'AT&T Stadium',               city:'Arlington, TX',                  ...BC.fox },
-  'Cape Verde|Saudi Arabia':   { date:'2026-06-15', timeLocal:'18:00', tz:'ET', venue:'Lincoln Financial Field',    city:'Philadelphia, PA',               ...BC.fs1 },
-  'Spain|Cape Verde':          { date:'2026-06-21', timeLocal:'21:00', tz:'ET', venue:'Rose Bowl',                  city:'Pasadena, CA',                   ...BC.fox },
-  'Saudi Arabia|Uruguay':      { date:'2026-06-22', timeLocal:'12:00', tz:'ET', venue:'Lumen Field',                city:'Seattle, WA',                    ...BC.fs1 },
-  'Saudi Arabia|Spain':        { date:'2026-06-28', timeLocal:'15:00', tz:'ET', venue:'BC Place',                   city:'Vancouver, Canada',              ...BC.fox },
-  'Uruguay|Cape Verde':        { date:'2026-06-28', timeLocal:'18:00', tz:'ET', venue:'Arrowhead Stadium',          city:'Kansas City, MO',                ...BC.fs1 },
+  'Spain|Uruguay':             { date:'2026-06-15', timeLocal:'18:00', tz:'ET', venue:'MetLife Stadium',            city:'East Rutherford, NJ',            ...BC.fox },
+  'Cape Verde|Saudi Arabia':   { date:'2026-06-16', timeLocal:'12:00', tz:'ET', venue:'Arrowhead Stadium',          city:'Kansas City, MO',                ...BC.fs1 },
+  'Spain|Cape Verde':          { date:'2026-06-21', timeLocal:'18:00', tz:'ET', venue:'MetLife Stadium',            city:'East Rutherford, NJ',            ...BC.fox },
+  'Saudi Arabia|Uruguay':      { date:'2026-06-21', timeLocal:'22:00', tz:'ET', venue:'Arrowhead Stadium',          city:'Kansas City, MO',                ...BC.fs1 },
+  'Saudi Arabia|Spain':        { date:'2026-06-27', timeLocal:'18:00', tz:'ET', venue:'MetLife Stadium',            city:'East Rutherford, NJ',            ...BC.fox },
+  'Uruguay|Cape Verde':        { date:'2026-06-27', timeLocal:'18:00', tz:'ET', venue:'Gillette Stadium',           city:'Foxborough, MA',                 ...BC.fs1 },
 
   // ── GROUP I ──────────────────────────────────────────────────────────────
-  'France|Iraq':               { date:'2026-06-15', timeLocal:'21:00', tz:'ET', venue:'AT&T Stadium',               city:'Arlington, TX',                  ...BC.fox },
-  'Senegal|Norway':            { date:'2026-06-16', timeLocal:'12:00', tz:'ET', venue:'NRG Stadium',                city:'Houston, TX',                    ...BC.fs1 },
-  'France|Senegal':            { date:'2026-06-22', timeLocal:'15:00', tz:'ET', venue:'SoFi Stadium',               city:'Inglewood, CA',                  ...BC.fox },
-  'Norway|Iraq':               { date:'2026-06-22', timeLocal:'18:00', tz:'ET', venue:'MetLife Stadium',            city:'East Rutherford, NJ',            ...BC.fs1 },
-  'Norway|France':             { date:'2026-06-28', timeLocal:'21:00', tz:'ET', venue:"Levi's Stadium",             city:'Santa Clara, CA',                ...BC.fox },
-  'Iraq|Senegal':              { date:'2026-06-29', timeLocal:'12:00', tz:'ET', venue:'Gillette Stadium',           city:'Foxborough, MA',                 ...BC.fs1 },
+  'France|Iraq':               { date:'2026-06-16', timeLocal:'15:00', tz:'ET', venue:'Rose Bowl',                  city:'Pasadena, CA',                   ...BC.fox },
+  'Senegal|Norway':            { date:'2026-06-16', timeLocal:'21:00', tz:'ET', venue:'NRG Stadium',                city:'Houston, TX',                    ...BC.fs1 },
+  'France|Senegal':            { date:'2026-06-22', timeLocal:'15:00', tz:'ET', venue:'Rose Bowl',                  city:'Pasadena, CA',                   ...BC.fox },
+  'Norway|Iraq':               { date:'2026-06-22', timeLocal:'21:00', tz:'ET', venue:'NRG Stadium',                city:'Houston, TX',                    ...BC.fs1 },
+  'Iraq|Senegal':              { date:'2026-06-28', timeLocal:'15:00', tz:'ET', venue:'Rose Bowl',                  city:'Pasadena, CA',                   ...BC.fox },
+  'Norway|France':             { date:'2026-06-28', timeLocal:'15:00', tz:'ET', venue:'Gillette Stadium',           city:'Foxborough, MA',                 ...BC.fs1 },
 
   // ── GROUP J ──────────────────────────────────────────────────────────────
-  'Argentina|Jordan':          { date:'2026-06-16', timeLocal:'15:00', tz:'ET', venue:'MetLife Stadium',            city:'East Rutherford, NJ',            ...BC.fox },
-  'Algeria|Austria':           { date:'2026-06-16', timeLocal:'18:00', tz:'ET', venue:'Rose Bowl',                  city:'Pasadena, CA',                   ...BC.fs1 },
-  'Argentina|Algeria':         { date:'2026-06-22', timeLocal:'21:00', tz:'ET', venue:'AT&T Stadium',               city:'Arlington, TX',                  ...BC.fox },
-  'Austria|Jordan':            { date:'2026-06-23', timeLocal:'12:00', tz:'ET', venue:'Hard Rock Stadium',          city:'Miami Gardens, FL',              ...BC.fs1 },
-  'Austria|Argentina':         { date:'2026-06-29', timeLocal:'15:00', tz:'ET', venue:'BC Place',                   city:'Vancouver, Canada',              ...BC.fox },
-  'Jordan|Algeria':            { date:'2026-06-29', timeLocal:'18:00', tz:'ET', venue:'Arrowhead Stadium',          city:'Kansas City, MO',                ...BC.fs1 },
+  'Argentina|Jordan':          { date:'2026-06-16', timeLocal:'18:00', tz:'ET', venue:'MetLife Stadium',            city:'East Rutherford, NJ',            ...BC.fox },
+  'Algeria|Austria':           { date:'2026-06-17', timeLocal:'12:00', tz:'ET', venue:'Hard Rock Stadium',          city:'Miami Gardens, FL',              ...BC.fs1 },
+  'Argentina|Algeria':         { date:'2026-06-22', timeLocal:'18:00', tz:'ET', venue:'MetLife Stadium',            city:'East Rutherford, NJ',            ...BC.fox },
+  'Austria|Jordan':            { date:'2026-06-22', timeLocal:'22:00', tz:'ET', venue:'Lincoln Financial Field',    city:'Philadelphia, PA',               ...BC.fs1 },
+  'Austria|Argentina':         { date:'2026-06-28', timeLocal:'18:00', tz:'ET', venue:'MetLife Stadium',            city:'East Rutherford, NJ',            ...BC.fox },
+  'Jordan|Algeria':            { date:'2026-06-28', timeLocal:'22:00', tz:'ET', venue:'Hard Rock Stadium',          city:'Miami Gardens, FL',              ...BC.fs1 },
 
   // ── GROUP K ──────────────────────────────────────────────────────────────
-  'Portugal|Uzbekistan':       { date:'2026-06-17', timeLocal:'12:00', tz:'ET', venue:'Lincoln Financial Field',    city:'Philadelphia, PA',               ...BC.fox },
-  'Congo DR|Colombia':         { date:'2026-06-17', timeLocal:'15:00', tz:'ET', venue:'Lumen Field',                city:'Seattle, WA',                    ...BC.fs1 },
-  'Portugal|Congo DR':         { date:'2026-06-23', timeLocal:'15:00', tz:'ET', venue:'NRG Stadium',                city:'Houston, TX',                    ...BC.fox },
-  'Colombia|Uzbekistan':       { date:'2026-06-23', timeLocal:'18:00', tz:'ET', venue:'Mercedes-Benz Stadium',      city:'Atlanta, GA',                    ...BC.fs1 },
-  'Colombia|Portugal':         { date:'2026-06-29', timeLocal:'21:00', tz:'ET', venue:'SoFi Stadium',               city:'Inglewood, CA',                  ...BC.fox },
-  'Uzbekistan|Congo DR':       { date:'2026-06-30', timeLocal:'12:00', tz:'ET', venue:'Gillette Stadium',           city:'Foxborough, MA',                 ...BC.fs1 },
+  'Portugal|Uzbekistan':       { date:'2026-06-17', timeLocal:'15:00', tz:'ET', venue:'Lincoln Financial Field',    city:'Philadelphia, PA',               ...BC.fox },
+  'Congo DR|Colombia':         { date:'2026-06-17', timeLocal:'21:00', tz:'ET', venue:'Lumen Field',                city:'Seattle, WA',                    ...BC.fs1 },
+  'Portugal|Congo DR':         { date:'2026-06-23', timeLocal:'15:00', tz:'ET', venue:'Lincoln Financial Field',    city:'Philadelphia, PA',               ...BC.fox },
+  'Colombia|Uzbekistan':       { date:'2026-06-23', timeLocal:'21:00', tz:'ET', venue:'Arrowhead Stadium',          city:'Kansas City, MO',                ...BC.fs1 },
+  'Colombia|Portugal':         { date:'2026-06-29', timeLocal:'15:00', tz:'ET', venue:'Lincoln Financial Field',    city:'Philadelphia, PA',               ...BC.fox },
+  'Uzbekistan|Congo DR':       { date:'2026-06-29', timeLocal:'15:00', tz:'ET', venue:'Lumen Field',                city:'Seattle, WA',                    ...BC.fs1 },
 
   // ── GROUP L ──────────────────────────────────────────────────────────────
-  'England|Panama':            { date:'2026-06-17', timeLocal:'18:00', tz:'ET', venue:'Rose Bowl',                  city:'Pasadena, CA',                   ...BC.fox },
-  'Croatia|Ghana':             { date:'2026-06-17', timeLocal:'21:00', tz:'ET', venue:'AT&T Stadium',               city:'Arlington, TX',                  ...BC.fs1 },
-  'England|Croatia':           { date:'2026-06-23', timeLocal:'21:00', tz:'ET', venue:'MetLife Stadium',            city:'East Rutherford, NJ',            ...BC.fox },
-  'Ghana|Panama':              { date:'2026-06-24', timeLocal:'12:00', tz:'ET', venue:'Hard Rock Stadium',          city:'Miami Gardens, FL',              ...BC.fs1 },
-  'Ghana|England':             { date:'2026-06-30', timeLocal:'15:00', tz:'ET', venue:'BC Place',                   city:'Vancouver, Canada',              ...BC.fox },
-  'Panama|Croatia':            { date:'2026-06-30', timeLocal:'18:00', tz:'ET', venue:'Arrowhead Stadium',          city:'Kansas City, MO',                ...BC.fs1 },
+  'England|Panama':            { date:'2026-06-17', timeLocal:'18:00', tz:'ET', venue:'AT&T Stadium',               city:'Arlington, TX',                  ...BC.fox },
+  'Croatia|Ghana':             { date:'2026-06-18', timeLocal:'12:00', tz:'ET', venue:'Hard Rock Stadium',          city:'Miami Gardens, FL',              ...BC.fs1 },
+  'England|Croatia':           { date:'2026-06-23', timeLocal:'18:00', tz:'ET', venue:'AT&T Stadium',               city:'Arlington, TX',                  ...BC.fox },
+  'Ghana|Panama':              { date:'2026-06-23', timeLocal:'22:00', tz:'ET', venue:'Mercedes-Benz Stadium',      city:'Atlanta, GA',                    ...BC.fs1 },
+  'Ghana|England':             { date:'2026-06-29', timeLocal:'18:00', tz:'ET', venue:'AT&T Stadium',               city:'Arlington, TX',                  ...BC.fox },
+  'Panama|Croatia':            { date:'2026-06-29', timeLocal:'18:00', tz:'ET', venue:'Mercedes-Benz Stadium',      city:'Atlanta, GA',                    ...BC.fs1 },
 };
 
-// Build WC_MATCHES from groups + fixture metadata
-function makeId(home, away) {
-  const slug = s => s.toLowerCase()
+// Unique match id from date + team names
+function makeMatchId(date, homeName, awayName) {
+  const slug = s => (s || '').toLowerCase()
     .replace(/[çć]/g,'c').replace(/[üú]/g,'u').replace(/[ñ]/g,'n')
     .replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'');
-  return `${slug(home)}-vs-${slug(away)}`;
+  return [date, slug(homeName), 'vs', slug(awayName)].filter(Boolean).join('-');
 }
 
-const WC_MATCHES = [];
-WC_GROUPS.forEach(group => {
-  const teams = group.teams;
-  for (let i = 0; i < teams.length; i++) {
-    for (let j = i + 1; j < teams.length; j++) {
-      const home = teams[i];
-      const away = teams[j];
-      const key  = `${home.name}|${away.name}`;
-      const meta = WC_FIXTURE_META[key] || {};
-      WC_MATCHES.push({
-        id:         makeId(home.name, away.name),
-        group:      group.id,
-        home,
-        away,
-        homeScore:  null,
-        awayScore:  null,
-        status:     'scheduled',
-        ...meta,
-      });
-    }
-  }
-});
+// Generate group stage matches (each team plays the other 3 in their group)
+function generateMatches() {
+  const matches = [];
+  WC_GROUPS.forEach(group => {
+    const teams = group.teams;
+    for (let i = 0; i < teams.length; i++) {
+      for (let j = i + 1; j < teams.length; j++) {
+        const keyFwd = teams[i].name + '|' + teams[j].name;
+        const keyRev = teams[j].name + '|' + teams[i].name;
+        const metaFwd = WC_FIXTURE_META[keyFwd];
+        const metaRev = WC_FIXTURE_META[keyRev];
+        const meta = metaFwd || metaRev || {};
 
+        const homeTeam = metaRev && !metaFwd ? teams[j] : teams[i];
+        const awayTeam = metaRev && !metaFwd ? teams[i] : teams[j];
+
+        matches.push({
+          id:        makeMatchId(meta.date || null, homeTeam.name, awayTeam.name),
+          group:     group.id,
+          home:      homeTeam,
+          away:      awayTeam,
+          date:      meta.date      || null,
+          timeLocal: meta.timeLocal || null,
+          tz:        meta.tz        || 'ET',
+          venue:     meta.venue     || null,
+          city:      meta.city      || null,
+          tvEnglish: meta.tvEnglish || ['FOX / FS1'],
+          tvSpanish: meta.tvSpanish || ['Telemundo'],
+          streaming: meta.streaming || ['FOX One', 'Peacock'],
+          homeScore: null,
+          awayScore: null,
+          prediction: { home: null, away: null }
+        });
+      }
+    }
+  });
+  return matches;
+}
+
+const WC_MATCHES = generateMatches();
+
+// ── KNOCKOUT STAGE FIXTURES ────────────────────────────────────────────────
 const WC_KNOCKOUT_FIXTURES = [
   // ── ROUND OF 32 ──────────────────────────────────────────────────────────
   { id:'r32-1',  stage:'Round of 32', homeSource:{type:'group',group:'A',pos:1}, awaySource:{type:'group',group:'B',pos:2}, home:{name:'1A',flag:'🏳️'}, away:{name:'2B',flag:'🏳️'}, date:'2026-06-28', timeLocal:'15:00', tz:'ET', venue:'Estadio Azteca',           city:'Mexico City, Mexico',        tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
   { id:'r32-2',  stage:'Round of 32', homeSource:{type:'group',group:'C',pos:1}, awaySource:{type:'group',group:'D',pos:2}, home:{name:'1C',flag:'🏳️'}, away:{name:'2D',flag:'🏳️'}, date:'2026-06-28', timeLocal:'19:00', tz:'ET', venue:'MetLife Stadium',          city:'East Rutherford, NJ',        tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
   { id:'r32-3',  stage:'Round of 32', homeSource:{type:'group',group:'E',pos:1}, awaySource:{type:'group',group:'F',pos:2}, home:{name:'1E',flag:'🏳️'}, away:{name:'2F',flag:'🏳️'}, date:'2026-06-29', timeLocal:'15:00', tz:'ET', venue:'SoFi Stadium',             city:'Inglewood, CA',              tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
-  { id:'r32-4',  stage:'Round of 32', homeSource:{type:'group',group:'G',pos:1}, awaySource:{type:'group',group:'H',pos:2}, home:{name:'1G',flag:'🏳️'}, away:{name:'2H',flag:'🏳️'}, date:'2026-06-29', timeLocal:'19:00', tz:'ET', venue:'AT&T Stadium',             city:'Arlington, TX',              tvEnglish:['FS1'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'r32-4',  stage:'Round of 32', homeSource:{type:'group',group:'G',pos:1}, awaySource:{type:'group',group:'H',pos:2}, home:{name:'1G',flag:'🏳️'}, away:{name:'2H',flag:'🏳️'}, date:'2026-06-29', timeLocal:'19:00', tz:'ET', venue:"AT&T Stadium",             city:'Arlington, TX',              tvEnglish:['FS1'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
   { id:'r32-5',  stage:'Round of 32', homeSource:{type:'group',group:'I',pos:1}, awaySource:{type:'group',group:'J',pos:2}, home:{name:'1I',flag:'🏳️'}, away:{name:'2J',flag:'🏳️'}, date:'2026-06-30', timeLocal:'15:00', tz:'ET', venue:'Arrowhead Stadium',        city:'Kansas City, MO',            tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
   { id:'r32-6',  stage:'Round of 32', homeSource:{type:'group',group:'K',pos:1}, awaySource:{type:'group',group:'L',pos:2}, home:{name:'1K',flag:'🏳️'}, away:{name:'2L',flag:'🏳️'}, date:'2026-06-30', timeLocal:'19:00', tz:'ET', venue:'NRG Stadium',              city:'Houston, TX',                tvEnglish:['FS1'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
   { id:'r32-7',  stage:'Round of 32', homeSource:{type:'group',group:'B',pos:1}, awaySource:{type:'group',group:'A',pos:2}, home:{name:'1B',flag:'🏳️'}, away:{name:'2A',flag:'🏳️'}, date:'2026-07-01', timeLocal:'15:00', tz:'ET', venue:'BC Place',                  city:'Vancouver, Canada',          tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
@@ -234,7 +253,7 @@ const WC_KNOCKOUT_FIXTURES = [
   { id:'r32-16', stage:'Round of 32', homeSource:{type:'best3rd',rank:7}, awaySource:{type:'best3rd',rank:8}, home:{name:'Best 3rd 7',flag:'🏳️'}, away:{name:'Best 3rd 8',flag:'🏳️'}, date:'2026-07-05', timeLocal:'19:00', tz:'ET', venue:"Levi's Stadium",        city:'Santa Clara, CA',            tvEnglish:['FS1'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
   // ── ROUND OF 16 ──────────────────────────────────────────────────────────
   { id:'r16-1', stage:'Round of 16', homeSource:{type:'winner',matchId:'r32-1'},  awaySource:{type:'winner',matchId:'r32-2'},  home:{name:'W R32-1', flag:'🏳️'}, away:{name:'W R32-2', flag:'🏳️'}, date:'2026-07-07', timeLocal:'15:00', tz:'ET', venue:'MetLife Stadium',         city:'East Rutherford, NJ', tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
-  { id:'r16-2', stage:'Round of 16', homeSource:{type:'winner',matchId:'r32-3'},  awaySource:{type:'winner',matchId:'r32-4'},  home:{name:'W R32-3', flag:'🏳️'}, away:{name:'W R32-4', flag:'🏳️'}, date:'2026-07-07', timeLocal:'19:00', tz:'ET', venue:'AT&T Stadium',           city:'Arlington, TX',       tvEnglish:['FS1'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'r16-2', stage:'Round of 16', homeSource:{type:'winner',matchId:'r32-3'},  awaySource:{type:'winner',matchId:'r32-4'},  home:{name:'W R32-3', flag:'🏳️'}, away:{name:'W R32-4', flag:'🏳️'}, date:'2026-07-07', timeLocal:'19:00', tz:'ET', venue:"AT&T Stadium",           city:'Arlington, TX',       tvEnglish:['FS1'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
   { id:'r16-3', stage:'Round of 16', homeSource:{type:'winner',matchId:'r32-5'},  awaySource:{type:'winner',matchId:'r32-6'},  home:{name:'W R32-5', flag:'🏳️'}, away:{name:'W R32-6', flag:'🏳️'}, date:'2026-07-08', timeLocal:'15:00', tz:'ET', venue:'SoFi Stadium',           city:'Inglewood, CA',       tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
   { id:'r16-4', stage:'Round of 16', homeSource:{type:'winner',matchId:'r32-7'},  awaySource:{type:'winner',matchId:'r32-8'},  home:{name:'W R32-7', flag:'🏳️'}, away:{name:'W R32-8', flag:'🏳️'}, date:'2026-07-08', timeLocal:'19:00', tz:'ET', venue:'Hard Rock Stadium',      city:'Miami Gardens, FL',   tvEnglish:['FS1'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
   { id:'r16-5', stage:'Round of 16', homeSource:{type:'winner',matchId:'r32-9'},  awaySource:{type:'winner',matchId:'r32-10'}, home:{name:'W R32-9', flag:'🏳️'}, away:{name:'W R32-10',flag:'🏳️'}, date:'2026-07-09', timeLocal:'15:00', tz:'ET', venue:'NRG Stadium',            city:'Houston, TX',         tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
@@ -245,16 +264,14 @@ const WC_KNOCKOUT_FIXTURES = [
   { id:'qf-1', stage:'Quarterfinals', homeSource:{type:'winner',matchId:'r16-1'}, awaySource:{type:'winner',matchId:'r16-2'}, home:{name:'W R16-1',flag:'🏳️'}, away:{name:'W R16-2',flag:'🏳️'}, date:'2026-07-14', timeLocal:'15:00', tz:'ET', venue:'Estadio Azteca',    city:'Mexico City, Mexico',  tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
   { id:'qf-2', stage:'Quarterfinals', homeSource:{type:'winner',matchId:'r16-3'}, awaySource:{type:'winner',matchId:'r16-4'}, home:{name:'W R16-3',flag:'🏳️'}, away:{name:'W R16-4',flag:'🏳️'}, date:'2026-07-14', timeLocal:'19:00', tz:'ET', venue:'MetLife Stadium',   city:'East Rutherford, NJ',  tvEnglish:['FS1'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
   { id:'qf-3', stage:'Quarterfinals', homeSource:{type:'winner',matchId:'r16-5'}, awaySource:{type:'winner',matchId:'r16-6'}, home:{name:'W R16-5',flag:'🏳️'}, away:{name:'W R16-6',flag:'🏳️'}, date:'2026-07-15', timeLocal:'15:00', tz:'ET', venue:'SoFi Stadium',      city:'Inglewood, CA',        tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
-  { id:'qf-4', stage:'Quarterfinals', homeSource:{type:'winner',matchId:'r16-7'}, awaySource:{type:'winner',matchId:'r16-8'}, home:{name:'W R16-7',flag:'🏳️'}, away:{name:'W R16-8',flag:'🏳️'}, date:'2026-07-15', timeLocal:'19:00', tz:'ET', venue:'AT&T Stadium',      city:'Arlington, TX',        tvEnglish:['FS1'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'qf-4', stage:'Quarterfinals', homeSource:{type:'winner',matchId:'r16-7'}, awaySource:{type:'winner',matchId:'r16-8'}, home:{name:'W R16-7',flag:'🏳️'}, away:{name:'W R16-8',flag:'🏳️'}, date:'2026-07-15', timeLocal:'19:00', tz:'ET', venue:"AT&T Stadium",      city:'Arlington, TX',        tvEnglish:['FS1'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
   // ── SEMIFINALS ──────────────────────────────────────────────────────────
   { id:'sf-1', stage:'Semifinals', homeSource:{type:'winner',matchId:'qf-1'}, awaySource:{type:'winner',matchId:'qf-2'}, home:{name:'W QF-1',flag:'🏳️'}, away:{name:'W QF-2',flag:'🏳️'}, date:'2026-07-18', timeLocal:'19:00', tz:'ET', venue:'MetLife Stadium',  city:'East Rutherford, NJ', tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
-  { id:'sf-2', stage:'Semifinals', homeSource:{type:'winner',matchId:'qf-3'}, awaySource:{type:'winner',matchId:'qf-4'}, home:{name:'W QF-3',flag:'🏳️'}, away:{name:'W QF-4',flag:'🏳️'}, date:'2026-07-21', timeLocal:'19:00', tz:'ET', venue:'AT&T Stadium',     city:'Arlington, TX',       tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
+  { id:'sf-2', stage:'Semifinals', homeSource:{type:'winner',matchId:'qf-3'}, awaySource:{type:'winner',matchId:'qf-4'}, home:{name:'W QF-3',flag:'🏳️'}, away:{name:'W QF-4',flag:'🏳️'}, date:'2026-07-21', timeLocal:'19:00', tz:'ET', venue:"AT&T Stadium",     city:'Arlington, TX',       tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
   // ── THIRD PLACE ──────────────────────────────────────────────────────────
   { id:'tp-1', stage:'Third Place', homeSource:{type:'loser',matchId:'sf-1'}, awaySource:{type:'loser',matchId:'sf-2'}, home:{name:'L SF-1',flag:'🏳️'}, away:{name:'L SF-2',flag:'🏳️'}, date:'2026-07-24', timeLocal:'14:00', tz:'ET', venue:'Hard Rock Stadium', city:'Miami Gardens, FL',   tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
   // ── FINAL ────────────────────────────────────────────────────────────────
   { id:'final', stage:'Final', homeSource:{type:'winner',matchId:'sf-1'}, awaySource:{type:'winner',matchId:'sf-2'}, home:{name:'W SF-1',flag:'🏳️'}, away:{name:'W SF-2',flag:'🏳️'}, date:'2026-07-26', timeLocal:'17:00', tz:'ET', venue:'MetLife Stadium',  city:'East Rutherford, NJ', tvEnglish:['FOX'], tvSpanish:['Telemundo'], streaming:['FOX One','Peacock'] },
 ];
-
-// Knockout fixtures are kept separate (see WC_KNOCKOUT_FIXTURES)
 
 export { WC_GROUPS, WC_MATCHES, WC_KNOCKOUT_FIXTURES };
