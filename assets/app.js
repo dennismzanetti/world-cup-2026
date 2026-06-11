@@ -181,7 +181,10 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
       const idx = liveMatches.findIndex(m => m.id === um.id);
       if (idx !== -1) liveMatches[idx] = { ...liveMatches[idx], ...um };
     });
-    renderAll();
+    // BUG FIX: Only call renderAll() if auth has already resolved.
+    // If watchMatches fires before watchAuth finishes awaiting getUserPredictions,
+    // rendering predictions here would show empty inputs over saved values.
+    if (authResolved) renderAll();
   });
 
   // ─── Points calculator ────────────────────────────────────────────────────
@@ -251,18 +254,30 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
       });
     }
     if (stageEl && stageEl.options.length <= 1) {
-      // Group stage options
+      // Group stage options — value matches m.group (single letter e.g. 'A')
       WC_GROUPS.forEach(g => {
         const opt = document.createElement('option');
         opt.value = g.id; opt.textContent = `Group ${g.id}`;
         stageEl.appendChild(opt);
       });
-      // Knockout stage options — only add stages that actually exist in WC_KNOCKOUT_FIXTURES
-      const knockoutStages = [...new Set(WC_KNOCKOUT_FIXTURES.map(f => f.stage).filter(Boolean))];
-      const stageOrder = ['R32','R16','QF','SF','3P','F'];
-      stageOrder.filter(s => knockoutStages.includes(s)).forEach(s => {
+      // BUG FIX: Knockout stage option VALUES must match m.stage exactly.
+      // Previously used short keys (R32, QF...) which never matched m.stage
+      // full strings ('Round of 32', 'Quarterfinals'...).
+      // Derive values directly from WC_KNOCKOUT_FIXTURES to stay in sync with data.js.
+      const stageOrder = ['Round of 32', 'Round of 16', 'Quarterfinals', 'Semifinals', 'Third Place', 'Final'];
+      const stageLabelMap = {
+        'Round of 32':  'Round of 32',
+        'Round of 16':  'Round of 16',
+        'Quarterfinals':'Quarter-Finals',
+        'Semifinals':   'Semi-Finals',
+        'Third Place':  'Third Place',
+        'Final':        'Final',
+      };
+      const presentStages = new Set(WC_KNOCKOUT_FIXTURES.map(f => f.stage).filter(Boolean));
+      stageOrder.filter(s => presentStages.has(s)).forEach(s => {
         const opt = document.createElement('option');
-        opt.value = s; opt.textContent = stageKeyToLabel(s);
+        opt.value = s;
+        opt.textContent = stageLabelMap[s] || s;
         stageEl.appendChild(opt);
       });
     }
@@ -390,7 +405,6 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
       <div class="card-header">
         <span class="card-header-group">${stageLabel}</span>
         ${statusBadge}
-        <span class="card-header-date">${dtStr}</span>
       </div>
       <div class="card-teams">
         <div class="card-team home-team">
@@ -403,12 +417,16 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
           ${aFlag ? `<span class="team-flag" aria-hidden="true">${aFlag}</span>` : ''}
         </div>
       </div>
-      ${m.venue ? `
+      ${(m.venue || dtStr) ? `
       <div class="card-meta">
-        <span class="card-meta-item">
+        ${m.venue ? `<span class="card-meta-item">
           <svg class="meta-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/><path d="M13 6c0 4.5-5 8.5-5 8.5S3 10.5 3 6a5 5 0 0 1 10 0z"/></svg>
           ${m.venue}${m.city ? ', ' + m.city : ''}
-        </span>
+        </span>` : ''}
+        ${dtStr ? `<span class="card-meta-item">
+          <svg class="meta-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M5 1.5v3M11 1.5v3M2 7h12"/></svg>
+          ${dtStr}
+        </span>` : ''}
       </div>` : ''}`;
 
     // ── Event listeners
@@ -499,6 +517,16 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     const filtersBar = document.getElementById('pred-filters');
     if (!container) return;
 
+    // BUG FIX: Don't render predictions until auth has resolved.
+    // watchMatches fires before watchAuth finishes awaiting getUserPredictions,
+    // which would cause this to render with userPredictions = {} and blank inputs.
+    if (!authResolved) {
+      authPrompt?.setAttribute('hidden', '');
+      if (filtersBar) filtersBar.hidden = true;
+      container.innerHTML = '<p class="empty-filter-msg">Loading…</p>';
+      return;
+    }
+
     if (!currentUser) {
       authPrompt?.removeAttribute('hidden');
       if (filtersBar) filtersBar.hidden = true;
@@ -515,7 +543,6 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     const stageVal = document.getElementById('pred-group-filter')?.value || 'all';
     const teamVal  = (document.getElementById('pred-team-filter')?.value || '').toLowerCase().trim();
 
-    // Use combined group + knockout match pool
     let matches = allPredMatches();
     if (dateVal  !== 'all') matches = matches.filter(m => m.date === dateVal);
     if (stageVal !== 'all') matches = matches.filter(m => (m.group || m.stage) === stageVal);
@@ -605,7 +632,6 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     }
     authPrompt?.setAttribute('hidden', '');
     let correctExact = 0, correctResult = 0, total = 0;
-    // Score accuracy across all matches (group + knockout)
     allPredMatches().forEach(match => {
       const pred = userPredictions[match.id];
       if (!pred || pred.home == null || pred.away == null) return;
