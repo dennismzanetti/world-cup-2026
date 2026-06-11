@@ -159,11 +159,13 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     }
   });
 
-  // ─── Match filters ────────────────────────────────────────────────────────
+  // ─── Match filters (Matches tab) ───────────────────────────────────────────────
   document.getElementById('match-date-filter')?.addEventListener('change', renderMatches);
   document.getElementById('match-group-filter')?.addEventListener('change', renderMatches);
   document.getElementById('match-venue-filter')?.addEventListener('change', renderMatches);
   document.getElementById('match-team-filter')?.addEventListener('input', renderMatches);
+
+  // ─── Prediction filters (Predictions tab) ─────────────────────────────────────
   document.getElementById('pred-date-filter')?.addEventListener('change', renderPredictions);
   document.getElementById('pred-group-filter')?.addEventListener('change', renderPredictions);
   document.getElementById('pred-team-filter')?.addEventListener('input', renderPredictions);
@@ -209,7 +211,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     '3P': 'Third Place', F: 'Final'
   }[key] || (/^[A-Z]$/.test(key) ? `Group ${key}` : key));
 
-  // ─── Populate filters ─────────────────────────────────────────────────────
+  // ─── Populate filters (Matches tab) ─────────────────────────────────────────────
   function populateMatchFilters() {
     const dateEl  = document.getElementById('match-date-filter');
     const stageEl = document.getElementById('match-group-filter');
@@ -221,7 +223,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     }
     if (stageEl) {
       const stages = [...new Set(liveMatches.map(m => m.group || m.stage).filter(Boolean))];
-      stageEl.innerHTML = '<option value="all">All Stages</option>' +
+      stageEl.innerHTML = '<option value="all">All Matches</option>' +
         stages.map(s => `<option value="${s}">${stageKeyToLabel(s)}</option>`).join('');
     }
     if (venueEl) {
@@ -231,18 +233,36 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     }
   }
 
+  // ─── Populate filters (Predictions tab) ───────────────────────────────────────
   function populatePredFilters() {
     const dateEl  = document.getElementById('pred-date-filter');
     const stageEl = document.getElementById('pred-group-filter');
-    if (dateEl) {
+    if (dateEl && dateEl.options.length <= 1) {
+      // Only populate once — preserve user selection on re-renders
       const dates = [...new Set(liveMatches.map(m => m.date).filter(Boolean))].sort();
-      dateEl.innerHTML = '<option value="all">All Dates</option>' +
-        dates.map(d => `<option value="${d}">${d}</option>`).join('');
+      dates.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d;
+        opt.textContent = d;
+        dateEl.appendChild(opt);
+      });
     }
-    if (stageEl) {
-      const stages = [...new Set(liveMatches.map(m => m.group || m.stage).filter(Boolean))];
-      stageEl.innerHTML = '<option value="all">All Stages</option>' +
-        stages.map(s => `<option value="${s}">${stageKeyToLabel(s)}</option>`).join('');
+    if (stageEl && stageEl.options.length <= 1) {
+      // Groups
+      WC_GROUPS.forEach(g => {
+        const opt = document.createElement('option');
+        opt.value = g.id;
+        opt.textContent = `Group ${g.id}`;
+        stageEl.appendChild(opt);
+      });
+      // Knockout stages
+      [['R32','Round of 32'],['R16','Round of 16'],['QF','Quarter-Finals'],
+       ['SF','Semi-Finals'],['3P','Third Place'],['F','Final']].forEach(([val, label]) => {
+        const opt = document.createElement('option');
+        opt.value = val;
+        opt.textContent = label;
+        stageEl.appendChild(opt);
+      });
     }
   }
 
@@ -309,13 +329,13 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     const aFlag      = teamFlag(m.away);
     const isLocked   = m.status === 'ft' || m.status === 'final';
 
-    // ── Status badge ────────────────────────────────────────────────────────
+    // ── Status badge
     let statusBadge = '';
     if      (m.status === 'live') statusBadge = '<span class="status-badge status-live"><span class="live-dot"></span>Live</span>';
     else if (m.status === 'ht')   statusBadge = '<span class="status-badge status-ht">HT</span>';
     else if (m.status === 'ft' || m.status === 'final') statusBadge = '<span class="status-badge status-ft">FT</span>';
 
-    // ── Centre score column ──────────────────────────────────────────────────
+    // ── Centre score column
     let scoreColHtml = '';
 
     if (isPred && currentUser) {
@@ -362,10 +382,10 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
       scoreColHtml = `<div class="card-score-col"><span class="${cls}">${hs} – ${as_}</span></div>`;
     }
 
-    // ── Date/time string ────────────────────────────────────────────────────
+    // ── Date/time string
     const dtStr = [m.date, m.timeLocal, m.tz].filter(Boolean).join(' ');
 
-    // ── Card HTML ────────────────────────────────────────────────────────────
+    // ── Card HTML
     card.innerHTML = `
       <div class="card-header">
         <span class="card-header-group">${stageLabel}</span>
@@ -394,7 +414,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
         </span>` : ''}
       </div>` : ''}`;
 
-    // ── Event listeners ──────────────────────────────────────────────────────
+    // ── Event listeners
     if (isPred && currentUser) {
       card.querySelector('.save-pred-btn')?.addEventListener('click', async () => {
         const savingEl = card.querySelector('.pred-saving');
@@ -479,25 +499,40 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
   function renderPredictions() {
     const container  = document.getElementById('predictions-list');
     const authPrompt = document.getElementById('predictions-auth-prompt');
+    const filtersBar = document.getElementById('pred-filters');
     if (!container) return;
+
     if (!currentUser) {
       authPrompt?.removeAttribute('hidden');
+      if (filtersBar) filtersBar.hidden = true;
       container.innerHTML = '';
       return;
     }
+
     authPrompt?.setAttribute('hidden', '');
+    if (filtersBar) filtersBar.hidden = false;
+
+    // Populate filter dropdowns (only fills them once; preserves selections on re-render)
     populatePredFilters();
+
+    // Read current filter values
     const dateVal  = document.getElementById('pred-date-filter')?.value  || 'all';
     const stageVal = document.getElementById('pred-group-filter')?.value || 'all';
     const teamVal  = (document.getElementById('pred-team-filter')?.value || '').toLowerCase().trim();
-    let matches = liveMatches.filter(m => m.group);
+
+    // Filter matches — all group matches from liveMatches
+    let matches = liveMatches.slice();
     if (dateVal  !== 'all') matches = matches.filter(m => m.date === dateVal);
     if (stageVal !== 'all') matches = matches.filter(m => (m.group || m.stage) === stageVal);
     if (teamVal)            matches = matches.filter(m =>
       teamName(m.home).toLowerCase().includes(teamVal) ||
       teamName(m.away).toLowerCase().includes(teamVal));
+
     container.innerHTML = '';
-    if (!matches.length) { container.innerHTML = '<p class="empty-filter-msg">No matches found.</p>'; return; }
+    if (!matches.length) {
+      container.innerHTML = '<p class="empty-filter-msg">No matches found.</p>';
+      return;
+    }
     matches.forEach(m => container.appendChild(buildMatchCard(m, true)));
   }
 
