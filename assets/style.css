@@ -20,7 +20,7 @@
   --space-8:  2rem;    --space-10: 2.5rem;  --space-12: 3rem;
   --space-16: 4rem;
 
-  --header-h: 5.75rem;
+  --header-h: 5.5rem;   /* total sticky height on mobile (3rem top + 2.5rem nav) */
   --footer-h: 2rem;
   --score-col-w: 9rem;
 
@@ -84,7 +84,7 @@
   --color-primary-hover:  #f5c85a;
   --color-primary-active: #fad270;
   --color-primary-highlight: #3a2c0a;
-  --color-accent:         #4a7fd4;
+  --color-accent:         #1a3a6b;
   --color-accent-hover:   #6a9ae4;
   --color-success:        #48bb6a;
   --color-success-highlight: #0d2e16;
@@ -112,7 +112,7 @@
     --color-surface-offset:#21293a; --color-divider:#2a3347; --color-border:#334060;
     --color-text:#e6eaf0; --color-text-muted:#8b96aa; --color-text-faint:#4a5568;
     --color-text-inverse:#0d1117; --color-primary:#e8b44a; --color-primary-hover:#f5c85a;
-    --color-accent:#4a7fd4; --color-success:#48bb6a; --color-success-highlight:#0d2e16;
+    --color-accent:#1a3a6b; --color-success:#48bb6a; --color-success-highlight:#0d2e16;
     --color-error:#e05a4e; --color-error-highlight:#2e0c0a;
     --color-live:#ff6b35; --color-live-bg:#2a1500; --color-live-border:#7a3010;
     --shadow-sm:0 1px 3px rgba(0,0,0,0.3); --shadow-md:0 4px 12px rgba(0,0,0,0.4);
@@ -179,7 +179,9 @@ a, button, [role="button"], input, select {
 .icon-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
 
 /* ============================================================
-   LAYOUT — HEADER  (matches index.html: .site-header > .header-inner)
+   LAYOUT — HEADER
+   Desktop: single row  [brand] [nav] [actions]
+   Mobile:  two rows    [brand + actions] / [nav tabs full-width]
    ============================================================ */
 
 .site-header {
@@ -187,6 +189,8 @@ a, button, [role="button"], input, select {
   background: var(--color-accent);
   box-shadow: var(--shadow-md);
 }
+
+/* ── Top row (brand + actions) ── */
 .header-inner {
   max-width: var(--content-default);
   margin: 0 auto;
@@ -207,15 +211,14 @@ a, button, [role="button"], input, select {
 .brand-logo { color: var(--color-primary); width: 28px; height: 28px; }
 .brand-name { font-family: var(--font-display); font-size: 1.4rem; letter-spacing: 0.04em; color: var(--color-text-inverse); }
 
-/* Main nav tabs */
+/* ── Nav tabs (desktop: inside header-inner, flex:1) ── */
 .main-nav {
   display: flex; align-items: stretch;
   gap: 0;
   flex: 1;
-  overflow-x: auto; scrollbar-width: none;
   height: 3rem;
+  /* no overflow-x on desktop — tabs fit fine */
 }
-.main-nav::-webkit-scrollbar { display: none; }
 .nav-btn {
   flex-shrink: 0;
   background: none; border: none; cursor: pointer;
@@ -243,8 +246,54 @@ a, button, [role="button"], input, select {
 #auth-btn:hover { background: var(--color-primary-hover); }
 #sign-out-btn { font-size: var(--text-xs); }
 
+/* ── Mobile: two-row header ── */
+@media (max-width: 600px) {
+  /* Pull nav out of the top row and stretch it below */
+  .main-nav {
+    order: 3;                        /* rendered after header-inner children */
+    flex: none;
+    width: 100%;
+    height: 2.5rem;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    overflow-x: visible;             /* 4 tabs share full width — no scroll */
+  }
+
+  /* Each tab takes equal share */
+  .nav-btn {
+    flex: 1;
+    justify-content: center;
+    padding: 0 var(--space-2);
+    font-size: 0.82rem;
+    height: 2.5rem;
+  }
+
+  /* Make site-header a flex column so the nav row wraps below */
+  .site-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+
+  /* Top row stays full-width */
+  .header-inner {
+    flex: 1 1 100%;
+    padding: 0 var(--space-3);
+    gap: var(--space-2);
+  }
+
+  .brand-name { display: none; }
+  .main-content { padding-top: var(--space-4); }
+  .container { padding: 0 var(--space-3); }
+  .card-teams { grid-template-columns: 1fr var(--score-col-w) 1fr; padding: var(--space-2) var(--space-3); }
+  .standings-grid, .groups-grid { grid-template-columns: 1fr; }
+  .sub-tab { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); }
+  .bracket-round { min-width: 150px; }
+  .bracket-header { flex-direction: column; align-items: flex-start; }
+  #pred-group-standings-container { grid-template-columns: 1fr; }
+}
+
 /* ============================================================
-   MAIN CONTENT  (matches index.html: .main-content > .container)
+   MAIN CONTENT
    ============================================================ */
 
 .main-content {
@@ -281,7 +330,7 @@ a, button, [role="button"], input, select {
 .view.active { display: block; }
 
 /* ============================================================
-   FILTER BAR  (matches .matches-filter in HTML)
+   FILTER BAR
    ============================================================ */
 
 .matches-filter {
@@ -409,7 +458,7 @@ a, button, [role="button"], input, select {
 .empty-filter-msg { color: var(--color-text-muted); font-size: var(--text-sm); padding: var(--space-8) 0; text-align: center; }
 
 /* ============================================================
-   GROUPS GRID  (matches #groups-grid in HTML)
+   GROUPS GRID
    ============================================================ */
 
 .groups-grid {
@@ -450,7 +499,7 @@ a, button, [role="button"], input, select {
 .group-table tr:last-child td { border-bottom: none; }
 
 /* ============================================================
-   STANDINGS GRID  (matches #standings-grid in HTML)
+   STANDINGS GRID
    ============================================================ */
 
 .standings-grid {
@@ -505,15 +554,13 @@ a, button, [role="button"], input, select {
 .pred-stat-label { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: var(--space-1); text-transform: uppercase; letter-spacing: 0.04em; }
 
 /* ============================================================
-   AUTH MODAL  (matches .modal / .modal-backdrop in HTML)
+   AUTH MODAL
    ============================================================ */
 
 .modal-backdrop {
   position: fixed; inset: 0; z-index: 200;
   background: rgba(0,0,0,0.5);
 }
-/* The modal itself is centered via flex on the backdrop — but since backdrop
-   and modal are siblings in HTML we use fixed positioning on the modal */
 #auth-modal {
   position: fixed; inset: 0; z-index: 201;
   display: flex; align-items: center; justify-content: center;
@@ -522,8 +569,6 @@ a, button, [role="button"], input, select {
   pointer-events: none;
 }
 #auth-modal:not([hidden]) { pointer-events: all; }
-
-/* Inner card */
 #auth-modal > * { pointer-events: all; }
 .modal-close {
   position: absolute; top: var(--space-4); right: var(--space-4);
@@ -533,22 +578,6 @@ a, button, [role="button"], input, select {
 }
 .modal-close:hover { color: var(--color-text); }
 
-/* Wrap the modal content in a card */
-#auth-modal::after { display: none; } /* reset */
-#auth-form,
-.modal-heading,
-.modal-sub,
-.auth-error,
-.auth-toggle-text {
-  /* all children of #auth-modal are laid out by the modal's flex container */
-}
-
-/* Give auth-modal a card appearance */
-#auth-modal {
-  /* override: use a pseudo inner wrapper approach via padding */
-}
-
-/* Simpler: style auth-modal as the card directly */
 #auth-modal {
   position: fixed;
   top: 50%; left: 50%;
@@ -690,7 +719,7 @@ a, button, [role="button"], input, select {
 .muted { color: var(--color-text-faint); font-weight: 400; }
 
 /* ============================================================
-   FOOTER  (matches .build-footer in HTML)
+   FOOTER
    ============================================================ */
 
 .build-footer {
@@ -704,21 +733,3 @@ a, button, [role="button"], input, select {
 }
 .build-sha { color: var(--color-text-faint); text-decoration: none; }
 .build-sha:hover { color: var(--color-text-muted); text-decoration: underline; }
-
-/* ============================================================
-   RESPONSIVE
-   ============================================================ */
-
-@media (max-width: 600px) {
-  .header-inner { padding: 0 var(--space-3); gap: var(--space-2); }
-  .brand-name { display: none; }
-  .nav-btn { padding: 0 var(--space-3); font-size: 0.85rem; }
-  .main-content { padding-top: var(--space-4); }
-  .container { padding: 0 var(--space-3); }
-  .card-teams { grid-template-columns: 1fr var(--score-col-w) 1fr; padding: var(--space-2) var(--space-3); }
-  .standings-grid, .groups-grid { grid-template-columns: 1fr; }
-  .sub-tab { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); }
-  .bracket-round { min-width: 150px; }
-  .bracket-header { flex-direction: column; align-items: flex-start; }
-  #pred-group-standings-container { grid-template-columns: 1fr; }
-}
