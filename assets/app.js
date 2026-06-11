@@ -176,13 +176,13 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     }
   });
 
-  // ─── Match filters (Matches tab) ────────────────────────────────────────────
+  // ─── Match filters (Matches tab) ──────────────────────────────────────────
   document.getElementById('match-date-filter')?.addEventListener('change', renderMatches);
   document.getElementById('match-group-filter')?.addEventListener('change', renderMatches);
   document.getElementById('match-venue-filter')?.addEventListener('change', renderMatches);
   document.getElementById('match-team-filter')?.addEventListener('input', renderMatches);
 
-  // ─── Prediction filters (Predictions tab) ────────────────────────────────────
+  // ─── Prediction filters (Predictions tab) ─────────────────────────────────
   document.getElementById('pred-date-filter')?.addEventListener('change', renderPredictions);
   document.getElementById('pred-group-filter')?.addEventListener('change', renderPredictions);
   document.getElementById('pred-team-filter')?.addEventListener('input', renderPredictions);
@@ -230,7 +230,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     '3P': 'Third Place', F: 'Final'
   }[key] || (/^[A-Z]$/.test(key) ? `Group ${key}` : key));
 
-  // ─── Populate filters (Matches tab) ─────────────────────────────────────────
+  // ─── Populate filters (Matches tab) ───────────────────────────────────────
   function populateMatchFilters() {
     const dateEl  = document.getElementById('match-date-filter');
     const stageEl = document.getElementById('match-group-filter');
@@ -252,7 +252,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     }
   }
 
-  // ─── Populate filters (Predictions tab) ──────────────────────────────────────
+  // ─── Populate filters (Predictions tab) ───────────────────────────────────
   function populatePredFilters() {
     const dateEl  = document.getElementById('pred-date-filter');
     const stageEl = document.getElementById('pred-group-filter');
@@ -321,6 +321,44 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     });
   }
 
+  // ─── Render by date (shared helper) ──────────────────────────────────────
+  // Sorts matches by date ascending, groups them under date section headers,
+  // and appends each card to `container` via `buildMatchCard(m, isPred)`.
+  function renderByDate(container, matches, isPred) {
+    // Sort by date (ISO string compare works fine), then preserve original
+    // order within the same date (stable sort in modern engines).
+    const sorted = matches.slice().sort((a, b) => {
+      const da = a.date || '';
+      const db = b.date || '';
+      if (da < db) return -1;
+      if (da > db) return 1;
+      return 0;
+    });
+
+    // Group into { date → [matches] } preserving sort order
+    const groups = [];
+    const seen   = {};
+    sorted.forEach(m => {
+      const key = m.date || '';
+      if (!seen[key]) { seen[key] = true; groups.push({ date: key, matches: [] }); }
+      groups[groups.length - 1].matches.push(m);
+    });
+
+    groups.forEach(g => {
+      // Date header
+      const hdr = document.createElement('div');
+      hdr.className = 'date-group-header';
+      hdr.textContent = g.date || 'Date TBD';
+      container.appendChild(hdr);
+
+      // Cards for this date
+      const group = document.createElement('div');
+      group.className = 'date-group';
+      g.matches.forEach(m => group.appendChild(buildMatchCard(m, isPred)));
+      container.appendChild(group);
+    });
+  }
+
   // ─── Matches ──────────────────────────────────────────────────────────────
   function renderMatches() {
     const container = document.getElementById('matches-list');
@@ -338,7 +376,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
       teamName(m.away).toLowerCase().includes(teamVal));
     container.innerHTML = '';
     if (!matches.length) { container.innerHTML = '<p class="empty-filter-msg">No matches found.</p>'; return; }
-    matches.forEach(m => container.appendChild(buildMatchCard(m, false)));
+    renderByDate(container, matches, false);
   }
 
   // ─── Match card ───────────────────────────────────────────────────────────
@@ -560,7 +598,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
       container.innerHTML = '<p class="empty-filter-msg">No matches found.</p>';
       return;
     }
-    matches.forEach(m => container.appendChild(buildMatchCard(m, true)));
+    renderByDate(container, matches, true);
   }
 
   // ─── Predicted Group Standings ────────────────────────────────────────────
