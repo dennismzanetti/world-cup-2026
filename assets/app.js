@@ -10,7 +10,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
   let authResolved     = false;
   let activeTab        = 'groups';
   let activePredSubtab = 'my-picks';
-  let userPredictions  = {};  // matchId → {homeScorePred, awayScorePred}
+  let userPredictions  = {};  // matchId → {home, away}
   let liveMatches      = WC_MATCHES.slice(); // mutable working copy
 
   // ─── Admin UIDs ───────────────────────────────────────────────────────────
@@ -84,11 +84,12 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
       authBtn?.setAttribute('hidden', '');
       signOutBtn?.removeAttribute('hidden');
       try {
+        // getUserPredictions returns { matchId: { home, away } }
         const preds = await getUserPredictions(user.uid);
-        userPredictions = {};
-        (preds || []).forEach(p => { userPredictions[p.matchId] = p; });
+        userPredictions = preds || {};
       } catch (e) {
         console.warn('[app] getUserPredictions error', e);
+        userPredictions = {};
       }
       renderAll();
     } else {
@@ -339,9 +340,10 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     let scoreColHtml = '';
 
     if (isPred && currentUser) {
+      // userPredictions[matchId] = { home, away } from Firestore
       const pred = userPredictions[m.id] || {};
-      const hVal = pred.homeScorePred !== undefined ? pred.homeScorePred : '';
-      const aVal = pred.awayScorePred !== undefined ? pred.awayScorePred : '';
+      const hVal = pred.home !== undefined ? pred.home : '';
+      const aVal = pred.away !== undefined ? pred.away : '';
       scoreColHtml = `
         <div class="card-score-col">
           <div class="score-inputs-wrap">
@@ -430,9 +432,11 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
         if (errEl)    errEl.hidden    = true;
         if (savingEl) savingEl.hidden = false;
         if (btn)      btn.disabled    = true;
-        userPredictions[m.id] = { homeScorePred: homeVal, awayScorePred: awayVal };
+        // Optimistically update local state using the { home, away } shape
+        userPredictions[m.id] = { home: homeVal, away: awayVal };
         try {
-          await savePrediction(currentUser.uid, m.id, { homeScorePred: homeVal, awayScorePred: awayVal });
+          // savePrediction(uid, matchId, home, away)
+          await savePrediction(currentUser.uid, m.id, homeVal, awayVal);
           if (savingEl) savingEl.hidden = true;
           if (savedEl)  { savedEl.hidden = false; setTimeout(() => { savedEl.hidden = true; }, 2000); }
         } catch (err) {
@@ -544,11 +548,12 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
       stats[n] = { team: t, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, pts: 0 };
     });
     matches.forEach(m => {
+      // userPredictions[matchId] = { home, away }
       const pred = userPredictions[m.id];
-      if (!pred || pred.homeScorePred == null || pred.awayScorePred == null) return;
+      if (!pred || pred.home == null || pred.away == null) return;
       const hn = teamName(m.home), an = teamName(m.away);
       if (!stats[hn] || !stats[an]) return;
-      const h = pred.homeScorePred, a = pred.awayScorePred;
+      const h = pred.home, a = pred.away;
       stats[hn].played++; stats[an].played++;
       stats[hn].gf += h;  stats[an].gf += a;
       stats[hn].ga += a;  stats[an].ga += h;
@@ -611,15 +616,16 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     authPrompt?.setAttribute('hidden', '');
     let correctExact = 0, correctResult = 0, total = 0;
     liveMatches.forEach(match => {
+      // userPredictions[matchId] = { home, away }
       const pred = userPredictions[match.id];
-      if (!pred || pred.homeScorePred == null || pred.awayScorePred == null) return;
+      if (!pred || pred.home == null || pred.away == null) return;
       if (match.homeScore == null || match.awayScore == null) return;
       total++;
-      const predResult   = pred.homeScorePred > pred.awayScorePred ? 'H'
-                         : pred.homeScorePred < pred.awayScorePred ? 'A' : 'D';
+      const predResult   = pred.home > pred.away ? 'H'
+                         : pred.home < pred.away ? 'A' : 'D';
       const actualResult = match.homeScore > match.awayScore ? 'H'
                          : match.homeScore < match.awayScore ? 'A' : 'D';
-      if (pred.homeScorePred === match.homeScore && pred.awayScorePred === match.awayScore) {
+      if (pred.home === match.homeScore && pred.away === match.awayScore) {
         correctExact++; correctResult++;
       } else if (predResult === actualResult) {
         correctResult++;
@@ -675,7 +681,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     const group = WC_GROUPS.find(g => g.id === groupId);
     if (!group) return null;
     const gm = liveMatches.filter(m => m.group === groupId);
-    if (!gm.some(m => userPredictions[m.id]?.homeScorePred != null)) return null;
+    if (!gm.some(m => userPredictions[m.id]?.home != null)) return null;
     return calcPredPoints(group.teams, gm)[rank - 1]?.team || null;
   }
 
