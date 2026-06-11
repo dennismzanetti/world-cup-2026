@@ -1,1 +1,204 @@
-__INDEX__
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>World Cup 2026</title>
+  <link rel="stylesheet" href="assets/style.css" />
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- Auth Modal -->
+  <div id="auth-backdrop" class="modal-backdrop" hidden></div>
+  <div id="auth-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="auth-heading" hidden>
+    <button id="auth-close-btn" class="modal-close" aria-label="Close">&times;</button>
+    <h2 id="auth-heading" class="modal-heading">Sign In</h2>
+    <p id="auth-error" class="auth-error" hidden></p>
+    <form id="auth-form" novalidate>
+      <div id="sign-in-form">
+        <label for="signin-email">Email</label>
+        <input id="signin-email" type="email" autocomplete="email" required />
+        <label for="signin-password">Password</label>
+        <input id="signin-password" type="password" autocomplete="current-password" required />
+      </div>
+      <div id="sign-up-form" class="hidden">
+        <label for="signup-name">Display Name</label>
+        <input id="signup-name" type="text" autocomplete="name" />
+        <label for="signup-email">Email</label>
+        <input id="signup-email" type="email" autocomplete="email" required />
+        <label for="signup-password">Password</label>
+        <input id="signup-password" type="password" autocomplete="new-password" required />
+      </div>
+      <button id="auth-submit-btn" class="btn btn-primary btn-full" type="submit">Sign In</button>
+    </form>
+    <p class="auth-toggle-text">
+      Don&rsquo;t have an account?
+      <a href="#" id="auth-toggle-link">Sign up</a>
+    </p>
+  </div>
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="header-brand">
+        <svg class="brand-logo" viewBox="0 0 36 36" fill="none" aria-label="World Cup 2026" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="18" cy="18" r="16" stroke="currentColor" stroke-width="2"/>
+          <path d="M18 4 C10 10 10 26 18 32 C26 26 26 10 18 4Z" stroke="currentColor" stroke-width="1.5" fill="none"/>
+          <path d="M4 14 H32 M4 22 H32" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="18" cy="10" r="2.5" fill="currentColor"/>
+          <path d="M14 8 L18 13 L22 8" stroke="currentColor" stroke-width="1.2" fill="none"/>
+        </svg>
+        <span class="brand-name">WC 2026</span>
+      </div>
+
+      <nav class="main-nav" role="tablist" aria-label="Main navigation">
+        <button class="nav-btn active" data-view="groups">Groups</button>
+        <button class="nav-btn" data-view="matches">Matches</button>
+        <button class="nav-btn" data-view="predictions">Predictions</button>
+        <button class="nav-btn" data-view="standings">Standings</button>
+      </nav>
+
+      <div class="header-actions">
+        <button class="icon-btn" data-theme-toggle aria-label="Switch to light mode">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+        </button>
+        <div id="user-bar" hidden>
+          <span id="user-greeting" class="user-greeting"></span>
+          <button id="sign-out-btn" class="btn btn-ghost btn-sm">Sign Out</button>
+        </div>
+        <button id="auth-open-btn" class="btn btn-primary btn-sm">Sign In</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main id="main" class="main-content">
+
+    <!-- GROUPS VIEW -->
+    <section class="view active" id="view-groups">
+      <div class="container">
+        <div class="page-header">
+          <h1 class="page-title">Group Stage</h1>
+          <p class="page-subtitle">2026 FIFA World Cup &mdash; 48 teams, 12 groups</p>
+        </div>
+        <div class="groups-grid" id="groups-container"></div>
+      </div>
+    </section>
+
+    <!-- MATCHES VIEW -->
+    <section class="view" id="view-matches">
+      <div class="container">
+        <div class="page-header">
+          <h1 class="page-title">Match Schedule &amp; Results</h1>
+          <p class="page-subtitle">Dates, venues, TV &amp; streaming info &mdash; enter results as they happen</p>
+        </div>
+        <div class="matches-filter">
+          <label for="match-date-filter">Date:</label>
+          <select id="match-date-filter">
+            <option value="all">All Dates</option>
+          </select>
+          <label for="match-group-filter">Stage:</label>
+          <select id="match-group-filter">
+            <option value="all">All Matches</option>
+          </select>
+          <label for="match-venue-filter">Venue:</label>
+          <select id="match-venue-filter">
+            <option value="all">All Venues</option>
+          </select>
+          <label for="match-search" class="sr-only">Team:</label>
+          <input id="match-search" type="search" placeholder="Search team&hellip;" autocomplete="off" class="filter-search-input">
+        </div>
+        <div id="matches-container"></div>
+      </div>
+    </section>
+
+    <!-- PREDICTIONS VIEW -->
+    <section class="view" id="view-predictions">
+      <div class="container">
+        <div class="page-header">
+          <h1 class="page-title">Predictions</h1>
+          <p class="page-subtitle">Predict match scores before kickoff &mdash; sign in to save</p>
+        </div>
+
+        <!-- Sub-tab bar -->
+        <div class="sub-tabs" role="tablist" aria-label="Predictions sub-tabs">
+          <button class="sub-tab active" data-subtab="my-picks" role="tab" aria-selected="true" aria-controls="subtab-my-picks">My Predictions</button>
+          <button class="sub-tab" data-subtab="pred-group-standings" role="tab" aria-selected="false" aria-controls="subtab-pred-group-standings">Group Standings</button>
+          <button class="sub-tab" data-subtab="pred-standings" role="tab" aria-selected="false" aria-controls="subtab-pred-standings">Prediction Accuracy</button>
+          <button class="sub-tab" data-subtab="pred-bracket" role="tab" aria-selected="false" aria-controls="subtab-pred-bracket">Knockout Bracket</button>
+        </div>
+
+        <!-- My Predictions panel -->
+        <div class="sub-tab-panel active" id="subtab-my-picks" role="tabpanel">
+          <div id="predictions-auth-prompt" class="auth-prompt" hidden>
+            <p>Sign in to save and track your predictions across devices.</p>
+            <button class="btn btn-primary" id="predict-signin-btn">Sign In to Predict</button>
+          </div>
+          <div class="matches-filter" id="pred-filters" hidden>
+            <label for="pred-date-filter">Date:</label>
+            <select id="pred-date-filter">
+              <option value="all">All Dates</option>
+            </select>
+            <label for="pred-group-filter">Stage:</label>
+            <select id="pred-group-filter">
+              <option value="all">All Matches</option>
+            </select>
+            <label for="pred-team-filter">Team:</label>
+            <input id="pred-team-filter" type="search" placeholder="Search team&hellip;" autocomplete="off" class="filter-search-input">
+          </div>
+          <div id="pred-picks-container"></div>
+        </div>
+
+        <!-- Group Standings panel -->
+        <div class="sub-tab-panel" id="subtab-pred-group-standings" role="tabpanel" hidden>
+          <div id="pred-group-standings-auth-prompt" class="auth-prompt" hidden>
+            <p>Sign in to see your predicted group standings.</p>
+            <button class="btn btn-primary pred-standings-signin-btn">Sign In</button>
+          </div>
+          <div id="pred-group-standings-container"></div>
+        </div>
+
+        <!-- Prediction Accuracy panel -->
+        <div class="sub-tab-panel" id="subtab-pred-standings" role="tabpanel" hidden>
+          <div id="pred-standings-auth-prompt" class="auth-prompt" hidden>
+            <p>Sign in to see your Prediction Accuracy.</p>
+            <button class="btn btn-primary pred-standings-signin-btn">Sign In</button>
+          </div>
+          <div id="pred-standings-container"></div>
+        </div>
+
+        <!-- Knockout Bracket panel -->
+        <div class="sub-tab-panel" id="subtab-pred-bracket" role="tabpanel" hidden>
+          <div id="pred-bracket-container"></div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- STANDINGS VIEW -->
+    <section class="view" id="view-standings">
+      <div class="container">
+        <div class="page-header">
+          <h1 class="page-title">Standings</h1>
+          <p class="page-subtitle">Group standings update automatically as results are entered</p>
+        </div>
+        <div class="standings-grid" id="standings-container"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="build-footer" id="build-footer" aria-label="Build information">
+    <span id="build-badge">Loading build&hellip;</span>
+  </footer>
+
+  <script type="module" src="assets/version.js"></script>
+  <script type="module" src="assets/app.js"></script>
+</body>
+</html>
