@@ -246,6 +246,50 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     }
   }
 
+  // ─── Group matches by date ────────────────────────────────────────────────
+  function groupByDate(matches) {
+    // Sort by date (lexicographic on YYYY-MM-DD is correct), then by time
+    const sorted = matches.slice().sort((a, b) => {
+      const da = (a.date || ''), db = (b.date || '');
+      if (da !== db) return da < db ? -1 : 1;
+      const ta = (a.timeLocal || ''), tb = (b.timeLocal || '');
+      return ta < tb ? -1 : ta > tb ? 1 : 0;
+    });
+    const groups = new Map(); // date string → match[]
+    sorted.forEach(m => {
+      const key = m.date || 'TBD';
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(m);
+    });
+    return groups; // Map preserves insertion order
+  }
+
+  // ─── Format date header label ─────────────────────────────────────────────
+  function formatDateLabel(dateStr) {
+    if (!dateStr || dateStr === 'TBD') return 'Date TBD';
+    // dateStr is expected as YYYY-MM-DD
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const d = new Date(year, month - 1, day);
+    return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  }
+
+  // ─── Render a grouped list of match cards into a container ────────────────
+  function renderGroupedCards(container, matches, isPred) {
+    container.innerHTML = '';
+    if (!matches.length) {
+      container.innerHTML = '<p class="empty-filter-msg">No matches found.</p>';
+      return;
+    }
+    const grouped = groupByDate(matches);
+    grouped.forEach((dayMatches, dateKey) => {
+      const header = document.createElement('div');
+      header.className = 'date-group-header';
+      header.textContent = formatDateLabel(dateKey);
+      container.appendChild(header);
+      dayMatches.forEach(m => container.appendChild(buildMatchCard(m, isPred)));
+    });
+  }
+
   // ─── Groups ───────────────────────────────────────────────────────────────
   function renderGroups() {
     const container = document.getElementById('groups-grid');
@@ -291,9 +335,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     if (teamVal)            matches = matches.filter(m =>
       teamName(m.home).toLowerCase().includes(teamVal) ||
       teamName(m.away).toLowerCase().includes(teamVal));
-    container.innerHTML = '';
-    if (!matches.length) { container.innerHTML = '<p class="empty-filter-msg">No matches found.</p>'; return; }
-    matches.forEach(m => container.appendChild(buildMatchCard(m, false)));
+    renderGroupedCards(container, matches, false);
   }
 
   // ─── Match card ───────────────────────────────────────────────────────────
@@ -496,9 +538,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     if (teamVal)            matches = matches.filter(m =>
       teamName(m.home).toLowerCase().includes(teamVal) ||
       teamName(m.away).toLowerCase().includes(teamVal));
-    container.innerHTML = '';
-    if (!matches.length) { container.innerHTML = '<p class="empty-filter-msg">No matches found.</p>'; return; }
-    matches.forEach(m => container.appendChild(buildMatchCard(m, true)));
+    renderGroupedCards(container, matches, true);
   }
 
   // ─── Predicted Group Standings ────────────────────────────────────────────
