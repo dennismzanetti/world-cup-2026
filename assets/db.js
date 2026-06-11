@@ -81,9 +81,9 @@ export async function getMatch(matchId) {
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
-export async function updateMatchResult(matchId, { homeScore, awayScore, status }) {
+export async function updateMatchResult(matchId, homeScore, awayScore) {
   return updateDoc(doc(db, "matches", matchId), {
-    homeScore, awayScore, status,
+    homeScore, awayScore,
     updatedAt: new Date().toISOString()
   });
 }
@@ -193,6 +193,50 @@ export async function getAllPredictions() {
   return results
     .filter(r => r.document)
     .map(r => docToObj(r.document));
+}
+
+// ─── BRACKET PICKS (REST) ────────────────────────────────────────────────────
+// Stored as a single document per user: bracketPicks/{userId}
+// Fields: one per knockout match ID, value = 'home' | 'away'
+
+function bracketDocUrl(userId) {
+  return `${FS_BASE}/bracketPicks/${encodeURIComponent(userId)}`;
+}
+
+export async function saveBracketPicks(userId, picks) {
+  const token  = await getIdTokenWithRetry();
+  const url    = bracketDocUrl(userId);
+  const fields = {};
+  for (const [matchId, side] of Object.entries(picks)) {
+    fields[matchId] = toFsValue(side);
+  }
+  fields['updatedAt'] = toFsValue(new Date().toISOString());
+  const res = await fetch(url, {
+    method:  'PATCH',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    console.warn(`[saveBracketPicks] Firestore error ${res.status}:`, err?.error?.message || res.statusText);
+  }
+}
+
+export async function getBracketPicks(userId) {
+  const token = await getIdTokenWithRetry();
+  const url   = bracketDocUrl(userId);
+  const res   = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+  if (res.status === 404) return {};
+  if (!res.ok) return {};
+  const fsDoc = await res.json();
+  const fields = fsDoc.fields || {};
+  const picks = {};
+  for (const [k, v] of Object.entries(fields)) {
+    if (k === 'updatedAt') continue;
+    const val = fromFsValue(v);
+    if (val === 'home' || val === 'away') picks[k] = val;
+  }
+  return picks;
 }
 
 // ─── USERS ───────────────────────────────────────────────────────────────────

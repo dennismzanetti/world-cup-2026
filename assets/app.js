@@ -1,7 +1,7 @@
 // World Cup 2026 App — Firebase-connected
 import { WC_GROUPS, WC_MATCHES, WC_KNOCKOUT_FIXTURES } from './data.js';
 import { signUp, signIn, logOut, watchAuth } from './auth.js';
-import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } from './db.js';
+import { watchMatches, savePrediction, getUserPredictions, updateMatchResult, saveBracketPicks, getBracketPicks } from './db.js';
 
 (function () {
 
@@ -12,6 +12,8 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
   let activePredSubtab = 'my-picks';
   let userPredictions  = {};  // matchId → {homeScorePred, awayScorePred}
   let liveMatches      = WC_MATCHES.slice(); // mutable working copy
+  let bracketPicks     = {};  // matchId → 'home' | 'away'  (moved up: fixes TDZ ReferenceError)
+  let bracketView      = 'overlay'; // 'my' | 'actual' | 'overlay'
 
   // ─── Admin UIDs ───────────────────────────────────────────────────────────
   const ADMIN_UIDS = ['EAi3lYhlSFYGaqm9F87BdJb1Vrg1'];
@@ -79,7 +81,6 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     authResolved = true;
     const bar  = document.getElementById('user-bar');
     const greet = document.getElementById('user-greeting');
-    const signOutBtn = document.getElementById('sign-out-btn');
     if (user) {
       bar?.removeAttribute('hidden');
       if (greet) greet.textContent = `Hello, ${user.displayName || user.email}`;
@@ -87,7 +88,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     } else {
       bar?.setAttribute('hidden', '');
       userPredictions = {};
-      bracketPicks    = {};
+      bracketPicks    = {};  // safe: declared at top of State now
     }
     if (activeTab === 'predictions') switchPredSubtab(activePredSubtab);
   });
@@ -98,6 +99,10 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     getUserPredictions(currentUser.uid).then(preds => {
       userPredictions = preds || {};
       if (activeTab === 'predictions') switchPredSubtab(activePredSubtab);
+    });
+    getBracketPicks(currentUser.uid).then(picks => {
+      bracketPicks = picks || {};
+      if (activeTab === 'predictions' && activePredSubtab === 'pred-bracket') renderKnockoutBracket();
     });
   }
 
@@ -169,8 +174,10 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
   (function () {
     const toggle = document.querySelector('[data-theme-toggle]');
     const html   = document.documentElement;
-    let theme = localStorage.getItem('theme') ||
-                (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    // Wrap localStorage in try/catch — sandboxed iframes block storage access
+    let savedTheme = null;
+    try { savedTheme = localStorage.getItem('theme'); } catch(e) {}
+    let theme = savedTheme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     html.setAttribute('data-theme', theme);
     function updateIcon() {
       if (!toggle) return;
@@ -340,7 +347,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
         </div>
         <div class="match-score-block">
           ${played
-            ? `<span class="match-score">${m.homeScore} – ${m.awayScore}</span>`
+            ? `<span class="match-score">${m.homeScore} \u2013 ${m.awayScore}</span>`
             : `<span class="match-score-dash">vs</span>`}
         </div>
         <div class="match-team match-team--away">
@@ -351,7 +358,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
       ${broadcastHtml ? `<div class="match-broadcast">${broadcastHtml}</div>` : ''}
       ${isAdmin ? `<div class="match-admin" data-match-id="${m.id}">
         <input type="number" class="score-input" placeholder="Home" min="0" value="${m.homeScore ?? ''}" data-field="home">
-        <span>–</span>
+        <span>\u2013</span>
         <input type="number" class="score-input" placeholder="Away" min="0" value="${m.awayScore ?? ''}" data-field="away">
         <button class="btn btn-sm btn-primary save-score-btn">Save</button>
       </div>` : ''}`;
@@ -361,6 +368,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
         const awayVal = card.querySelector('[data-field="away"]')?.value;
         const hs = homeVal !== '' ? parseInt(homeVal) : null;
         const as = awayVal !== '' ? parseInt(awayVal) : null;
+        // Fix: pass positional args matching db.js signature updateMatchResult(matchId, homeScore, awayScore)
         updateMatchResult(m.id, hs, as);
       });
     }
@@ -442,7 +450,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
         <span class="pred-team-name pred-team-name--away">${teamName(m.away)}</span>
         <span class="pred-flag">${teamFlag(m.away)}</span>
       </div>
-      ${played ? `<div class="pred-result-row">Result: <strong>${m.homeScore} – ${m.awayScore}</strong></div>` : ''}`;
+      ${played ? `<div class="pred-result-row">Result: <strong>${m.homeScore} \u2013 ${m.awayScore}</strong></div>` : ''}`;
     const saveInput = async () => {
       if (!currentUser) return;
       const h = card.querySelector('[data-field="home"]')?.value;
@@ -450,7 +458,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
       if (h === '' && a === '') return;
       const hs = h !== '' ? parseInt(h) : null;
       const as = a !== '' ? parseInt(a) : null;
-      await savePrediction(currentUser.uid, m.id, hs, as);
+      await savePrediction(currentUser.uid, m.id, { homeScorePred: hs, awayScorePred: as });
       userPredictions[m.id] = { homeScorePred: hs, awayScorePred: as };
     };
     card.querySelectorAll('.pred-input').forEach(inp => {
@@ -543,19 +551,11 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
   }
 
   // ─── Knockout Bracket ─────────────────────────────────────────────────────
-  let bracketPicks = {};   // matchId → 'home' | 'away'
-  let bracketView  = 'overlay'; // 'my' | 'actual' | 'overlay'
 
-  function saveBracketPicks() {
+  // Persist bracket picks to Firestore (replaces localStorage)
+  async function persistBracketPicks() {
     if (!currentUser) return;
-    try { localStorage.setItem(`bracketPicks_${currentUser.uid}`, JSON.stringify(bracketPicks)); } catch(e) {}
-  }
-  function loadBracketPicks() {
-    if (!currentUser) return;
-    try {
-      const raw = localStorage.getItem(`bracketPicks_${currentUser.uid}`);
-      bracketPicks = raw ? JSON.parse(raw) : {};
-    } catch(e) { bracketPicks = {}; }
+    await saveBracketPicks(currentUser.uid, bracketPicks);
   }
 
   // Resolve actual match result from liveMatches
@@ -568,7 +568,6 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
   }
 
   // Resolve team object for a slot in the bracket
-  // mode: 'pick' = user predictions, 'actual' = real results
   function resolveSlot(slot, mode, depth) {
     if (depth === undefined) depth = 0;
     if (depth > 10 || !slot) return null;
@@ -662,7 +661,6 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
       container.querySelectorAll('.pred-standings-signin-btn').forEach(b => b.addEventListener('click', openModal));
       return;
     }
-    loadBracketPicks();
     container.innerHTML = '';
 
     // ── Accuracy banner ──
@@ -685,7 +683,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     banner.innerHTML = `
       <div class="bab-main">
         <div class="bab-picks-group">
-          <span class="bab-icon">📋</span>
+          <span class="bab-icon">&#x1F4CB;</span>
           <div class="bab-text">
             <div class="bab-stat-value">${madePicks}<span class="bab-of">/${totalPossible}</span></div>
             <div class="bab-stat-label">Picks Made</div>
@@ -698,7 +696,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
         ${acc.total > 0 ? `
         <div class="bab-divider"></div>
         <div class="bab-accuracy-group">
-          <span class="bab-icon">🎯</span>
+          <span class="bab-icon">&#x1F3AF;</span>
           <div class="bab-text">
             <div class="bab-stat-value bab-correct">${acc.correct}<span class="bab-of">/${acc.total}</span></div>
             <div class="bab-stat-label">Correct</div>
@@ -725,7 +723,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
       <div class="bracket-view-toggle" role="group" aria-label="Bracket view mode">
         <button class="bvt-btn${bracketView==='my'?' bvt-active':''}" data-bview="my">My Picks</button>
         <button class="bvt-btn${bracketView==='actual'?' bvt-active':''}" data-bview="actual">Actual</button>
-        <button class="bvt-btn${bracketView==='overlay'?' bvt-active':''}" data-bview="overlay">Overlay ✨</button>
+        <button class="bvt-btn${bracketView==='overlay'?' bvt-active':''}" data-bview="overlay">Overlay &#x2728;</button>
       </div>
       <div class="bracket-actions">
         <button class="btn btn-sm btn-ghost" id="bracket-seed-btn">Seed from Groups</button>
@@ -763,11 +761,11 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
       labelEl.className = 'bracket-round-label';
       const resetBtn = document.createElement('button');
       resetBtn.className = 'bracket-reset-round';
-      resetBtn.textContent = '↺';
+      resetBtn.textContent = '\u21BA';
       resetBtn.title = `Reset ${round.label}`;
       resetBtn.addEventListener('click', () => {
         round.ids.forEach(id => clearDownstreamPicks(id));
-        saveBracketPicks(); renderKnockoutBracket();
+        persistBracketPicks(); renderKnockoutBracket();
       });
       labelEl.appendChild(document.createTextNode(round.label));
       labelEl.appendChild(resetBtn);
@@ -804,7 +802,6 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
             /^[12][A-L]$/.test(t.name)
           ));
 
-          // Correctness state for overlay
           let rowState = '';
           if (bracketView === 'overlay' && actualResult) {
             if (isMyPick && isActWin)  rowState = 'correct';
@@ -820,7 +817,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
           if (actualResult && !isActWin && bracketView === 'actual') row.classList.add('bracket-team--eliminated');
 
           if (bracketView === 'overlay') {
-            const myName  = isTbd(myTeam)  ? '—' : teamName(myTeam);
+            const myName  = isTbd(myTeam)  ? '\u2014' : teamName(myTeam);
             const myFlag  = isTbd(myTeam)  ? '' : teamFlag(myTeam);
             const actName = isTbd(actTeam) ? 'TBD' : teamName(actTeam);
             const actFlag = isTbd(actTeam) ? '' : teamFlag(actTeam);
@@ -837,8 +834,8 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
                   <span class="bt-col-label">Actual</span>
                   <span class="bt-flag">${actFlag}</span>
                   <span class="bt-name">${actName}</span>
-                  ${rowState === 'correct' ? '<span class="bt-result bt-result--correct">✓</span>' :
-                    rowState === 'wrong'   ? '<span class="bt-result bt-result--wrong">✗</span>' :
+                  ${rowState === 'correct' ? '<span class="bt-result bt-result--correct">&#x2713;</span>' :
+                    rowState === 'wrong'   ? '<span class="bt-result bt-result--wrong">&#x2717;</span>' :
                     isActWin              ? '<span class="bt-result bt-result--win">W</span>' : ''}
                 </div>
               </div>`;
@@ -848,21 +845,21 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
             row.innerHTML = `
               <span class="bracket-flag">${flag}</span>
               <span class="bracket-name ${isTbd(actTeam)?'bracket-team--tbd':''}">${name}</span>
-              ${isActWin ? '<span class="bracket-check">✓</span>' : ''}`;
+              ${isActWin ? '<span class="bracket-check">&#x2713;</span>' : ''}`;
           } else {
             const name = isTbd(myTeam) ? (side==='home' ? fixture.home?.name : fixture.away?.name) || 'TBD' : teamName(myTeam);
             const flag = isTbd(myTeam) ? '' : teamFlag(myTeam);
             row.innerHTML = `
               <span class="bracket-flag">${flag}</span>
               <span class="bracket-name ${isTbd(myTeam)?'bracket-team--tbd':''}">${name}</span>
-              ${isMyPick ? '<span class="bracket-check">✓</span>' : ''}`;
+              ${isMyPick ? '<span class="bracket-check">&#x2713;</span>' : ''}`;
           }
 
           row.addEventListener('click', () => {
             if (bracketView === 'actual') return;
             if (bracketPicks[matchId] !== side) clearDownstreamPicks(matchId);
             bracketPicks[matchId] = side;
-            saveBracketPicks(); renderKnockoutBracket();
+            persistBracketPicks(); renderKnockoutBracket();
           });
           return row;
         };
@@ -925,33 +922,33 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
       const actFlag = actualChamp ? teamFlag(actualChamp) : '';
       const isCorrect = myName && actName && myName === actName;
       champCard.innerHTML = `
-        <div class="bracket-champion-trophy">🏆</div>
+        <div class="bracket-champion-trophy">&#x1F3C6;</div>
         <div class="champion-overlay-grid">
           <div class="champion-col champion-col--pred">
             <div class="champion-col-label">Your Pick</div>
-            ${myChamp ? `<div class="champion-flag">${myFlag}</div><div class="champion-name">${myName}</div>` : '<div class="champion-tbd">Make picks →</div>'}
+            ${myChamp ? `<div class="champion-flag">${myFlag}</div><div class="champion-name">${myName}</div>` : '<div class="champion-tbd">Make picks &#x2192;</div>'}
           </div>
           ${actualChamp ? `
           <div class="champion-col champion-col--actual">
-            <div class="champion-col-label">Champion 🥇</div>
+            <div class="champion-col-label">Champion &#x1F947;</div>
             <div class="champion-flag">${actFlag}</div>
             <div class="champion-name champion-name--actual">${actName}</div>
-            ${isCorrect ? '<div class="champion-correct-badge">🎉 Correct!</div>' : ''}
+            ${isCorrect ? '<div class="champion-correct-badge">&#x1F389; Correct!</div>' : ''}
           </div>` : ''}
         </div>`;
     } else if (bracketView === 'actual') {
       champCard.innerHTML = actualChamp
-        ? `<div class="bracket-champion-trophy">🏆</div>
+        ? `<div class="bracket-champion-trophy">&#x1F3C6;</div>
            <div class="bracket-champion-flag">${teamFlag(actualChamp)}</div>
            <div class="bracket-champion-name">${teamName(actualChamp)}</div>`
-        : `<div class="bracket-champion-trophy" style="opacity:0.3">🏆</div>
+        : `<div class="bracket-champion-trophy" style="opacity:0.3">&#x1F3C6;</div>
            <div class="bracket-champion-empty">To be determined</div>`;
     } else {
       champCard.innerHTML = myChamp
-        ? `<div class="bracket-champion-trophy">🏆</div>
+        ? `<div class="bracket-champion-trophy">&#x1F3C6;</div>
            <div class="bracket-champion-flag">${teamFlag(myChamp)}</div>
            <div class="bracket-champion-name">${teamName(myChamp)}</div>`
-        : `<div class="bracket-champion-trophy" style="opacity:0.3">🏆</div>
+        : `<div class="bracket-champion-trophy" style="opacity:0.3">&#x1F3C6;</div>
            <div class="bracket-champion-empty">Pick a champion</div>`;
     }
 
@@ -961,14 +958,30 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     // ── Toolbar button handlers ──
     container.querySelector('#bracket-reset-all-btn')?.addEventListener('click', () => {
       if (confirm('Reset all bracket picks?')) {
-        bracketPicks = {}; saveBracketPicks(); renderKnockoutBracket();
+        bracketPicks = {}; persistBracketPicks(); renderKnockoutBracket();
       }
     });
+
+    // Fix: Seed from Groups now uses resolveFixtureTeams to pick the predicted qualifier
+    // rather than blindly defaulting every slot to 'home'.
     container.querySelector('#bracket-seed-btn')?.addEventListener('click', () => {
       const r32ids = ['r32-1','r32-2','r32-3','r32-4','r32-5','r32-6','r32-7','r32-8',
                       'r32-9','r32-10','r32-11','r32-12','r32-13','r32-14','r32-15','r32-16'];
-      r32ids.forEach(id => { if (!bracketPicks[id]) bracketPicks[id] = 'home'; });
-      saveBracketPicks(); renderKnockoutBracket();
+      r32ids.forEach(id => {
+        if (bracketPicks[id]) return; // don't overwrite existing picks
+        const fixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === id);
+        if (!fixture) return;
+        const { homeTeam, awayTeam } = resolveFixtureTeams(fixture, 'pick');
+        // Prefer home if both resolved, otherwise pick whichever side is known
+        if (homeTeam && !homeTeam.name?.match(/^[12][A-L]$/) && !homeTeam.name?.startsWith('W ')) {
+          bracketPicks[id] = 'home';
+        } else if (awayTeam && !awayTeam.name?.match(/^[12][A-L]$/) && !awayTeam.name?.startsWith('W ')) {
+          bracketPicks[id] = 'away';
+        } else {
+          bracketPicks[id] = 'home'; // fallback if no group predictions yet
+        }
+      });
+      persistBracketPicks(); renderKnockoutBracket();
     });
   }
 
