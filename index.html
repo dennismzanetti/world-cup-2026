@@ -16,30 +16,21 @@
 
   <!-- Auth Modal -->
   <div id="auth-backdrop" class="modal-backdrop" hidden></div>
-  <div id="auth-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="auth-heading" hidden>
-    <button id="auth-close-btn" class="modal-close" aria-label="Close">&times;</button>
-    <h2 id="auth-heading" class="modal-heading">Sign In</h2>
-    <p id="auth-error" class="auth-error" hidden></p>
+  <div id="auth-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="auth-title" hidden>
+    <button id="auth-close" class="modal-close" aria-label="Close">&times;</button>
+    <h2 id="auth-title" class="modal-heading">Sign In</h2>
+    <p id="auth-sub" class="modal-sub">Sign in to save your predictions.</p>
+    <p id="auth-error" class="auth-error"></p>
     <form id="auth-form" novalidate>
-      <div id="sign-in-form">
-        <label for="signin-email">Email</label>
-        <input id="signin-email" type="email" autocomplete="email" required />
-        <label for="signin-password">Password</label>
-        <input id="signin-password" type="password" autocomplete="current-password" required />
-      </div>
-      <div id="sign-up-form" class="hidden">
-        <label for="signup-name">Display Name</label>
-        <input id="signup-name" type="text" autocomplete="name" />
-        <label for="signup-email">Email</label>
-        <input id="signup-email" type="email" autocomplete="email" required />
-        <label for="signup-password">Password</label>
-        <input id="signup-password" type="password" autocomplete="new-password" required />
-      </div>
-      <button id="auth-submit-btn" class="btn btn-primary btn-full" type="submit">Sign In</button>
+      <label for="auth-email">Email</label>
+      <input id="auth-email" type="email" autocomplete="email" required />
+      <label for="auth-password">Password</label>
+      <input id="auth-password" type="password" autocomplete="current-password" required />
+      <button id="auth-submit" class="btn btn-primary btn-full" type="submit">Sign In</button>
     </form>
     <p class="auth-toggle-text">
       Don&rsquo;t have an account?
-      <a href="#" id="auth-toggle-link">Sign up</a>
+      <a href="#" id="auth-switch">Sign up</a>
     </p>
   </div>
 
@@ -74,7 +65,7 @@
           <span id="user-greeting" class="user-greeting"></span>
           <button id="sign-out-btn" class="btn btn-ghost btn-sm">Sign Out</button>
         </div>
-        <button id="auth-open-btn" class="btn btn-primary btn-sm">Sign In</button>
+        <button id="auth-btn" class="btn btn-primary btn-sm">Sign In</button>
       </div>
     </div>
   </header>
@@ -89,7 +80,7 @@
           <h1 class="page-title">Group Stage</h1>
           <p class="page-subtitle">2026 FIFA World Cup &mdash; 48 teams, 12 groups</p>
         </div>
-        <div class="groups-grid" id="groups-container"></div>
+        <div class="groups-grid" id="groups-grid"></div>
       </div>
     </section>
 
@@ -113,10 +104,10 @@
           <select id="match-venue-filter">
             <option value="all">All Venues</option>
           </select>
-          <label for="match-search" class="sr-only">Team:</label>
-          <input id="match-search" type="search" placeholder="Search team&hellip;" autocomplete="off" class="filter-search-input">
+          <label for="match-team-filter" class="sr-only">Team:</label>
+          <input id="match-team-filter" type="search" placeholder="Search team&hellip;" autocomplete="off" class="filter-search-input">
         </div>
-        <div id="matches-container"></div>
+        <div id="matches-list"></div>
       </div>
     </section>
 
@@ -154,7 +145,7 @@
             <label for="pred-team-filter">Team:</label>
             <input id="pred-team-filter" type="search" placeholder="Search team&hellip;" autocomplete="off" class="filter-search-input">
           </div>
-          <div id="pred-picks-container"></div>
+          <div id="predictions-list"></div>
         </div>
 
         <!-- Group Standings panel -->
@@ -190,7 +181,7 @@
           <h1 class="page-title">Standings</h1>
           <p class="page-subtitle">Group standings update automatically as results are entered</p>
         </div>
-        <div class="standings-grid" id="standings-container"></div>
+        <div class="standings-grid" id="standings-grid"></div>
       </div>
     </section>
 
