@@ -1,10 +1,11 @@
 // sync/live-scores.js
 // Fetches live World Cup 2026 scores via ESPN APIs and writes to Firestore.
-// Gets event IDs from scoreboard, then fetches each summary for fresh status.
+// Auto-seeds matches from data/matches.json if collection is empty.
 // No API key needed.
 // Requires: FIREBASE_SERVICE_ACCOUNT_JSON (GitHub Secret)
 
 import fetch from 'node-fetch';
+import { readFile } from 'fs/promises';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
@@ -17,6 +18,29 @@ const HEADERS = { 'User-Agent': 'world-cup-2026-sync/1.0' };
 
 const SCOREBOARD_URL = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard';
 const SUMMARY_URL    = id => `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/summary?event=${id}`;
+
+// ─── Auto-seed if matches collection is empty ────────────────────────────────
+async function ensureSeeded() {
+  const sample = await db.collection('matches').limit(1).get();
+  if (!sample.empty) {
+    console.log('  matches collection already seeded — skipping.');
+    return;
+  }
+  console.log('  matches collection is empty — seeding from data/matches.json…');
+  const raw     = await readFile(new URL('../data/matches.json', import.meta.url), 'utf8');
+  const matches = JSON.parse(raw);
+
+  // Firestore batch limit is 500 writes
+  const CHUNK = 500;
+  for (let i = 0; i < matches.length; i += CHUNK) {
+    const batch = db.batch();
+    for (const m of matches.slice(i, i + CHUNK)) {
+      batch.set(db.collection('matches').doc(m.id), m);
+    }
+    await batch.commit();
+  }
+  console.log(`  ✓ Seeded ${matches.length} matches.`);
+}
 
 // ─── Team name normalisation ──────────────────────────────────────────────────
 const TEAM_NAME_MAP = {
@@ -98,8 +122,11 @@ function parseMinute(statusObj) {
 }
 
 async function syncScores() {
-  console.log(`[${new Date().toISOString()}] Fetching scoreboard from ESPN…`);
+  console.log(`[${new Date().toISOString()}] Starting sync…`);
 
+  await ensureSeeded();
+
+  console.log('  Fetching scoreboard from ESPN…');
   const sbRes = await fetch(SCOREBOARD_URL, { headers: HEADERS });
   if (!sbRes.ok) { console.error(`Scoreboard error: ${sbRes.status}`); process.exit(1); }
   const sbData  = await sbRes.json();
@@ -124,18 +151,15 @@ async function syncScores() {
     const awayComp = comp.competitors?.find(c => c.homeAway === 'away');
     if (!homeComp || !awayComp) continue;
 
-    const homeTeam = normalise(homeComp.team.displayName);
-    const awayTeam = normalise(awayComp.team.displayName);
+    const homeTeam  = normalise(homeComp.team.displayName);
+    const awayTeam  = normalise(awayComp.team.displayName);
     const statusObj = comp.status;
     const status    = parseStatus(statusObj);
     const minute    = parseMinute(statusObj);
 
-    console.log(`  -> ${homeTeam} vs ${awayTeam} | state=${statusObj?.type?.state} | name=${statusObj?.type?.name} | clock=${statusObj?.displayClock} | score=${homeComp.score}-${awayComp.score}`);
+    console.log(`  -> ${homeTeam} vs ${awayTeam} | state=${statusObj?.type?.state} | clock=${statusObj?.displayClock} | score=${homeComp.score}-${awayComp.score}`);
 
-    if (status === 'scheduled') {
-      console.log(`  Skipping (not started).`);
-      continue;
-    }
+    if (status === 'scheduled') { console.log(`  Skipping (not started).`); continue; }
 
     const homeScore = parseInt(homeComp.score ?? '0', 10);
     const awayScore = parseInt(awayComp.score ?? '0', 10);
