@@ -1,8 +1,6 @@
 // sync/live-scores.js
 // Fetches live World Cup 2026 scores via ESPN APIs and writes to Firestore.
-// Strategy: scoreboard gives us today's event IDs, then we hit each
-// event's summary endpoint which is more reliably real-time.
-//
+// Gets event IDs from scoreboard, then fetches each summary for fresh status.
 // No API key needed.
 // Requires: FIREBASE_SERVICE_ACCOUNT_JSON (GitHub Secret)
 
@@ -16,7 +14,6 @@ const db = admin.firestore();
 
 const HEADERS = { 'User-Agent': 'world-cup-2026-sync/1.0' };
 
-// ─── ESPN endpoints ─────────────────────────────────────────────────────────
 const SCOREBOARD_URL = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard';
 const SUMMARY_URL    = id => `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/summary?event=${id}`;
 
@@ -99,30 +96,29 @@ function parseMinute(statusObj) {
   return isNaN(mins) || mins === 0 ? null : mins;
 }
 
-// ─── Main sync ────────────────────────────────────────────────────────────────
 async function syncScores() {
   console.log(`[${new Date().toISOString()}] Fetching scoreboard from ESPN…`);
 
-  const sbRes  = await fetch(SCOREBOARD_URL, { headers: HEADERS });
+  const sbRes = await fetch(SCOREBOARD_URL, { headers: HEADERS });
   if (!sbRes.ok) { console.error(`Scoreboard error: ${sbRes.status}`); process.exit(1); }
-  const sbData = await sbRes.json();
-  const events = sbData.events ?? [];
-  console.log(`  Scoreboard: ${events.length} event(s) today.`);
-
+  const sbData  = await sbRes.json();
+  const events  = sbData.events ?? [];
+  console.log(`  Scoreboard returned ${events.length} event(s).`);
   if (!events.length) { console.log('  No matches today.'); return; }
 
   let updated = 0;
 
   for (const event of events) {
     const eventId = event.id;
+    console.log(`  Fetching summary for event ${eventId} (${event.name})…`);
 
-    // Fetch the per-match summary for fresher status data
-    const sumRes  = await fetch(SUMMARY_URL(eventId), { headers: HEADERS });
-    if (!sumRes.ok) { console.warn(`  Summary fetch failed for event ${eventId}: ${sumRes.status}`); continue; }
+    // Always fetch the summary — it has fresher status than the scoreboard cache
+    const sumRes = await fetch(SUMMARY_URL(eventId), { headers: HEADERS });
+    if (!sumRes.ok) { console.warn(`  Summary error ${sumRes.status} for event ${eventId}`); continue; }
     const sumData = await sumRes.json();
 
     const comp = sumData.header?.competitions?.[0];
-    if (!comp) continue;
+    if (!comp) { console.warn('  No competition found in summary'); continue; }
 
     const homeComp = comp.competitors?.find(c => c.homeAway === 'home');
     const awayComp = comp.competitors?.find(c => c.homeAway === 'away');
@@ -130,13 +126,14 @@ async function syncScores() {
 
     const homeTeam = normalise(homeComp.team.displayName);
     const awayTeam = normalise(awayComp.team.displayName);
-    const status   = parseStatus(comp.status);
-    const minute   = parseMinute(comp.status);
+    const statusObj = comp.status;
+    const status    = parseStatus(statusObj);
+    const minute    = parseMinute(statusObj);
 
-    console.log(`  [${homeTeam} vs ${awayTeam}] state=${comp.status?.type?.state} name=${comp.status?.type?.name} clock=${comp.status?.displayClock}`);
+    console.log(`  -> ${homeTeam} vs ${awayTeam} | state=${statusObj?.type?.state} | name=${statusObj?.type?.name} | clock=${statusObj?.displayClock} | score=${homeComp.score}-${awayComp.score}`);
 
     if (status === 'scheduled') {
-      console.log(`  Skipping (not started): ${homeTeam} vs ${awayTeam}`);
+      console.log(`  Skipping (not started).`);
       continue;
     }
 
@@ -150,15 +147,12 @@ async function syncScores() {
       .get();
 
     if (snap.empty) {
-      console.warn(`  ⚠ No Firestore doc found for: ${homeTeam} vs ${awayTeam}`);
+      console.warn(`  ⚠ No Firestore doc: ${homeTeam} vs ${awayTeam}`);
       continue;
     }
 
     await snap.docs[0].ref.update({
-      homeScore,
-      awayScore,
-      status,
-      minute,
+      homeScore, awayScore, status, minute,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
