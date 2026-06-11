@@ -237,8 +237,9 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
   function populatePredFilters() {
     const dateEl  = document.getElementById('pred-date-filter');
     const stageEl = document.getElementById('pred-group-filter');
-    if (dateEl && dateEl.options.length <= 1) {
-      // Only populate once — preserve user selection on re-renders
+
+    // Use data-populated attribute as a reliable once-only guard
+    if (dateEl && !dateEl.dataset.populated) {
       const dates = [...new Set(liveMatches.map(m => m.date).filter(Boolean))].sort();
       dates.forEach(d => {
         const opt = document.createElement('option');
@@ -246,9 +247,11 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
         opt.textContent = d;
         dateEl.appendChild(opt);
       });
+      dateEl.dataset.populated = '1';
     }
-    if (stageEl && stageEl.options.length <= 1) {
-      // Groups
+
+    if (stageEl && !stageEl.dataset.populated) {
+      // Groups A–L
       WC_GROUPS.forEach(g => {
         const opt = document.createElement('option');
         opt.value = g.id;
@@ -263,10 +266,11 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
         opt.textContent = label;
         stageEl.appendChild(opt);
       });
+      stageEl.dataset.populated = '1';
     }
   }
 
-  // ─── Groups ───────────────────────────────────────────────────────────────
+  // ─── Groups ──────────────────────────────────────────────────────────────
   function renderGroups() {
     const container = document.getElementById('groups-grid');
     if (!container) return;
@@ -512,7 +516,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     authPrompt?.setAttribute('hidden', '');
     if (filtersBar) filtersBar.hidden = false;
 
-    // Populate filter dropdowns (only fills them once; preserves selections on re-render)
+    // Populate dropdowns exactly once (guarded by data-populated)
     populatePredFilters();
 
     // Read current filter values
@@ -520,7 +524,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     const stageVal = document.getElementById('pred-group-filter')?.value || 'all';
     const teamVal  = (document.getElementById('pred-team-filter')?.value || '').toLowerCase().trim();
 
-    // Filter matches — all group matches from liveMatches
+    // Apply filters
     let matches = liveMatches.slice();
     if (dateVal  !== 'all') matches = matches.filter(m => m.date === dateVal);
     if (stageVal !== 'all') matches = matches.filter(m => (m.group || m.stage) === stageVal);
@@ -821,7 +825,8 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
   // ─── Init ─────────────────────────────────────────────────────────────────
   function init() {
     populateMatchFilters();
-    populatePredFilters();
+    // Note: populatePredFilters() is NOT called here — it runs lazily
+    // inside renderPredictions() the first time the user visits that tab.
     renderGroups();
   }
   init();
