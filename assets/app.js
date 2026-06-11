@@ -234,11 +234,13 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
   }
 
   // ─── Populate filters (Predictions tab) ───────────────────────────────────────
+  // Option values for knockout stages MUST match the `stage` strings used in data.js
+  // e.g. 'Round of 32', 'Round of 16', 'Quarterfinals', 'Semifinals', 'Third Place', 'Final'
+  // Group options use the group letter (e.g. 'A'), matching m.group on group-stage matches.
   function populatePredFilters() {
     const dateEl  = document.getElementById('pred-date-filter');
     const stageEl = document.getElementById('pred-group-filter');
 
-    // Use data-populated attribute as a reliable once-only guard
     if (dateEl && !dateEl.dataset.populated) {
       const dates = [...new Set(liveMatches.map(m => m.date).filter(Boolean))].sort();
       dates.forEach(d => {
@@ -251,18 +253,24 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     }
 
     if (stageEl && !stageEl.dataset.populated) {
-      // Groups A–L
+      // Groups A–L  (value = group letter, matches m.group)
       WC_GROUPS.forEach(g => {
         const opt = document.createElement('option');
         opt.value = g.id;
         opt.textContent = `Group ${g.id}`;
         stageEl.appendChild(opt);
       });
-      // Knockout stages
-      [['R32','Round of 32'],['R16','Round of 16'],['QF','Quarter-Finals'],
-       ['SF','Semi-Finals'],['3P','Third Place'],['F','Final']].forEach(([val, label]) => {
+      // Knockout stages — values must exactly match the `stage` field in data.js
+      [
+        ['Round of 32',   'Round of 32'],
+        ['Round of 16',   'Round of 16'],
+        ['Quarterfinals', 'Quarter-Finals'],
+        ['Semifinals',    'Semi-Finals'],
+        ['Third Place',   'Third Place'],
+        ['Final',         'Final'],
+      ].forEach(([val, label]) => {
         const opt = document.createElement('option');
-        opt.value = val;
+        opt.value = val;    // matches m.stage exactly
         opt.textContent = label;
         stageEl.appendChild(opt);
       });
@@ -524,7 +532,7 @@ import { watchMatches, savePrediction, getUserPredictions, updateMatchResult } f
     const stageVal = document.getElementById('pred-group-filter')?.value || 'all';
     const teamVal  = (document.getElementById('pred-team-filter')?.value || '').toLowerCase().trim();
 
-    // Apply filters
+    // Apply filters — group-stage matches use m.group; knockout matches use m.stage
     let matches = liveMatches.slice();
     if (dateVal  !== 'all') matches = matches.filter(m => m.date === dateVal);
     if (stageVal !== 'all') matches = matches.filter(m => (m.group || m.stage) === stageVal);
