@@ -5,7 +5,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
 
 (function () {
 
-  // ─── State ───────────────────────────────────────────────────────────────
+  // ─── State ──────────────────────────────────────────────────────────────────────────
   let currentUser      = null;
   let authResolved     = false;
   let activeTab        = 'groups';
@@ -19,7 +19,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
   function allPredMatches() { return [...liveMatches, ...WC_KNOCKOUT_FIXTURES]; }
   function allTabMatches()  { return liveMatches.slice(); }
 
-  // ─── Bracket rounds — IDs must match WC_KNOCKOUT_FIXTURES string IDs ─────
+  // ─── Bracket rounds ───────────────────────────────────────────────────────
   const BRACKET_ROUNDS = [
     { label: 'Round of 32',    ids: ['r32-1','r32-2','r32-3','r32-4','r32-5','r32-6','r32-7','r32-8','r32-9','r32-10','r32-11','r32-12','r32-13','r32-14','r32-15','r32-16'] },
     { label: 'Round of 16',    ids: ['r16-1','r16-2','r16-3','r16-4','r16-5','r16-6','r16-7','r16-8'] },
@@ -28,15 +28,15 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     { label: 'Final',          ids: ['final'] },
   ];
 
-  // ─── Admin UIDs ───────────────────────────────────────────────────────────
+  // ─── Admin UIDs ──────────────────────────────────────────────────────────────
   const ADMIN_UIDS = ['EAi3lYhlSFYGaqm9F87BdJb1Vrg1'];
 
-  // ─── Team helpers ─────────────────────────────────────────────────────────
+  // ─── Team helpers ──────────────────────────────────────────────────────────
   function teamName(t)    { return (t && typeof t === 'object') ? t.name : (t || ''); }
   function teamFlag(t)    { return (t && typeof t === 'object') ? (t.flag || '') : ''; }
   function teamDisplay(t) { return teamFlag(t) ? `${teamFlag(t)} ${teamName(t)}` : teamName(t); }
 
-  // ─── Date formatting ──────────────────────────────────────────────────────
+  // ─── Date formatting ──────────────────────────────────────────────────────────
   function formatDateHeader(isoDate) {
     if (!isoDate) return 'Date TBD';
     const [year, month, day] = isoDate.split('-').map(Number);
@@ -44,11 +44,11 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     return d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   }
 
-  // ─── Modal helpers ────────────────────────────────────────────────────────
+  // ─── Modal helpers ──────────────────────────────────────────────────────────
   function openModal()  { document.getElementById('auth-modal')?.removeAttribute('hidden'); document.getElementById('auth-backdrop')?.removeAttribute('hidden'); }
   function closeModal() { document.getElementById('auth-modal')?.setAttribute('hidden', ''); document.getElementById('auth-backdrop')?.setAttribute('hidden', ''); }
 
-  // ─── Sub-tab switching ────────────────────────────────────────────────────
+  // ─── Sub-tab switching ─────────────────────────────────────────────────────────
   function switchPredSubtab(id) {
     activePredSubtab = id;
     document.querySelectorAll('.sub-tab').forEach(btn => {
@@ -70,7 +70,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     if (id === 'pred-bracket')         renderKnockoutBracket();
   }
 
-  // ─── Main tab switching ───────────────────────────────────────────────────
+  // ─── Main tab switching ─────────────────────────────────────────────────────────
   function switchTab(id) {
     activeTab = id;
     document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -86,7 +86,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     if (id === 'predictions') switchPredSubtab(activePredSubtab);
   }
 
-  // ─── Auth ─────────────────────────────────────────────────────────────────
+  // ─── Auth ───────────────────────────────────────────────────────────────────────────
   watchAuth(async user => {
     if (unsubPredictions) { unsubPredictions(); unsubPredictions = null; }
     currentUser  = user;
@@ -126,7 +126,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     }
   }
 
-  // ─── Bracket picks persistence (Firestore, debounced) ────────────────────
+  // ─── Bracket picks persistence ───────────────────────────────────────────────────
   function persistBracketPicks() {
     if (!currentUser) return;
     clearTimeout(bracketSaveTimer);
@@ -136,7 +136,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     }, 600);
   }
 
-  // ─── Event Listeners ──────────────────────────────────────────────────────
+  // ─── Event Listeners ──────────────────────────────────────────────────────────
   document.querySelectorAll('.nav-btn').forEach(btn =>
     btn.addEventListener('click', () => switchTab(btn.dataset.view)));
   document.querySelectorAll('.sub-tab').forEach(btn =>
@@ -191,7 +191,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
   document.getElementById('pred-group-filter')?.addEventListener('change', renderPredictions);
   document.getElementById('pred-team-filter')?.addEventListener('input', renderPredictions);
 
-  // ─── Live match data ──────────────────────────────────────────────────────
+  // ─── Live match data ──────────────────────────────────────────────────────────
   watchMatches(allMatches => {
     allMatches.forEach(um => {
       const idx = liveMatches.findIndex(m => m.id === um.id);
@@ -200,7 +200,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     if (authResolved) renderAll();
   });
 
-  // ─── Points calculator ────────────────────────────────────────────────────
+  // ─── Points calculator ──────────────────────────────────────────────────────────
   function calcPoints(teams, matches) {
     const stats = {};
     teams.forEach(t => { const n = teamName(t); stats[n] = { team: t, played:0, won:0, drawn:0, lost:0, gf:0, ga:0, gd:0, pts:0 }; });
@@ -220,12 +220,12 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     return Object.values(stats).sort((a,b) => b.pts-a.pts || b.gd-a.gd || b.gf-a.gf || teamName(a.team).localeCompare(teamName(b.team)));
   }
 
-  // ─── Stage label ──────────────────────────────────────────────────────────
+  // ─── Stage label ────────────────────────────────────────────────────────────────────
   const stageKeyToLabel = key => ({
     R32:'Round of 32', R16:'Round of 16', QF:'Quarter-Finals', SF:'Semi-Finals', '3P':'Third Place', F:'Final'
   }[key] || (/^[A-Z]$/.test(key) ? `Group ${key}` : key));
 
-  // ─── Populate filters (Matches tab) ──────────────────────────────────────
+  // ─── Populate filters (Matches tab) ───────────────────────────────────────────────
   function populateMatchFilters() {
     const dateEl  = document.getElementById('match-date-filter');
     const stageEl = document.getElementById('match-group-filter');
@@ -247,7 +247,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     }
   }
 
-  // ─── Populate filters (Predictions tab) ──────────────────────────────────
+  // ─── Populate filters (Predictions tab) ───────────────────────────────────────────────
   function populatePredFilters() {
     const dateEl  = document.getElementById('pred-date-filter');
     const stageEl = document.getElementById('pred-group-filter');
@@ -275,7 +275,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     }
   }
 
-  // ─── Groups ───────────────────────────────────────────────────────────────
+  // ─── Groups ──────────────────────────────────────────────────────────────────────────
   function renderGroups() {
     const container = document.getElementById('groups-grid');
     if (!container) return;
@@ -302,7 +302,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     });
   }
 
-  // ─── Render by date ───────────────────────────────────────────────────────
+  // ─── Render by date ─────────────────────────────────────────────────────────────
   function renderByDate(container, matches, isPred) {
     const sorted = matches.slice().sort((a,b) => {
       const da = (a.date||'') + (a.timeLocal||'');
@@ -327,7 +327,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     });
   }
 
-  // ─── Matches tab ──────────────────────────────────────────────────────────
+  // ─── Matches tab ──────────────────────────────────────────────────────────────────
   function renderMatches() {
     const container = document.getElementById('matches-list');
     if (!container) return;
@@ -346,14 +346,35 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     renderByDate(container, matches, false);
   }
 
-  // ─── Match card ───────────────────────────────────────────────────────────
+  // ─── Broadcaster row builder ─────────────────────────────────────────────────────
+  // TV icon SVG
+  const TV_ICON = `<svg class="meta-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M5 13.5h6M8 13v.5"/></svg>`;
+  // Stream icon SVG
+  const STREAM_ICON = `<svg class="meta-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 4.5C3 4.5 1 6 1 8s2 3.5 2 3.5M13 4.5s2 1.5 2 3.5-2 3.5-2 3.5M5.5 6.5S4.5 7 4.5 8s1 1.5 1 1.5M10.5 6.5S11.5 7 11.5 8s-1 1.5-1 1.5"/><circle cx="8" cy="8" r="1.25" fill="currentColor" stroke="none"/></svg>`;
+
+  function buildBroadcastRow(m) {
+    const parts = [];
+    const tvEn  = Array.isArray(m.tvEnglish)  ? m.tvEnglish  : (m.tvEnglish  ? [m.tvEnglish]  : []);
+    const tvEs  = Array.isArray(m.tvSpanish)  ? m.tvSpanish  : (m.tvSpanish  ? [m.tvSpanish]  : []);
+    const strm  = Array.isArray(m.streaming)  ? m.streaming  : (m.streaming  ? [m.streaming]  : []);
+
+    if (tvEn.length || tvEs.length) {
+      const combined = [...new Set([...tvEn, ...tvEs])];
+      parts.push(`<span class="card-meta-item">${TV_ICON}${combined.map(c => `<span class="broadcaster-chip">${c}</span>`).join('')}</span>`);
+    }
+    if (strm.length) {
+      parts.push(`<span class="card-meta-item">${STREAM_ICON}${strm.map(s => `<span class="broadcaster-chip broadcaster-chip--stream">${s}</span>`).join('')}</span>`);
+    }
+    return parts.length ? `<div class="card-meta card-meta-broadcast">${parts.join('')}</div>` : '';
+  }
+
+  // ─── Match card ────────────────────────────────────────────────────────────────────
   function buildMatchCard(m, isPred) {
     const card     = document.createElement('div');
     card.className = 'match-card' + (m.status === 'live' ? ' match-card-live' : '');
     const stageLabel = m.group ? `Group ${m.group}` : stageKeyToLabel(m.stage || '');
     const isAdmin    = currentUser && ADMIN_UIDS.includes(currentUser.uid);
     const isKnockout = !!m.homeSource;
-    // For knockout fixtures on the predictions tab, resolve names from predicted standings
     const hn = isKnockout && isPred
       ? (resolveKnockoutTeamForPreds(m.homeSource || m.home) || slotLabel(m.homeSource))
       : teamName(m.home);
@@ -422,7 +443,8 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       <div class="card-meta">
         ${m.venue ? `<span class="card-meta-item"><svg class="meta-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/><path d="M13 6c0 4.5-5 8.5-5 8.5S3 10.5 3 6a5 5 0 0 1 10 0z"/></svg>${m.venue}${m.city ? ', '+m.city : ''}</span>` : ''}
         ${dtStr  ? `<span class="card-meta-item"><svg class="meta-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M5 1.5v3M11 1.5v3M2 7h12"/></svg>${dtStr}</span>` : ''}
-      </div>` : ''}`;
+      </div>` : ''}
+      ${buildBroadcastRow(m)}`;
     if (isPred && currentUser) {
       card.querySelector('.save-pred-btn')?.addEventListener('click', async () => {
         const savingEl = card.querySelector('.pred-saving');
@@ -465,7 +487,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     return card;
   }
 
-  // ─── Predictions (My Picks) ───────────────────────────────────────────────
+  // ─── Predictions (My Picks) ────────────────────────────────────────────────────────
   function renderPredictions() {
     const container  = document.getElementById('predictions-list');
     const authPrompt = document.getElementById('predictions-auth-prompt');
@@ -499,7 +521,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     renderByDate(container, matches, true);
   }
 
-  // ─── Predicted Group Standings ────────────────────────────────────────────
+  // ─── Predicted Group Standings ────────────────────────────────────────────────────────
   function calcPredPoints(teams, matches) {
     const stats = {};
     teams.forEach(t => { const n = teamName(t); stats[n] = { team:t, played:0, won:0, drawn:0, lost:0, gf:0, ga:0, gd:0, pts:0 }; });
@@ -549,7 +571,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     });
   }
 
-  // ─── Prediction Accuracy ──────────────────────────────────────────────────
+  // ─── Prediction Accuracy ─────────────────────────────────────────────────────────────
   function renderPredStandings() {
     const container  = document.getElementById('pred-standings-container');
     const authPrompt = document.getElementById('pred-standings-auth-prompt');
@@ -577,7 +599,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       </div>`;
   }
 
-  // ─── Knockout Bracket ─────────────────────────────────────────────────────
+  // ─── Knockout Bracket ─────────────────────────────────────────────────────────────────
 
   function getActualGroupFinisher(groupId, rank) {
     const group = WC_GROUPS.find(g => g.id === groupId);
@@ -595,7 +617,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     return calcPredPoints(group.teams, gm)[rank-1]?.team || null;
   }
 
-  // Resolve a slot using actual results first, then predicted standings as fallback
   function resolveKnockoutTeam(slot, depth = 0) {
     if (depth > 10 || !slot) return slot;
     const groupMatch = slot.match(/^(\d)([A-Z])$/);
@@ -617,7 +638,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     return slot;
   }
 
-  // Human-readable label for a source slot when no team is resolved yet
   function slotLabel(source) {
     if (!source) return 'TBD';
     if (source.type === 'group') {
@@ -629,11 +649,8 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     return 'TBD';
   }
 
-  // Predictions-only resolver — uses homeSource/awaySource for clean resolution
-  // Returns team name string if resolved, null if unpredicted (caller shows slotLabel)
   function resolveKnockoutTeamForPreds(source, depth = 0) {
     if (depth > 10 || source == null) return null;
-    // Legacy: accept raw name strings (normalize to source object)
     if (typeof source === 'string' || (typeof source === 'object' && source.name)) {
       const name = typeof source === 'string' ? source : source.name;
       const gm = name.match(/^(\d)([A-Z])$/);
@@ -659,7 +676,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     return null;
   }
 
-  // Clear this match pick and any downstream matches that depended on it
   function clearDownstreamPicks(fixtureId) {
     const toVisit = [fixtureId], visited = new Set();
     while (toVisit.length) {
@@ -682,11 +698,9 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       container.querySelectorAll('.pred-standings-signin-btn').forEach(b => b.addEventListener('click', openModal));
       return;
     }
-
     const totalPicks = BRACKET_ROUNDS.reduce((s, r) => s + r.ids.length, 0);
     const madePicks  = BRACKET_ROUNDS.reduce((s, r) => s + r.ids.filter(id => bracketPicks[id]).length, 0);
     const pct        = Math.round((madePicks / totalPicks) * 100);
-
     container.innerHTML = '';
     const header = document.createElement('div');
     header.className = 'bracket-header';
@@ -700,11 +714,9 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
         <button class="btn btn-sm btn-ghost" id="bracket-reset-all-btn">Reset All</button>
       </div>`;
     container.appendChild(header);
-
     const scrollArea = document.createElement('div');
     scrollArea.className = 'bracket-scroll';
     container.appendChild(scrollArea);
-
     BRACKET_ROUNDS.forEach(round => {
       const roundEl = document.createElement('div');
       roundEl.className = 'bracket-round';
@@ -720,7 +732,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       });
       labelEl.appendChild(resetBtn);
       roundEl.appendChild(labelEl);
-
       round.ids.forEach(matchId => {
         const fixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === matchId);
         if (!fixture) return;
@@ -751,7 +762,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       });
       scrollArea.appendChild(roundEl);
     });
-
     const finalId      = 'final';
     const finalFixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === finalId);
     const finalPick    = bracketPicks[finalId];
@@ -769,7 +779,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
         ? `<span class="trophy">🏆</span><span>${champion}</span>`
         : '<span class="muted">TBD</span>'}</div>`;
     scrollArea.appendChild(champEl);
-
     container.querySelector('#bracket-reset-all-btn')?.addEventListener('click', () => {
       bracketPicks = {}; persistBracketPicks(); renderKnockoutBracket();
     });
@@ -779,7 +788,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     });
   }
 
-  // ─── Init ─────────────────────────────────────────────────────────────────
+  // ─── Init ───────────────────────────────────────────────────────────────────────────
   function init() {
     populateMatchFilters();
     populatePredFilters();
