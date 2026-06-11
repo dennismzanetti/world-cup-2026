@@ -19,6 +19,11 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     return [...liveMatches, ...WC_KNOCKOUT_FIXTURES];
   }
 
+  // All matches for the Matches tab = group stage + knockout fixtures
+  function allTabMatches() {
+    return liveMatches.slice();
+  }
+
   // ─── Admin UIDs ───────────────────────────────────────────────────────────
   const ADMIN_UIDS = ['EAi3lYhlSFYGaqm9F87BdJb1Vrg1'];
 
@@ -26,6 +31,19 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
   function teamName(t) { return (t && typeof t === 'object') ? t.name : (t || ''); }
   function teamFlag(t) { return (t && typeof t === 'object') ? (t.flag || '') : ''; }
   function teamDisplay(t) { return teamFlag(t) ? `${teamFlag(t)} ${teamName(t)}` : teamName(t); }
+
+  // ─── Date formatting ──────────────────────────────────────────────────────
+  // Formats an ISO date string (YYYY-MM-DD) as "Weekday, Month Day, Year"
+  // e.g. "2026-06-11" → "Thursday, June 11, 2026"
+  function formatDateHeader(isoDate) {
+    if (!isoDate) return 'Date TBD';
+    // Parse without timezone shift by splitting manually
+    const [year, month, day] = isoDate.split('-').map(Number);
+    const d = new Date(year, month - 1, day);
+    return d.toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+  }
 
   // ─── Modal helpers ────────────────────────────────────────────────────────
   function openModal() {
@@ -236,17 +254,17 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     const stageEl = document.getElementById('match-group-filter');
     const venueEl = document.getElementById('match-venue-filter');
     if (dateEl) {
-      const dates = [...new Set(liveMatches.map(m => m.date).filter(Boolean))].sort();
+      const dates = [...new Set(allTabMatches().map(m => m.date).filter(Boolean))].sort();
       dateEl.innerHTML = '<option value="all">All Dates</option>' +
-        dates.map(d => `<option value="${d}">${d}</option>`).join('');
+        dates.map(d => `<option value="${d}">${formatDateHeader(d)}</option>`).join('');
     }
     if (stageEl) {
-      const stages = [...new Set(liveMatches.map(m => m.group || m.stage).filter(Boolean))];
+      const stages = [...new Set(allTabMatches().map(m => m.group || m.stage).filter(Boolean))];
       stageEl.innerHTML = '<option value="all">All Matches</option>' +
         stages.map(s => `<option value="${s}">${stageKeyToLabel(s)}</option>`).join('');
     }
     if (venueEl) {
-      const venues = [...new Set(liveMatches.map(m => m.venue).filter(Boolean))].sort();
+      const venues = [...new Set(allTabMatches().map(m => m.venue).filter(Boolean))].sort();
       venueEl.innerHTML = '<option value="all">All Venues</option>' +
         venues.map(v => `<option value="${v}">${v}</option>`).join('');
     }
@@ -260,7 +278,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
       const dates = [...new Set(allPredMatches().map(m => m.date).filter(Boolean))].sort();
       dates.forEach(d => {
         const opt = document.createElement('option');
-        opt.value = d; opt.textContent = d;
+        opt.value = d; opt.textContent = formatDateHeader(d);
         dateEl.appendChild(opt);
       });
     }
@@ -322,14 +340,13 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
   }
 
   // ─── Render by date (shared helper) ──────────────────────────────────────
-  // Sorts matches by date ascending, groups them under date section headers,
-  // and appends each card to `container` via `buildMatchCard(m, isPred)`.
+  // Sorts matches by date+time ascending, groups them under formatted date
+  // section headers, and appends each card via buildMatchCard(m, isPred).
   function renderByDate(container, matches, isPred) {
-    // Sort by date (ISO string compare works fine), then preserve original
-    // order within the same date (stable sort in modern engines).
+    // Sort by date then time within the same date
     const sorted = matches.slice().sort((a, b) => {
-      const da = a.date || '';
-      const db = b.date || '';
+      const da = (a.date || '') + (a.timeLocal || '');
+      const db = (b.date || '') + (b.timeLocal || '');
       if (da < db) return -1;
       if (da > db) return 1;
       return 0;
@@ -345,10 +362,10 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     });
 
     groups.forEach(g => {
-      // Date header
+      // Date header — formatted as "Weekday, Month Day, Year"
       const hdr = document.createElement('div');
       hdr.className = 'date-group-header';
-      hdr.textContent = g.date || 'Date TBD';
+      hdr.textContent = formatDateHeader(g.date);
       container.appendChild(hdr);
 
       // Cards for this date
@@ -367,7 +384,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
     const stageVal = document.getElementById('match-group-filter')?.value || 'all';
     const venueVal = document.getElementById('match-venue-filter')?.value || 'all';
     const teamVal  = (document.getElementById('match-team-filter')?.value || '').toLowerCase().trim();
-    let matches = liveMatches.slice();
+    let matches = allTabMatches();
     if (dateVal  !== 'all') matches = matches.filter(m => m.date === dateVal);
     if (stageVal !== 'all') matches = matches.filter(m => (m.group || m.stage) === stageVal);
     if (venueVal !== 'all') matches = matches.filter(m => m.venue === venueVal);
@@ -445,7 +462,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
       scoreColHtml = `<div class="card-score-col"><span class="${cls}">${hs} – ${as_}</span></div>`;
     }
 
-    const dtStr = [m.date, m.timeLocal, m.tz].filter(Boolean).join(' ');
+    const dtStr = [m.timeLocal, m.tz].filter(Boolean).join(' ');
 
     card.innerHTML = `
       <div class="card-header">
