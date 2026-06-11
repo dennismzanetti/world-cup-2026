@@ -54,14 +54,19 @@ export async function savePrediction(uid, matchId, home, away) {
 }
 
 /**
- * Load all predictions for a user.
- * Returns { matchId: { home, away } }
+ * Watch all predictions for a user in real-time.
+ * Calls cb({ matchId: { home, away } }) on every change.
+ * Returns an unsubscribe function.
  */
-export async function getUserPredictions(uid) {
-  const snap = await getDocs(collection(db, 'users', uid, 'predictions'));
-  const result = {};
-  snap.forEach(d => { result[d.id] = d.data(); });
-  return result;
+export function watchUserPredictions(uid, cb) {
+  return onSnapshot(collection(db, 'users', uid, 'predictions'), snap => {
+    const result = {};
+    snap.forEach(d => { result[d.id] = d.data(); });
+    cb(result);
+  }, err => {
+    console.error('watchUserPredictions error:', err);
+    cb({});
+  });
 }
 
 // ============================================================
