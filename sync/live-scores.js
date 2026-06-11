@@ -5,20 +5,23 @@
 // Requires: FIREBASE_SERVICE_ACCOUNT_JSON (GitHub Secret)
 
 import fetch from 'node-fetch';
-import { readFile } from 'fs/promises'
+import { readFile } from 'fs/promises';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
-// ─── Firebase Admin Init ─────────────────────────────────────────────────────
+// ─── Firebase Admin Init ──────────────────────────────────────────────────────
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
 
-// Debug: confirm which project + SA the secret points at
 console.log(`[init] project_id   : ${serviceAccount.project_id}`);
 console.log(`[init] client_email : ${serviceAccount.client_email}`);
 console.log(`[init] Firestore DB : wc2026`);
 
 const app = initializeApp({ credential: cert(serviceAccount) });
-const db  = getFirestore(app, 'wc2026');
+
+// Use settings() to specify the named database — more reliable than
+// the getFirestore(app, databaseId) overload across firebase-admin versions.
+const db = getFirestore(app);
+db.settings({ databaseId: 'wc2026' });
 
 const HEADERS = { 'User-Agent': 'world-cup-2026-sync/1.0' };
 
