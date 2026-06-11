@@ -342,16 +342,45 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
   border-color: var(--color-live-border);
   box-shadow: var(--shadow-sm), 0 0 0 1px var(--color-live-border);
 }
+
+/* Card header: group badge pinned left, date pinned right, status badge between */
 .card-header {
-  display: flex; align-items: center; gap: var(--space-3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
   padding: var(--space-2) var(--space-4);
-  background: var(--color-accent); color: #fff;
-  min-height: 2.25rem; flex-wrap: wrap;
+  background: var(--color-accent);
+  color: #fff;
+  min-height: 2.25rem;
+  flex-wrap: nowrap;
+  overflow: hidden;
 }
 .card-header-group {
-  font-family: var(--font-display); font-size: var(--text-sm);
-  letter-spacing: 0.1em; text-transform: uppercase; line-height: 1; white-space: nowrap;
-  background: rgba(255,255,255,0.15); border-radius: var(--radius-full); padding: 0.2rem 0.6rem; flex-shrink: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
+  background: rgba(255,255,255,0.15);
+  border-radius: var(--radius-full);
+  padding: 0.2rem 0.6rem;
+  flex-shrink: 0;
+}
+.card-header-date {
+  font-size: var(--text-xs);
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+  flex: 1;
+  min-width: 0;
+}
+/* Status badge pushed to right of group, before date */
+.card-header .status-badge {
+  flex-shrink: 0;
 }
 .card-header-matchup {
   flex: 1; display: flex; align-items: center; justify-content: center;
@@ -507,7 +536,8 @@ a, button, [role="button"], input, select { transition: color var(--transition-i
 @media (max-width: 600px) {
   .card-teams { grid-template-columns: 1fr 7rem 1fr; gap: var(--space-2); padding: var(--space-3) var(--space-3); }
   .score-input, .pred-input { width: 2.25rem; height: 2.25rem; font-size: var(--text-base); }
-  .card-header { padding: var(--space-2) var(--space-3); }
+  .card-header { padding: var(--space-2) var(--space-3); gap: var(--space-2); }
+  .card-header-date { font-size: 0.65rem; }
   .card-meta { padding: var(--space-2) var(--space-3); gap: var(--space-3); }
   .card-broadcast-row { padding: var(--space-2) var(--space-3); }
   .page-title { font-size: var(--text-xl); }
