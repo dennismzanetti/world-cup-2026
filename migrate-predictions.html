@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <title>Prediction ID Migration</title>
 <style>
-  body { font-family: monospace; background: #111; color: #ccc; padding: 2rem; max-width: 860px; margin: auto; }
+  body { font-family: monospace; background: #111; color: #ccc; padding: 2rem; max-width: 900px; margin: auto; }
   h1 { color: #4f98a3; }
   button { padding: .6rem 1.4rem; background: #4f98a3; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 1rem; margin: .5rem .5rem .5rem 0; }
   button:disabled { opacity: .4; cursor: default; }
@@ -13,37 +13,50 @@
   .warn{ color: #e8af34; }
   .err { color: #dd6974; }
   .info{ color: #5591c7; }
-  input { padding: .4rem .7rem; background: #1c1b19; border: 1px solid #444; border-radius: 5px; color: #ccc; font-size: .95rem; width: 280px; }
-  label { display: block; margin: .5rem 0 .25rem; color: #aaa; font-size: .9rem; }
+  input[type=email], input[type=password], input[type=text] {
+    padding: .4rem .7rem; background: #1c1b19; border: 1px solid #444;
+    border-radius: 5px; color: #ccc; font-size: .95rem;
+  }
+  input[type=email], input[type=password] { width: 240px; }
+  input[type=text] { width: 420px; }
+  label { display: block; margin: .6rem 0 .2rem; color: #aaa; font-size: .9rem; }
+  .section { margin-bottom: 1.2rem; }
+  .note { color: #888; font-size: .82rem; margin-top: .25rem; }
 </style>
 </head>
 <body>
 <h1>🔧 Prediction ID Migration</h1>
-<p>This tool scans every user's predictions in Firestore, computes what the <strong>current</strong> match ID should be, and re-saves any docs whose IDs have drifted.</p>
+<p>Scans prediction docs in Firestore, maps stale match IDs → current canonical IDs, re-saves and deletes stale docs.</p>
 
-<label>Sign in as admin first:</label>
-<input id="email" type="email" placeholder="admin@email.com">
-<input id="password" type="password" placeholder="password" style="margin-left:.5rem">
-<br>
-<button id="signin-btn">Sign In</button>
-<span id="auth-status" style="margin-left:1rem;color:#aaa"></span>
+<div class="section">
+  <label>Email</label>
+  <input id="email" type="email" placeholder="you@email.com">
+  <label>Password</label>
+  <input id="password" type="password" placeholder="password">
+  <br><br>
+  <button id="signin-btn">Sign In</button>
+  <span id="auth-status" style="margin-left:1rem;color:#aaa"></span>
+</div>
 
-<br><br>
-<button id="dry-run-btn" disabled>🔍 Dry Run (preview changes)</button>
+<div class="section">
+  <label>UIDs to scan <span class="note">(comma-separated — your signed-in UID is filled automatically; add others if needed)</span></label>
+  <input id="uid-list" type="text" placeholder="uid1, uid2, uid3">
+</div>
+
+<button id="dry-run-btn" disabled>🔍 Dry Run (preview)</button>
 <button id="migrate-btn" disabled style="background:#964219">⚡ Run Migration</button>
 <button id="clear-btn">Clear Log</button>
 
-<div id="log"><span class="info">Sign in above, then click Dry Run to preview what will be migrated.</span></div>
+<div id="log"><span class="info">Sign in above — your UID will be filled automatically. Then click Dry Run.</span></div>
 
 <script type="module">
-import { initializeApp }          from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { initializeApp }     from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged }
-                                   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+                              from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc, serverTimestamp }
-                                   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+                              from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-// ── Firebase init (same config as app) ──────────────────────────────────
-const app = initializeApp({
+const app  = initializeApp({
   apiKey: 'AIzaSyCmbjBxgkBLylC_JeNdmhwuFdNXQcGvNlA',
   authDomain: 'worldcup2026-cfbc2.firebaseapp.com',
   projectId: 'worldcup2026-cfbc2',
@@ -54,163 +67,147 @@ const app = initializeApp({
 const auth = getAuth(app);
 const db   = getFirestore(app, 'wc2026');
 
-// ── Canonical match ID generator (must stay in sync with data.js) ────────
+// ── Canonical ID generator (mirrors data.js makeMatchId) ─────────────────
 function makeMatchId(date, homeName, awayName) {
   function slug(s) {
-    return s
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '');
+    return s.normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
   }
-  return `${date || 'tbd'}-${slug(homeName)}-${slug(awayName)}`;
+  return `${date||'tbd'}-${slug(homeName)}-${slug(awayName)}`;
 }
 
-// ── Full match list (group + knockout) — must mirror data.js ─────────────
-// We inline the canonical ID table here so the script is self-contained.
-// Each entry: { id, home, away }  where home/away are team name strings.
+// ── Canonical match table (mirrors data.js) ──────────────────────────────
 const CANONICAL_MATCHES = [
-  // Group stage — generated the same way as data.js generateMatches()
-  // Key: makeMatchId(date, homeTeam.name, awayTeam.name)
   // Group A
-  {id:makeMatchId('2026-06-11','Mexico','South Africa'),         home:'Mexico',            away:'South Africa'},
-  {id:makeMatchId('2026-06-11','South Korea','Czechia'),         home:'South Korea',        away:'Czechia'},
-  {id:makeMatchId('2026-06-18','Mexico','South Korea'),          home:'Mexico',             away:'South Korea'},
-  {id:makeMatchId('2026-06-18','Czechia','South Africa'),        home:'Czechia',            away:'South Africa'},
-  {id:makeMatchId('2026-06-24','Czechia','Mexico'),              home:'Czechia',            away:'Mexico'},
-  {id:makeMatchId('2026-06-24','South Africa','South Korea'),    home:'South Africa',       away:'South Korea'},
+  {id:makeMatchId('2026-06-11','Mexico','South Africa'),           home:'Mexico',             away:'South Africa'},
+  {id:makeMatchId('2026-06-11','South Korea','Czechia'),           home:'South Korea',         away:'Czechia'},
+  {id:makeMatchId('2026-06-18','Mexico','South Korea'),            home:'Mexico',              away:'South Korea'},
+  {id:makeMatchId('2026-06-18','Czechia','South Africa'),          home:'Czechia',             away:'South Africa'},
+  {id:makeMatchId('2026-06-24','Czechia','Mexico'),                home:'Czechia',             away:'Mexico'},
+  {id:makeMatchId('2026-06-24','South Africa','South Korea'),      home:'South Africa',        away:'South Korea'},
   // Group B
-  {id:makeMatchId('2026-06-12','Canada','Bosnia-Herzegovina'),   home:'Canada',             away:'Bosnia-Herzegovina'},
-  {id:makeMatchId('2026-06-13','Qatar','Switzerland'),           home:'Qatar',              away:'Switzerland'},
-  {id:makeMatchId('2026-06-18','Switzerland','Bosnia-Herzegovina'),home:'Switzerland',      away:'Bosnia-Herzegovina'},
-  {id:makeMatchId('2026-06-18','Canada','Qatar'),                home:'Canada',             away:'Qatar'},
-  {id:makeMatchId('2026-06-24','Switzerland','Canada'),          home:'Switzerland',        away:'Canada'},
-  {id:makeMatchId('2026-06-24','Bosnia-Herzegovina','Qatar'),    home:'Bosnia-Herzegovina', away:'Qatar'},
+  {id:makeMatchId('2026-06-12','Canada','Bosnia-Herzegovina'),     home:'Canada',              away:'Bosnia-Herzegovina'},
+  {id:makeMatchId('2026-06-13','Qatar','Switzerland'),             home:'Qatar',               away:'Switzerland'},
+  {id:makeMatchId('2026-06-18','Switzerland','Bosnia-Herzegovina'),home:'Switzerland',         away:'Bosnia-Herzegovina'},
+  {id:makeMatchId('2026-06-18','Canada','Qatar'),                  home:'Canada',              away:'Qatar'},
+  {id:makeMatchId('2026-06-24','Switzerland','Canada'),            home:'Switzerland',         away:'Canada'},
+  {id:makeMatchId('2026-06-24','Bosnia-Herzegovina','Qatar'),      home:'Bosnia-Herzegovina',  away:'Qatar'},
   // Group C
-  {id:makeMatchId('2026-06-13','Brazil','Morocco'),              home:'Brazil',             away:'Morocco'},
-  {id:makeMatchId('2026-06-13','Haiti','Scotland'),              home:'Haiti',              away:'Scotland'},
-  {id:makeMatchId('2026-06-19','Scotland','Morocco'),            home:'Scotland',           away:'Morocco'},
-  {id:makeMatchId('2026-06-19','Brazil','Haiti'),                home:'Brazil',             away:'Haiti'},
-  {id:makeMatchId('2026-06-24','Scotland','Brazil'),             home:'Scotland',           away:'Brazil'},
-  {id:makeMatchId('2026-06-24','Morocco','Haiti'),               home:'Morocco',            away:'Haiti'},
+  {id:makeMatchId('2026-06-13','Brazil','Morocco'),                home:'Brazil',              away:'Morocco'},
+  {id:makeMatchId('2026-06-13','Haiti','Scotland'),                home:'Haiti',               away:'Scotland'},
+  {id:makeMatchId('2026-06-19','Scotland','Morocco'),              home:'Scotland',            away:'Morocco'},
+  {id:makeMatchId('2026-06-19','Brazil','Haiti'),                  home:'Brazil',              away:'Haiti'},
+  {id:makeMatchId('2026-06-24','Scotland','Brazil'),               home:'Scotland',            away:'Brazil'},
+  {id:makeMatchId('2026-06-24','Morocco','Haiti'),                 home:'Morocco',             away:'Haiti'},
   // Group D
-  {id:makeMatchId('2026-06-12','USA','Paraguay'),                home:'USA',                away:'Paraguay'},
-  {id:makeMatchId('2026-06-13','Australia','Türkiye'),           home:'Australia',          away:'Türkiye'},
-  {id:makeMatchId('2026-06-19','USA','Australia'),               home:'USA',                away:'Australia'},
-  {id:makeMatchId('2026-06-19','Türkiye','Paraguay'),            home:'Türkiye',            away:'Paraguay'},
-  {id:makeMatchId('2026-06-25','Türkiye','USA'),                 home:'Türkiye',            away:'USA'},
-  {id:makeMatchId('2026-06-25','Paraguay','Australia'),          home:'Paraguay',           away:'Australia'},
+  {id:makeMatchId('2026-06-12','USA','Paraguay'),                  home:'USA',                 away:'Paraguay'},
+  {id:makeMatchId('2026-06-13','Australia','Türkiye'),             home:'Australia',           away:'Türkiye'},
+  {id:makeMatchId('2026-06-19','USA','Australia'),                 home:'USA',                 away:'Australia'},
+  {id:makeMatchId('2026-06-19','Türkiye','Paraguay'),              home:'Türkiye',             away:'Paraguay'},
+  {id:makeMatchId('2026-06-25','Türkiye','USA'),                   home:'Türkiye',             away:'USA'},
+  {id:makeMatchId('2026-06-25','Paraguay','Australia'),            home:'Paraguay',            away:'Australia'},
   // Group E
-  {id:makeMatchId('2026-06-14','Germany','Curaçao'),             home:'Germany',            away:'Curaçao'},
-  {id:makeMatchId('2026-06-14','Ivory Coast','Ecuador'),         home:'Ivory Coast',        away:'Ecuador'},
-  {id:makeMatchId('2026-06-20','Germany','Ivory Coast'),         home:'Germany',            away:'Ivory Coast'},
-  {id:makeMatchId('2026-06-20','Ecuador','Curaçao'),             home:'Ecuador',            away:'Curaçao'},
-  {id:makeMatchId('2026-06-25','Curaçao','Ivory Coast'),         home:'Curaçao',            away:'Ivory Coast'},
-  {id:makeMatchId('2026-06-25','Ecuador','Germany'),             home:'Ecuador',            away:'Germany'},
+  {id:makeMatchId('2026-06-14','Germany','Curaçao'),               home:'Germany',             away:'Curaçao'},
+  {id:makeMatchId('2026-06-14','Ivory Coast','Ecuador'),           home:'Ivory Coast',         away:'Ecuador'},
+  {id:makeMatchId('2026-06-20','Germany','Ivory Coast'),           home:'Germany',             away:'Ivory Coast'},
+  {id:makeMatchId('2026-06-20','Ecuador','Curaçao'),               home:'Ecuador',             away:'Curaçao'},
+  {id:makeMatchId('2026-06-25','Curaçao','Ivory Coast'),           home:'Curaçao',             away:'Ivory Coast'},
+  {id:makeMatchId('2026-06-25','Ecuador','Germany'),               home:'Ecuador',             away:'Germany'},
   // Group F
-  {id:makeMatchId('2026-06-14','Netherlands','Japan'),           home:'Netherlands',        away:'Japan'},
-  {id:makeMatchId('2026-06-14','Sweden','Tunisia'),              home:'Sweden',             away:'Tunisia'},
-  {id:makeMatchId('2026-06-20','Netherlands','Sweden'),          home:'Netherlands',        away:'Sweden'},
-  {id:makeMatchId('2026-06-20','Tunisia','Japan'),               home:'Tunisia',            away:'Japan'},
-  {id:makeMatchId('2026-06-25','Japan','Sweden'),                home:'Japan',              away:'Sweden'},
-  {id:makeMatchId('2026-06-25','Tunisia','Netherlands'),         home:'Tunisia',            away:'Netherlands'},
+  {id:makeMatchId('2026-06-14','Netherlands','Japan'),             home:'Netherlands',         away:'Japan'},
+  {id:makeMatchId('2026-06-14','Sweden','Tunisia'),                home:'Sweden',              away:'Tunisia'},
+  {id:makeMatchId('2026-06-20','Netherlands','Sweden'),            home:'Netherlands',         away:'Sweden'},
+  {id:makeMatchId('2026-06-20','Tunisia','Japan'),                 home:'Tunisia',             away:'Japan'},
+  {id:makeMatchId('2026-06-25','Japan','Sweden'),                  home:'Japan',               away:'Sweden'},
+  {id:makeMatchId('2026-06-25','Tunisia','Netherlands'),           home:'Tunisia',             away:'Netherlands'},
   // Group G
-  {id:makeMatchId('2026-06-15','Belgium','Egypt'),               home:'Belgium',            away:'Egypt'},
-  {id:makeMatchId('2026-06-15','Iran','New Zealand'),            home:'Iran',               away:'New Zealand'},
-  {id:makeMatchId('2026-06-21','Belgium','Iran'),                home:'Belgium',            away:'Iran'},
-  {id:makeMatchId('2026-06-21','New Zealand','Egypt'),           home:'New Zealand',        away:'Egypt'},
-  {id:makeMatchId('2026-06-26','Egypt','Iran'),                  home:'Egypt',              away:'Iran'},
-  {id:makeMatchId('2026-06-26','New Zealand','Belgium'),         home:'New Zealand',        away:'Belgium'},
+  {id:makeMatchId('2026-06-15','Belgium','Egypt'),                 home:'Belgium',             away:'Egypt'},
+  {id:makeMatchId('2026-06-15','Iran','New Zealand'),              home:'Iran',                away:'New Zealand'},
+  {id:makeMatchId('2026-06-21','Belgium','Iran'),                  home:'Belgium',             away:'Iran'},
+  {id:makeMatchId('2026-06-21','New Zealand','Egypt'),             home:'New Zealand',         away:'Egypt'},
+  {id:makeMatchId('2026-06-26','Egypt','Iran'),                    home:'Egypt',               away:'Iran'},
+  {id:makeMatchId('2026-06-26','New Zealand','Belgium'),           home:'New Zealand',         away:'Belgium'},
   // Group H
-  {id:makeMatchId('2026-06-15','Spain','Cape Verde'),            home:'Spain',              away:'Cape Verde'},
-  {id:makeMatchId('2026-06-15','Saudi Arabia','Uruguay'),        home:'Saudi Arabia',       away:'Uruguay'},
-  {id:makeMatchId('2026-06-21','Spain','Saudi Arabia'),          home:'Spain',              away:'Saudi Arabia'},
-  {id:makeMatchId('2026-06-21','Uruguay','Cape Verde'),          home:'Uruguay',            away:'Cape Verde'},
-  {id:makeMatchId('2026-06-26','Cape Verde','Saudi Arabia'),     home:'Cape Verde',         away:'Saudi Arabia'},
-  {id:makeMatchId('2026-06-26','Uruguay','Spain'),               home:'Uruguay',            away:'Spain'},
+  {id:makeMatchId('2026-06-15','Spain','Cape Verde'),              home:'Spain',               away:'Cape Verde'},
+  {id:makeMatchId('2026-06-15','Saudi Arabia','Uruguay'),          home:'Saudi Arabia',        away:'Uruguay'},
+  {id:makeMatchId('2026-06-21','Spain','Saudi Arabia'),            home:'Spain',               away:'Saudi Arabia'},
+  {id:makeMatchId('2026-06-21','Uruguay','Cape Verde'),            home:'Uruguay',             away:'Cape Verde'},
+  {id:makeMatchId('2026-06-26','Cape Verde','Saudi Arabia'),       home:'Cape Verde',          away:'Saudi Arabia'},
+  {id:makeMatchId('2026-06-26','Uruguay','Spain'),                 home:'Uruguay',             away:'Spain'},
   // Group I
-  {id:makeMatchId('2026-06-16','France','Senegal'),              home:'France',             away:'Senegal'},
-  {id:makeMatchId('2026-06-16','Iraq','Norway'),                 home:'Iraq',               away:'Norway'},
-  {id:makeMatchId('2026-06-22','France','Iraq'),                 home:'France',             away:'Iraq'},
-  {id:makeMatchId('2026-06-22','Norway','Senegal'),              home:'Norway',             away:'Senegal'},
-  {id:makeMatchId('2026-06-26','Norway','France'),               home:'Norway',             away:'France'},
-  {id:makeMatchId('2026-06-26','Senegal','Iraq'),                home:'Senegal',            away:'Iraq'},
+  {id:makeMatchId('2026-06-16','France','Senegal'),                home:'France',              away:'Senegal'},
+  {id:makeMatchId('2026-06-16','Iraq','Norway'),                   home:'Iraq',                away:'Norway'},
+  {id:makeMatchId('2026-06-22','France','Iraq'),                   home:'France',              away:'Iraq'},
+  {id:makeMatchId('2026-06-22','Norway','Senegal'),                home:'Norway',              away:'Senegal'},
+  {id:makeMatchId('2026-06-26','Norway','France'),                 home:'Norway',              away:'France'},
+  {id:makeMatchId('2026-06-26','Senegal','Iraq'),                  home:'Senegal',             away:'Iraq'},
   // Group J
-  {id:makeMatchId('2026-06-16','Argentina','Algeria'),           home:'Argentina',          away:'Algeria'},
-  {id:makeMatchId('2026-06-16','Austria','Jordan'),              home:'Austria',            away:'Jordan'},
-  {id:makeMatchId('2026-06-22','Argentina','Austria'),           home:'Argentina',          away:'Austria'},
-  {id:makeMatchId('2026-06-22','Jordan','Algeria'),              home:'Jordan',             away:'Algeria'},
-  {id:makeMatchId('2026-06-27','Algeria','Austria'),             home:'Algeria',            away:'Austria'},
-  {id:makeMatchId('2026-06-27','Jordan','Argentina'),            home:'Jordan',             away:'Argentina'},
+  {id:makeMatchId('2026-06-16','Argentina','Algeria'),             home:'Argentina',           away:'Algeria'},
+  {id:makeMatchId('2026-06-16','Austria','Jordan'),                home:'Austria',             away:'Jordan'},
+  {id:makeMatchId('2026-06-22','Argentina','Austria'),             home:'Argentina',           away:'Austria'},
+  {id:makeMatchId('2026-06-22','Jordan','Algeria'),                home:'Jordan',              away:'Algeria'},
+  {id:makeMatchId('2026-06-27','Algeria','Austria'),               home:'Algeria',             away:'Austria'},
+  {id:makeMatchId('2026-06-27','Jordan','Argentina'),              home:'Jordan',              away:'Argentina'},
   // Group K
-  {id:makeMatchId('2026-06-17','Portugal','Congo DR'),           home:'Portugal',           away:'Congo DR'},
-  {id:makeMatchId('2026-06-17','Uzbekistan','Colombia'),         home:'Uzbekistan',         away:'Colombia'},
-  {id:makeMatchId('2026-06-23','Portugal','Uzbekistan'),         home:'Portugal',           away:'Uzbekistan'},
-  {id:makeMatchId('2026-06-23','Colombia','Congo DR'),           home:'Colombia',           away:'Congo DR'},
-  {id:makeMatchId('2026-06-27','Colombia','Portugal'),           home:'Colombia',           away:'Portugal'},
-  {id:makeMatchId('2026-06-27','Congo DR','Uzbekistan'),         home:'Congo DR',           away:'Uzbekistan'},
+  {id:makeMatchId('2026-06-17','Portugal','Congo DR'),             home:'Portugal',            away:'Congo DR'},
+  {id:makeMatchId('2026-06-17','Uzbekistan','Colombia'),           home:'Uzbekistan',          away:'Colombia'},
+  {id:makeMatchId('2026-06-23','Portugal','Uzbekistan'),           home:'Portugal',            away:'Uzbekistan'},
+  {id:makeMatchId('2026-06-23','Colombia','Congo DR'),             home:'Colombia',            away:'Congo DR'},
+  {id:makeMatchId('2026-06-27','Colombia','Portugal'),             home:'Colombia',            away:'Portugal'},
+  {id:makeMatchId('2026-06-27','Congo DR','Uzbekistan'),           home:'Congo DR',            away:'Uzbekistan'},
   // Group L
-  {id:makeMatchId('2026-06-17','England','Croatia'),             home:'England',            away:'Croatia'},
-  {id:makeMatchId('2026-06-17','Ghana','Panama'),                home:'Ghana',              away:'Panama'},
-  {id:makeMatchId('2026-06-23','England','Ghana'),               home:'England',            away:'Ghana'},
-  {id:makeMatchId('2026-06-23','Panama','Croatia'),              home:'Panama',             away:'Croatia'},
-  {id:makeMatchId('2026-06-27','Panama','England'),              home:'Panama',             away:'England'},
-  {id:makeMatchId('2026-06-27','Croatia','Ghana'),               home:'Croatia',            away:'Ghana'},
-  // Knockout stage IDs are stable strings — no migration needed for those
-  {id:'r32-1'}, {id:'r32-2'}, {id:'r32-3'}, {id:'r32-4'},
-  {id:'r32-5'}, {id:'r32-6'}, {id:'r32-7'}, {id:'r32-8'},
-  {id:'r32-9'}, {id:'r32-10'},{id:'r32-11'},{id:'r32-12'},
+  {id:makeMatchId('2026-06-17','England','Croatia'),               home:'England',             away:'Croatia'},
+  {id:makeMatchId('2026-06-17','Ghana','Panama'),                  home:'Ghana',               away:'Panama'},
+  {id:makeMatchId('2026-06-23','England','Ghana'),                 home:'England',             away:'Ghana'},
+  {id:makeMatchId('2026-06-23','Panama','Croatia'),                home:'Panama',              away:'Croatia'},
+  {id:makeMatchId('2026-06-27','Panama','England'),                home:'Panama',              away:'England'},
+  {id:makeMatchId('2026-06-27','Croatia','Ghana'),                 home:'Croatia',             away:'Ghana'},
+  // Knockout (already stable string IDs)
+  {id:'r32-1'},{id:'r32-2'},{id:'r32-3'},{id:'r32-4'},
+  {id:'r32-5'},{id:'r32-6'},{id:'r32-7'},{id:'r32-8'},
+  {id:'r32-9'},{id:'r32-10'},{id:'r32-11'},{id:'r32-12'},
   {id:'r32-13'},{id:'r32-14'},{id:'r32-15'},{id:'r32-16'},
-  {id:'r16-1'}, {id:'r16-2'}, {id:'r16-3'}, {id:'r16-4'},
-  {id:'r16-5'}, {id:'r16-6'}, {id:'r16-7'}, {id:'r16-8'},
-  {id:'qf-1'},  {id:'qf-2'},  {id:'qf-3'},  {id:'qf-4'},
-  {id:'sf-1'},  {id:'sf-2'},  {id:'tp-1'},  {id:'final'},
+  {id:'r16-1'},{id:'r16-2'},{id:'r16-3'},{id:'r16-4'},
+  {id:'r16-5'},{id:'r16-6'},{id:'r16-7'},{id:'r16-8'},
+  {id:'qf-1'},{id:'qf-2'},{id:'qf-3'},{id:'qf-4'},
+  {id:'sf-1'},{id:'sf-2'},{id:'tp-1'},{id:'final'},
 ];
 
 const CANONICAL_IDS = new Set(CANONICAL_MATCHES.map(m => m.id));
 
-// Build a lookup: normalised key → canonical ID
-// Key = date + slug(home) + slug(away)  (same algo as makeMatchId)
-// Also try swapped home/away in case old data stored them reversed
+// Build forward+reverse lookup: "date|homeslug|awayslug" → canonical ID
+function slug(s) {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+}
 const KEY_TO_CANONICAL = {};
 CANONICAL_MATCHES.forEach(m => {
-  if (!m.home) return; // knockout entries — skip, IDs are already stable
-  KEY_TO_CANONICAL[m.id] = m.id; // identity (already canonical)
-  // extract date portion from the canonical ID
+  if (!m.home) return;
   const datePart = m.id.split('-').slice(0,3).join('-');
-  function slug(s) {
-    return s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
-  }
-  // forward: home|away
   KEY_TO_CANONICAL[`${datePart}|${slug(m.home)}|${slug(m.away)}`] = m.id;
-  // reversed: away|home  (in case old code had them swapped)
   KEY_TO_CANONICAL[`${datePart}|${slug(m.away)}|${slug(m.home)}`] = m.id;
 });
 
-// Given a stale doc ID, try to find the canonical ID it corresponds to
 function resolveCanonical(staleId) {
-  if (CANONICAL_IDS.has(staleId)) return staleId; // already canonical
-  // The stale ID is date-slug-slug; extract date + two team slugs
-  // Format: YYYY-MM-DD-<homeslug>-<awayslug>
+  if (CANONICAL_IDS.has(staleId)) return staleId;
   const m = staleId.match(/^(\d{4}-\d{2}-\d{2})-(.+)$/);
   if (!m) return null;
-  const datePart = m[1];
-  const rest     = m[2]; // e.g. 'germany-curacao-ivory-coast-ecuador'
-  // Try all possible split points between home and away slugs
-  const parts = rest.split('-');
+  const datePart = m[1], parts = m[2].split('-');
   for (let i = 1; i < parts.length; i++) {
-    const homeSlug = parts.slice(0, i).join('-');
-    const awaySlug = parts.slice(i).join('-');
-    const key = `${datePart}|${homeSlug}|${awaySlug}`;
+    const key = `${datePart}|${parts.slice(0,i).join('-')}|${parts.slice(i).join('-')}`;
     if (KEY_TO_CANONICAL[key]) return KEY_TO_CANONICAL[key];
   }
   return null;
 }
 
-// ── UI helpers ───────────────────────────────────────────────────────────
-const logEl = document.getElementById('log');
-function log(msg, cls = '') {
+// ── UI ────────────────────────────────────────────────────────────────────
+const logEl      = document.getElementById('log');
+const authStatus = document.getElementById('auth-status');
+const dryRunBtn  = document.getElementById('dry-run-btn');
+const migrateBtn = document.getElementById('migrate-btn');
+const uidListEl  = document.getElementById('uid-list');
+
+function log(msg, cls='') {
   const span = document.createElement('span');
   if (cls) span.className = cls;
   span.textContent = msg + '\n';
@@ -219,16 +216,16 @@ function log(msg, cls = '') {
 }
 function clearLog() { logEl.innerHTML = ''; }
 
-// ── Auth ─────────────────────────────────────────────────────────────────
-const signinBtn  = document.getElementById('signin-btn');
-const dryRunBtn  = document.getElementById('dry-run-btn');
-const migrateBtn = document.getElementById('migrate-btn');
-const authStatus = document.getElementById('auth-status');
-
 onAuthStateChanged(auth, user => {
   if (user) {
-    authStatus.textContent = `✓ Signed in as ${user.email}`;
+    authStatus.textContent = `✓ Signed in as ${user.email} (UID: ${user.uid})`;
     authStatus.style.color = '#6daa45';
+    // Pre-fill the UID field with the signed-in user's UID
+    if (!uidListEl.value.includes(user.uid)) {
+      uidListEl.value = uidListEl.value
+        ? uidListEl.value + ', ' + user.uid
+        : user.uid;
+    }
     dryRunBtn.disabled  = false;
     migrateBtn.disabled = false;
   } else {
@@ -239,98 +236,89 @@ onAuthStateChanged(auth, user => {
   }
 });
 
-signinBtn.addEventListener('click', async () => {
+document.getElementById('signin-btn').addEventListener('click', async () => {
   const email = document.getElementById('email').value.trim();
   const pw    = document.getElementById('password').value;
-  signinBtn.disabled = true;
   try {
     await signInWithEmailAndPassword(auth, email, pw);
-    log('Signed in successfully.', 'ok');
-  } catch(e) {
-    log('Sign-in failed: ' + e.message, 'err');
-  }
-  signinBtn.disabled = false;
+  } catch(e) { log('Sign-in failed: ' + e.message, 'err'); }
 });
 
-document.getElementById('clear-btn').addEventListener('click', () => clearLog());
+document.getElementById('clear-btn').addEventListener('click', clearLog);
 
-// ── Core migration logic ─────────────────────────────────────────────────
+// ── Migration ─────────────────────────────────────────────────────────────
 async function runMigration(dryRun) {
   clearLog();
   log(dryRun ? '=== DRY RUN (no writes) ===' : '=== LIVE MIGRATION ===', 'info');
   log('');
 
-  let totalUsers = 0, totalDocs = 0, totalMigrated = 0, totalUnknown = 0;
+  const uids = uidListEl.value.split(',').map(s => s.trim()).filter(Boolean);
+  if (!uids.length) { log('No UIDs entered. Add UIDs to the field above.', 'err'); return; }
 
-  // List all users by scanning users collection
-  const usersSnap = await getDocs(collection(db, 'users'));
-  totalUsers = usersSnap.size;
-  log(`Found ${totalUsers} user(s) in Firestore.`, 'info');
+  log(`Scanning ${uids.length} UID(s): ${uids.join(', ')}`, 'info');
   log('');
 
-  for (const userDoc of usersSnap.docs) {
-    const uid = userDoc.id;
-    const predsSnap = await getDocs(collection(db, 'users', uid, 'predictions'));
-    if (predsSnap.empty) continue;
+  let totalDocs = 0, totalMigrated = 0, totalUnknown = 0;
+
+  for (const uid of uids) {
+    let predsSnap;
+    try {
+      predsSnap = await getDocs(collection(db, 'users', uid, 'predictions'));
+    } catch(e) {
+      log(`  ERROR reading predictions for ${uid}: ${e.message}`, 'err');
+      continue;
+    }
+
+    if (predsSnap.empty) {
+      log(`── UID: ${uid}  →  0 predictions found`, 'warn');
+      log('');
+      continue;
+    }
 
     let userMigrated = 0, userUnknown = 0, userOk = 0;
-    log(`── User: ${uid} (${predsSnap.size} predictions)`, 'info');
+    log(`── UID: ${uid}  (${predsSnap.size} predictions)`, 'info');
 
     for (const predDoc of predsSnap.docs) {
       const oldId = predDoc.id;
       totalDocs++;
 
-      if (CANONICAL_IDS.has(oldId)) {
-        userOk++;
-        continue; // already correct
-      }
+      if (CANONICAL_IDS.has(oldId)) { userOk++; continue; }
 
       const newId = resolveCanonical(oldId);
       if (!newId) {
-        log(`  ⚠ UNKNOWN: ${oldId}`, 'warn');
-        userUnknown++;
-        totalUnknown++;
+        log(`  ⚠ UNRESOLVED: ${oldId}`, 'warn');
+        userUnknown++; totalUnknown++;
         continue;
       }
 
-      log(`  ${dryRun ? '[DRY]' : '[MIGRATE]'} ${oldId}  →  ${newId}`, dryRun ? 'warn' : 'ok');
-      userMigrated++;
-      totalMigrated++;
+      log(`  ${dryRun ? '[DRY]' : '[MIGRATE]'}  ${oldId}`, dryRun ? 'warn' : 'ok');
+      log(`           →  ${newId}`, dryRun ? 'warn' : 'ok');
+      userMigrated++; totalMigrated++;
 
       if (!dryRun) {
         const data = predDoc.data();
-        // Write new doc
         await setDoc(doc(db, 'users', uid, 'predictions', newId), {
-          ...data,
-          migratedFrom: oldId,
-          migratedAt: serverTimestamp(),
+          ...data, migratedFrom: oldId, migratedAt: serverTimestamp(),
         });
-        // Delete old doc
         await deleteDoc(doc(db, 'users', uid, 'predictions', oldId));
       }
     }
 
-    log(`  → ${userOk} already correct, ${userMigrated} to migrate, ${userUnknown} unresolved`, '');
+    log(`  → ${userOk} already correct, ${userMigrated} need migration, ${userUnknown} unresolved`, '');
     log('');
   }
 
   log('══════════════════════════════════════', 'info');
-  log(`Users scanned:   ${totalUsers}`, '');
-  log(`Docs scanned:    ${totalDocs}`, '');
-  log(`Will migrate:    ${totalMigrated}`, totalMigrated > 0 ? 'ok' : '');
-  log(`Unresolved:      ${totalUnknown}`, totalUnknown > 0 ? 'warn' : 'ok');
-  if (dryRun && totalMigrated > 0) {
-    log('');
-    log('Run the live migration to apply these changes.', 'info');
-  } else if (!dryRun) {
-    log('');
-    log(totalMigrated > 0 ? '✓ Migration complete!' : '✓ Nothing to migrate — all IDs were already canonical.', 'ok');
-  }
+  log(`Total docs scanned:  ${totalDocs}`, '');
+  log(`To migrate:          ${totalMigrated}`, totalMigrated > 0 ? (dryRun ? 'warn' : 'ok') : '');
+  log(`Unresolved:          ${totalUnknown}`, totalUnknown > 0 ? 'warn' : 'ok');
+  if (!dryRun) log(totalMigrated > 0 ? '\n✓ Migration complete!' : '\n✓ Nothing to migrate.', 'ok');
+  if (dryRun && totalMigrated > 0) log('\nClick "Run Migration" to apply.', 'info');
 }
 
-dryRunBtn.addEventListener('click',  () => runMigration(true));
+dryRunBtn.addEventListener('click', () => runMigration(true));
 migrateBtn.addEventListener('click', async () => {
-  if (!confirm('This will write and delete Firestore documents. Proceed?')) return;
+  if (!confirm('Write and delete Firestore docs. Proceed?')) return;
   migrateBtn.disabled = true;
   await runMigration(false);
   migrateBtn.disabled = false;
