@@ -117,10 +117,15 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     }
   });
 
+  // Change 1: renderAll() also keeps bracket fresh when on predictions tab
   function renderAll() {
     if (activeTab === 'groups')      renderGroups();
     if (activeTab === 'matches')     renderMatches();
     if (activeTab === 'predictions') switchPredSubtab(activePredSubtab);
+    // Keep bracket slots current even when a different predictions sub-tab is active
+    if (activeTab === 'predictions' && activePredSubtab !== 'pred-bracket') {
+      renderKnockoutBracket();
+    }
   }
 
   // ─── Bracket picks persistence (Firestore, debounced) ───────────────────
@@ -584,26 +589,44 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     return calcPredPoints(group.teams, gm)[rank-1]?.team || null;
   }
 
-  // Resolve a slot like '1A', '2B', 'Wr32-1' to a team name
+  // Resolve a slot using actual results first, then predicted standings as fallback
   function resolveKnockoutTeam(slot, depth = 0) {
     if (depth > 10 || !slot) return slot;
-    // Group finisher: '1A', '2B', etc.
     const groupMatch = slot.match(/^(\d)([A-Z])$/);
     if (groupMatch) {
       const t = getActualGroupFinisher(groupMatch[2], parseInt(groupMatch[1]))
              || getPredictedGroupFinisher(groupMatch[2], parseInt(groupMatch[1]));
       return t ? teamName(t) : slot;
     }
-    // Winner of a knockout fixture: 'Wr32-1', 'Wr16-2', 'Wqf-1', etc.
     const winnerMatch = slot.match(/^W(.+)$/);
     if (winnerMatch) {
-      const fixtureId = winnerMatch[1]; // e.g. 'r32-1'
+      const fixtureId = winnerMatch[1];
       const fixture   = WC_KNOCKOUT_FIXTURES.find(f => f.id === fixtureId);
       const pick      = bracketPicks[fixtureId];
       if (!fixture || !pick) return slot;
       return pick === 'home'
         ? resolveKnockoutTeam(fixture.home, depth + 1)
         : resolveKnockoutTeam(fixture.away, depth + 1);
+    }
+    return slot;
+  }
+
+  // Change 2: predictions-only resolver — never falls back to actual results
+  function resolveKnockoutTeamForPreds(slot, depth = 0) {
+    if (depth > 10 || !slot) return slot;
+    const groupMatch = slot.match(/^(\d)([A-Z])$/);
+    if (groupMatch) {
+      const t = getPredictedGroupFinisher(groupMatch[2], parseInt(groupMatch[1]));
+      return t ? teamName(t) : null; // null = not yet predicted
+    }
+    const winnerMatch = slot.match(/^W(.+)$/);
+    if (winnerMatch) {
+      const fixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === winnerMatch[1]);
+      const pick    = bracketPicks[winnerMatch[1]];
+      if (!fixture || !pick) return null;
+      return pick === 'home'
+        ? resolveKnockoutTeamForPreds(fixture.home, depth + 1)
+        : resolveKnockoutTeamForPreds(fixture.away, depth + 1);
     }
     return slot;
   }
@@ -616,7 +639,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       if (visited.has(id)) continue;
       visited.add(id);
       delete bracketPicks[id];
-      // Find fixtures whose home or away slot references this fixture's winner
       WC_KNOCKOUT_FIXTURES.forEach(f => {
         if (f.home === `W${id}` || f.away === `W${id}`) toVisit.push(f.id);
       });
@@ -671,15 +693,16 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       roundEl.appendChild(labelEl);
 
       round.ids.forEach(matchId => {
-        const fixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === matchId); // string === string ✔️
+        const fixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === matchId);
         if (!fixture) return;
-        const homeTeam = resolveKnockoutTeam(fixture.home);
-        const awayTeam = resolveKnockoutTeam(fixture.away);
+        // Change 3: use predictions-only resolver; add .tbd class when unresolved
+        const homeTeam = resolveKnockoutTeamForPreds(fixture.home);
+        const awayTeam = resolveKnockoutTeamForPreds(fixture.away);
         const pick     = bracketPicks[matchId];
         const matchEl  = document.createElement('div');
         matchEl.className = 'bracket-match';
         const homeEl = document.createElement('div');
-        homeEl.className = 'bracket-team' + (pick === 'home' ? ' picked' : '');
+        homeEl.className = 'bracket-team' + (pick === 'home' ? ' picked' : '') + (homeTeam ? '' : ' tbd');
         homeEl.textContent = homeTeam || fixture.home;
         homeEl.addEventListener('click', () => {
           if (bracketPicks[matchId] !== 'home') clearDownstreamPicks(matchId);
@@ -687,7 +710,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
           persistBracketPicks(); renderKnockoutBracket();
         });
         const awayEl = document.createElement('div');
-        awayEl.className = 'bracket-team' + (pick === 'away' ? ' picked' : '');
+        awayEl.className = 'bracket-team' + (pick === 'away' ? ' picked' : '') + (awayTeam ? '' : ' tbd');
         awayEl.textContent = awayTeam || fixture.away;
         awayEl.addEventListener('click', () => {
           if (bracketPicks[matchId] !== 'away') clearDownstreamPicks(matchId);

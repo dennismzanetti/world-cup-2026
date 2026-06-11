@@ -724,6 +724,8 @@ a, button, [role="button"], input, select {
 .bracket-team:hover { background: var(--color-surface-offset); }
 .bracket-team.picked { background: var(--color-primary-highlight); color: var(--color-primary-active); font-weight: 700; }
 [data-theme="dark"] .bracket-team.picked { color: var(--color-primary); }
+/* Change 4: TBD slots are visually muted */
+.bracket-team.tbd { color: var(--color-text-faint); font-style: italic; }
 
 .bracket-champion { min-width: 160px; }
 .champion-card {
