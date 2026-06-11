@@ -32,7 +32,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
   function teamFlag(t) { return (t && typeof t === 'object') ? (t.flag || '') : ''; }
   function teamDisplay(t) { return teamFlag(t) ? `${teamFlag(t)} ${teamName(t)}` : teamName(t); }
 
-  // ─── Date formatting ──────────────────────────────────────────────────────
+  // ─── Date formatting ────────────────────────────────────────────────────
   // Formats an ISO date string (YYYY-MM-DD) as "Weekday, Month Day, Year"
   // e.g. "2026-06-11" → "Thursday, June 11, 2026"
   function formatDateHeader(isoDate) {
@@ -274,14 +274,18 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult }
   function populatePredFilters() {
     const dateEl  = document.getElementById('pred-date-filter');
     const stageEl = document.getElementById('pred-group-filter');
-    if (dateEl && dateEl.options.length <= 1) {
+
+    // Always rebuild the date dropdown so all match dates (including past ones)
+    // are present. Preserve the user's current selection if it still exists.
+    if (dateEl) {
+      const prevVal = dateEl.value;
       const dates = [...new Set(allPredMatches().map(m => m.date).filter(Boolean))].sort();
-      dates.forEach(d => {
-        const opt = document.createElement('option');
-        opt.value = d; opt.textContent = formatDateHeader(d);
-        dateEl.appendChild(opt);
-      });
+      dateEl.innerHTML = '<option value="all">All Dates</option>' +
+        dates.map(d => `<option value="${d}">${formatDateHeader(d)}</option>`).join('');
+      if (prevVal && dates.includes(prevVal)) dateEl.value = prevVal;
     }
+
+    // Stage options are static — only build once.
     if (stageEl && stageEl.options.length <= 1) {
       // Group stage options — value matches m.group (single letter e.g. 'A')
       WC_GROUPS.forEach(g => {
