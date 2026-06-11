@@ -1,13 +1,10 @@
 // sync/live-scores.js
-// Polls the ESPN public scoreboard API for live/finished World Cup 2026 scores
-// and writes them into Firestore so the front-end onSnapshot listener
-// can push updates to all connected browsers in real time.
+// Fetches live World Cup 2026 scores via ESPN APIs and writes to Firestore.
+// Strategy: scoreboard gives us today's event IDs, then we hit each
+// event's summary endpoint which is more reliably real-time.
 //
-// Run via GitHub Actions (.github/workflows/sync-scores.yml) every 5 minutes.
-// Requires one environment variable (set as GitHub Secret):
-//   FIREBASE_SERVICE_ACCOUNT_JSON  — full JSON of a Firebase service account
-//
-// No API key needed for ESPN.
+// No API key needed.
+// Requires: FIREBASE_SERVICE_ACCOUNT_JSON (GitHub Secret)
 
 import fetch from 'node-fetch';
 import admin from 'firebase-admin';
@@ -17,8 +14,11 @@ const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const db = admin.firestore();
 
-// ─── ESPN public scoreboard API ───────────────────────────────────────────────
-const ESPN_URL = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard';
+const HEADERS = { 'User-Agent': 'world-cup-2026-sync/1.0' };
+
+// ─── ESPN endpoints ─────────────────────────────────────────────────────────
+const SCOREBOARD_URL = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard';
+const SUMMARY_URL    = id => `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/summary?event=${id}`;
 
 // ─── Team name normalisation ──────────────────────────────────────────────────
 const TEAM_NAME_MAP = {
@@ -83,27 +83,18 @@ const TEAM_NAME_MAP = {
   'Panama':                   'Panama',
 };
 
-function normalise(name) {
-  return TEAM_NAME_MAP[name] ?? name;
-}
+function normalise(name) { return TEAM_NAME_MAP[name] ?? name; }
 
-// ─── Parse ESPN status → app token ─────────────────────────────────────────────
-// ESPN uses status.type.state: 'pre' | 'in' | 'post'
-// status.type.name examples: STATUS_SECOND_HALF, STATUS_HALFTIME, STATUS_FULL_TIME
-function parseStatus(event) {
-  const state = event.status?.type?.state;
-  const name  = event.status?.type?.name ?? '';
+function parseStatus(statusObj) {
+  const state = statusObj?.type?.state;
+  const name  = statusObj?.type?.name ?? '';
   if (state === 'post') return 'finished';
-  if (state === 'in') {
-    if (name === 'STATUS_HALFTIME') return 'ht';
-    return 'live';
-  }
+  if (state === 'in') return name === 'STATUS_HALFTIME' ? 'ht' : 'live';
   return 'scheduled';
 }
 
-// ESPN clock is like "61'" — strip the prime symbol and parse as int
-function parseMinute(event) {
-  const clock = event.status?.displayClock ?? '';
+function parseMinute(statusObj) {
+  const clock = statusObj?.displayClock ?? '';
   const mins  = parseInt(clock.replace(/[^0-9]/g, ''), 10);
   return isNaN(mins) || mins === 0 ? null : mins;
 }
@@ -112,28 +103,25 @@ function parseMinute(event) {
 async function syncScores() {
   console.log(`[${new Date().toISOString()}] Fetching scoreboard from ESPN…`);
 
-  const res = await fetch(ESPN_URL, {
-    headers: { 'User-Agent': 'world-cup-2026-sync/1.0' }
-  });
+  const sbRes  = await fetch(SCOREBOARD_URL, { headers: HEADERS });
+  if (!sbRes.ok) { console.error(`Scoreboard error: ${sbRes.status}`); process.exit(1); }
+  const sbData = await sbRes.json();
+  const events = sbData.events ?? [];
+  console.log(`  Scoreboard: ${events.length} event(s) today.`);
 
-  if (!res.ok) {
-    console.error(`ESPN API error: ${res.status} ${res.statusText}`);
-    process.exit(1);
-  }
-
-  const data   = await res.json();
-  const events = data.events ?? [];
-  console.log(`  ESPN returned ${events.length} event(s) today.`);
-
-  if (!events.length) {
-    console.log('  No matches today — nothing to update.');
-    return;
-  }
+  if (!events.length) { console.log('  No matches today.'); return; }
 
   let updated = 0;
 
   for (const event of events) {
-    const comp = event.competitions?.[0];
+    const eventId = event.id;
+
+    // Fetch the per-match summary for fresher status data
+    const sumRes  = await fetch(SUMMARY_URL(eventId), { headers: HEADERS });
+    if (!sumRes.ok) { console.warn(`  Summary fetch failed for event ${eventId}: ${sumRes.status}`); continue; }
+    const sumData = await sumRes.json();
+
+    const comp = sumData.header?.competitions?.[0];
     if (!comp) continue;
 
     const homeComp = comp.competitors?.find(c => c.homeAway === 'home');
@@ -142,8 +130,10 @@ async function syncScores() {
 
     const homeTeam = normalise(homeComp.team.displayName);
     const awayTeam = normalise(awayComp.team.displayName);
-    const status   = parseStatus(event);
-    const minute   = parseMinute(event);
+    const status   = parseStatus(comp.status);
+    const minute   = parseMinute(comp.status);
+
+    console.log(`  [${homeTeam} vs ${awayTeam}] state=${comp.status?.type?.state} name=${comp.status?.type?.name} clock=${comp.status?.displayClock}`);
 
     if (status === 'scheduled') {
       console.log(`  Skipping (not started): ${homeTeam} vs ${awayTeam}`);
@@ -179,7 +169,4 @@ async function syncScores() {
   console.log(`  Done — ${updated} document(s) updated.`);
 }
 
-syncScores().catch(err => {
-  console.error('Sync failed:', err);
-  process.exit(1);
-});
+syncScores().catch(err => { console.error('Sync failed:', err); process.exit(1); });
