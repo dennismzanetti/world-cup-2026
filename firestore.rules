@@ -2,10 +2,16 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // MATCHES — public read, no client writes (admin only via Admin SDK)
+    // Admin UID allowed to write matches
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.uid == 'EAi3lYhlSFYGaqm9F87BdJb1Vrg1';
+    }
+
+    // MATCHES — public read, admin write only
     match /matches/{matchId} {
       allow read: if true;
-      allow write: if false;
+      allow write: if isAdmin();
     }
 
     // USERS — each user can only read and write their own profile
