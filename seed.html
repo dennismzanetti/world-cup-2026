@@ -10,10 +10,12 @@
     #login-form input  { padding: .5rem .75rem; border-radius: 6px; border: 1px solid #444; background: #222; color: #fff; font-size: 1rem; }
     #login-form button { padding: .5rem 1rem; border-radius: 6px; border: none; background: #0a84ff; color: #fff; font-size: 1rem; cursor: pointer; }
     #login-error { color: #f55; min-height: 1.2rem; }
-    #log { white-space: pre-wrap; }
-    .done  { color: #0f0; font-weight: bold; }
-    .error { color: #f55; font-weight: bold; }
-    .info  { color: #aaa; }
+    #log { white-space: pre-wrap; margin-top: 1rem; }
+    .done   { color: #0f0; font-weight: bold; }
+    .error  { color: #f55; font-weight: bold; }
+    .info   { color: #aaa; }
+    .warn   { color: #fa0; }
+    .uid    { color: #7df; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -30,7 +32,7 @@
   <div id="log"></div>
 
   <script type="module">
-    import { signInWithEmailAndPassword } from
+    import { signInWithEmailAndPassword, getIdTokenResult } from
       'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
     import { auth } from './assets/firebase.js';
     import { seedMatches } from './seed.js';
@@ -39,9 +41,9 @@
     const errEl = document.getElementById('login-error');
     const form  = document.getElementById('login-form');
 
-    const append = (msg, cls) => {
+    const append = (msg, cls = 'info') => {
       const line = document.createElement('div');
-      if (cls) line.className = cls;
+      line.className = cls;
       line.textContent = msg;
       log.appendChild(line);
     };
@@ -61,10 +63,35 @@
       const btn = form.querySelector('button');
       btn.disabled = true;
       btn.textContent = 'Signing in…';
+
       try {
-        await signInWithEmailAndPassword(auth, email, password);
+        const cred = await signInWithEmailAndPassword(auth, email, password);
+        const user = cred.user;
         form.hidden = true;
-        append('Signed in. Starting seed…', 'info');
+
+        // —— Auth diagnostics ——
+        append(`✓ Signed in as: ${user.email}`, 'done');
+        append(`  UID:          ${user.uid}`, 'uid');
+        append(`  Email verified: ${user.emailVerified}`, 'info');
+
+        const EXPECTED_UID = 'EAi3lYhlSFYGaqm9F87BdJb1Vrg1';
+        if (user.uid === EXPECTED_UID) {
+          append(`  ✅ UID matches ADMIN_UIDS — should have write access`, 'done');
+        } else {
+          append(`  ⚠️ UID does NOT match expected admin UID!`, 'warn');
+          append(`  Expected: ${EXPECTED_UID}`, 'warn');
+          append(`  Got:      ${user.uid}`, 'warn');
+          append(`  Fix: update ADMIN_UIDS in app.js and the Firestore rule to use UID above.`, 'warn');
+        }
+
+        // Force-refresh token and show claims
+        const tokenResult = await getIdTokenResult(user, true);
+        append(`  Token issued at: ${tokenResult.issuedAtTime}`, 'info');
+        append(`  Auth time:       ${tokenResult.authTime}`, 'info');
+
+        // Check which Firestore database is being targeted
+        append(`Starting seed on Firestore database 'wc2026'…`, 'info');
+
         await seedMatches();
         append('🎉 Done! You can close this tab.', 'done');
       } catch (err) {
@@ -72,6 +99,7 @@
         btn.disabled = false;
         btn.textContent = 'Sign In & Seed';
         append('❌ ' + err.message, 'error');
+        append('  Full error: ' + JSON.stringify(err.code), 'error');
       }
     });
   </script>
