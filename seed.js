@@ -1,7 +1,7 @@
 // seed.js — Self-contained seeder for all 2026 World Cup matches.
 // Deletes ALL existing documents in the `matches` collection, then
 // writes 72 group-stage matches + 35 knockout fixtures.
-// No dependency on data.js (which has been removed).
+// Team names are normalised at seed time to match ESPN output.
 
 import { db } from './assets/firebase.js';
 import {
@@ -12,6 +12,73 @@ import {
   getDocs,
   serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+// ── TEAM NAME NORMALISATION (must match live-scores.js) ──────────────────────
+// Canonical names used in both seed output AND ESPN sync lookup.
+const TEAM_NAME_MAP = {
+  'Mexico':                   'Mexico',
+  'South Africa':             'South Africa',
+  'Korea Republic':           'South Korea',
+  'South Korea':              'South Korea',
+  'Czech Republic':           'Czechia',
+  'Czechia':                  'Czechia',
+  'Canada':                   'Canada',
+  'Bosnia & Herzegovina':     'Bosnia-Herzegovina',
+  'Bosnia and Herzegovina':   'Bosnia-Herzegovina',
+  'Bosnia-Herzegovina':       'Bosnia-Herzegovina',
+  'Qatar':                    'Qatar',
+  'Switzerland':              'Switzerland',
+  'Brazil':                   'Brazil',
+  'Morocco':                  'Morocco',
+  'Haiti':                    'Haiti',
+  'Scotland':                 'Scotland',
+  'USA':                      'United States',
+  'United States':            'United States',
+  'Paraguay':                 'Paraguay',
+  'Australia':                'Australia',
+  'Turkey':                   'Türkiye',
+  'Türkiye':                  'Türkiye',
+  'Germany':                  'Germany',
+  'Curaçao':                  'Curaçao',
+  'Curacao':                  'Curaçao',
+  "Cote d'Ivoire":            'Ivory Coast',
+  "Çôte d'Ivoire":            'Ivory Coast',
+  'Ivory Coast':              'Ivory Coast',
+  'Ecuador':                  'Ecuador',
+  'Netherlands':              'Netherlands',
+  'Japan':                    'Japan',
+  'Sweden':                   'Sweden',
+  'Tunisia':                  'Tunisia',
+  'Belgium':                  'Belgium',
+  'Egypt':                    'Egypt',
+  'Iran':                     'Iran',
+  'New Zealand':              'New Zealand',
+  'Spain':                    'Spain',
+  'Cape Verde':               'Cape Verde',
+  'Cabo Verde':               'Cape Verde',
+  'Saudi Arabia':             'Saudi Arabia',
+  'Uruguay':                  'Uruguay',
+  'France':                   'France',
+  'Senegal':                  'Senegal',
+  'Iraq':                     'Iraq',
+  'Norway':                   'Norway',
+  'Argentina':                'Argentina',
+  'Algeria':                  'Algeria',
+  'Austria':                  'Austria',
+  'Jordan':                   'Jordan',
+  'Portugal':                 'Portugal',
+  'DR Congo':                 'Congo DR',
+  'Congo DR':                 'Congo DR',
+  'Congo, DR':                'Congo DR',
+  'Uzbekistan':               'Uzbekistan',
+  'Colombia':                 'Colombia',
+  'England':                  'England',
+  'Croatia':                  'Croatia',
+  'Ghana':                    'Ghana',
+  'Panama':                   'Panama',
+};
+
+function normalise(name) { return TEAM_NAME_MAP[name] ?? name; }
 
 // ── GROUPS ────────────────────────────────────────────────────────────────────
 const WC_GROUPS = [
@@ -34,10 +101,10 @@ const WC_GROUPS = [
     { name: 'Scotland',  flag: '🏴󠁧󠁢󠁳󠁣󠁴󠁿' },
   ]},
   { id: 'D', teams: [
-    { name: 'USA',        flag: '🇺🇸' },
-    { name: 'Paraguay',   flag: '🇵🇾' },
-    { name: 'Australia',  flag: '🇦🇺' },
-    { name: 'Türkiye',    flag: '🇹🇷' },
+    { name: 'United States', flag: '🇺🇸' },
+    { name: 'Paraguay',      flag: '🇵🇾' },
+    { name: 'Australia',     flag: '🇦🇺' },
+    { name: 'Türkiye',       flag: '🇹🇷' },
   ]},
   { id: 'E', teams: [
     { name: 'Germany',      flag: '🇩🇪' },
@@ -118,12 +185,12 @@ const WC_FIXTURE_META = {
   'Scotland|Brazil':  { date: '2026-06-24', timeLocal: '18:00', tz: 'ET', venue: 'Hard Rock Stadium',         city: 'Miami Gardens, FL',           ...BC.fox },
   'Morocco|Haiti':    { date: '2026-06-24', timeLocal: '18:00', tz: 'ET', venue: 'Mercedes-Benz Stadium',     city: 'Atlanta, GA',                 ...BC.fs1 },
   // ── GROUP D ──
-  'USA|Paraguay':       { date: '2026-06-12', timeLocal: '21:00', tz: 'ET', venue: 'SoFi Stadium',             city: 'Inglewood, CA',               ...BC.fox },
-  'Australia|Türkiye':  { date: '2026-06-13', timeLocal: '00:00', tz: 'ET', venue: 'BC Place',                 city: 'Vancouver, Canada',           ...BC.fs1 },
-  'USA|Australia':      { date: '2026-06-19', timeLocal: '15:00', tz: 'ET', venue: 'Lumen Field',              city: 'Seattle, WA',                 ...BC.fox },
-  'Türkiye|Paraguay':   { date: '2026-06-19', timeLocal: '23:00', tz: 'ET', venue: "Levi's Stadium",           city: 'Santa Clara, CA',             ...BC.fs1 },
-  'Türkiye|USA':        { date: '2026-06-25', timeLocal: '22:00', tz: 'ET', venue: 'SoFi Stadium',             city: 'Inglewood, CA',               ...BC.fox },
-  'Paraguay|Australia': { date: '2026-06-25', timeLocal: '22:00', tz: 'ET', venue: "Levi's Stadium",           city: 'Santa Clara, CA',             ...BC.fs1 },
+  'United States|Paraguay':  { date: '2026-06-12', timeLocal: '21:00', tz: 'ET', venue: 'SoFi Stadium',             city: 'Inglewood, CA',               ...BC.fox },
+  'Australia|Türkiye':       { date: '2026-06-13', timeLocal: '00:00', tz: 'ET', venue: 'BC Place',                 city: 'Vancouver, Canada',           ...BC.fs1 },
+  'United States|Australia': { date: '2026-06-19', timeLocal: '15:00', tz: 'ET', venue: 'Lumen Field',              city: 'Seattle, WA',                 ...BC.fox },
+  'Türkiye|Paraguay':        { date: '2026-06-19', timeLocal: '23:00', tz: 'ET', venue: "Levi's Stadium",           city: 'Santa Clara, CA',             ...BC.fs1 },
+  'Türkiye|United States':   { date: '2026-06-25', timeLocal: '22:00', tz: 'ET', venue: 'SoFi Stadium',             city: 'Inglewood, CA',               ...BC.fox },
+  'Paraguay|Australia':      { date: '2026-06-25', timeLocal: '22:00', tz: 'ET', venue: "Levi's Stadium",           city: 'Santa Clara, CA',             ...BC.fs1 },
   // ── GROUP E ──
   'Germany|Curaçao':      { date: '2026-06-14', timeLocal: '13:00', tz: 'ET', venue: 'NRG Stadium',            city: 'Houston, TX',                 ...BC.fox },
   'Ivory Coast|Ecuador':  { date: '2026-06-14', timeLocal: '19:00', tz: 'ET', venue: 'Lincoln Financial Field', city: 'Philadelphia, PA',            ...BC.fs1 },
@@ -146,12 +213,12 @@ const WC_FIXTURE_META = {
   'Egypt|Iran':         { date: '2026-06-27', timeLocal: '15:00', tz: 'ET', venue: 'Hard Rock Stadium',        city: 'Miami Gardens, FL',           ...BC.fox },
   'Belgium|New Zealand':{ date: '2026-06-27', timeLocal: '15:00', tz: 'ET', venue: 'Rose Bowl',                city: 'Pasadena, CA',                ...BC.fs1 },
   // ── GROUP H ──
-  'Spain|Uruguay':       { date: '2026-06-15', timeLocal: '18:00', tz: 'ET', venue: 'MetLife Stadium',         city: 'East Rutherford, NJ',         ...BC.fox },
-  'Cape Verde|Saudi Arabia': { date: '2026-06-16', timeLocal: '12:00', tz: 'ET', venue: 'Arrowhead Stadium',   city: 'Kansas City, MO',             ...BC.fs1 },
-  'Spain|Cape Verde':    { date: '2026-06-21', timeLocal: '18:00', tz: 'ET', venue: 'MetLife Stadium',         city: 'East Rutherford, NJ',         ...BC.fox },
-  'Saudi Arabia|Uruguay':{ date: '2026-06-21', timeLocal: '22:00', tz: 'ET', venue: 'Arrowhead Stadium',       city: 'Kansas City, MO',             ...BC.fs1 },
-  'Saudi Arabia|Spain':  { date: '2026-06-27', timeLocal: '18:00', tz: 'ET', venue: 'MetLife Stadium',         city: 'East Rutherford, NJ',         ...BC.fox },
-  'Uruguay|Cape Verde':  { date: '2026-06-27', timeLocal: '18:00', tz: 'ET', venue: 'Gillette Stadium',        city: 'Foxborough, MA',              ...BC.fs1 },
+  'Spain|Uruguay':           { date: '2026-06-15', timeLocal: '18:00', tz: 'ET', venue: 'MetLife Stadium',         city: 'East Rutherford, NJ',         ...BC.fox },
+  'Cape Verde|Saudi Arabia': { date: '2026-06-16', timeLocal: '12:00', tz: 'ET', venue: 'Arrowhead Stadium',       city: 'Kansas City, MO',             ...BC.fs1 },
+  'Spain|Cape Verde':        { date: '2026-06-21', timeLocal: '18:00', tz: 'ET', venue: 'MetLife Stadium',         city: 'East Rutherford, NJ',         ...BC.fox },
+  'Saudi Arabia|Uruguay':    { date: '2026-06-21', timeLocal: '22:00', tz: 'ET', venue: 'Arrowhead Stadium',       city: 'Kansas City, MO',             ...BC.fs1 },
+  'Saudi Arabia|Spain':      { date: '2026-06-27', timeLocal: '18:00', tz: 'ET', venue: 'MetLife Stadium',         city: 'East Rutherford, NJ',         ...BC.fox },
+  'Uruguay|Cape Verde':      { date: '2026-06-27', timeLocal: '18:00', tz: 'ET', venue: 'Gillette Stadium',        city: 'Foxborough, MA',              ...BC.fs1 },
   // ── GROUP I ──
   'France|Iraq':    { date: '2026-06-16', timeLocal: '15:00', tz: 'ET', venue: 'Rose Bowl',                   city: 'Pasadena, CA',                ...BC.fox },
   'Senegal|Norway': { date: '2026-06-16', timeLocal: '21:00', tz: 'ET', venue: 'NRG Stadium',                 city: 'Houston, TX',                 ...BC.fs1 },
@@ -199,21 +266,26 @@ function buildGroupMatches() {
     const teams = group.teams;
     for (let i = 0; i < teams.length; i++) {
       for (let j = i + 1; j < teams.length; j++) {
-        const keyFwd = teams[i].name + '|' + teams[j].name;
-        const keyRev = teams[j].name + '|' + teams[i].name;
+        const normI = normalise(teams[i].name);
+        const normJ = normalise(teams[j].name);
+        const keyFwd = normI + '|' + normJ;
+        const keyRev = normJ + '|' + normI;
         const metaFwd = WC_FIXTURE_META[keyFwd];
         const metaRev = WC_FIXTURE_META[keyRev];
         const meta = metaFwd || metaRev || {};
-        const homeTeam = (metaRev && !metaFwd) ? teams[j] : teams[i];
-        const awayTeam = (metaRev && !metaFwd) ? teams[i] : teams[j];
+        const isReversed = !metaFwd && !!metaRev;
+        const homeName = isReversed ? normJ : normI;
+        const awayName = isReversed ? normI : normJ;
+        const homeFlag = isReversed ? teams[j].flag : teams[i].flag;
+        const awayFlag = isReversed ? teams[i].flag : teams[j].flag;
         matches.push({
-          id:         makeMatchId(meta.date || null, homeTeam.name, awayTeam.name),
+          id:         makeMatchId(meta.date || null, homeName, awayName),
           stage:      'Group ' + group.id,
           group:      group.id,
-          home:       homeTeam.name,
-          homeflag:   homeTeam.flag,
-          away:       awayTeam.name,
-          awayflag:   awayTeam.flag,
+          home:       homeName,
+          homeflag:   homeFlag,
+          away:       awayName,
+          awayflag:   awayFlag,
           date:       meta.date       || null,
           timeLocal:  meta.timeLocal  || null,
           tz:         meta.tz         || 'ET',
@@ -247,10 +319,10 @@ const KNOCKOUT_FIXTURES = [
   { id: 'r32-10', stage: 'Round of 32', homeSource: { type: 'group',   group: 'H', pos: 1 }, awaySource: { type: 'group',   group: 'G', pos: 2 }, date: '2026-07-02', timeLocal: '19:00', tz: 'ET', venue: 'Gillette Stadium',         city: 'Foxborough, MA',        ...BC.fs1 },
   { id: 'r32-11', stage: 'Round of 32', homeSource: { type: 'group',   group: 'J', pos: 1 }, awaySource: { type: 'group',   group: 'I', pos: 2 }, date: '2026-07-03', timeLocal: '15:00', tz: 'ET', venue: 'Hard Rock Stadium',        city: 'Miami Gardens, FL',     ...BC.fox },
   { id: 'r32-12', stage: 'Round of 32', homeSource: { type: 'group',   group: 'L', pos: 1 }, awaySource: { type: 'group',   group: 'K', pos: 2 }, date: '2026-07-03', timeLocal: '19:00', tz: 'ET', venue: 'BMO Field',                city: 'Toronto, Canada',       ...BC.fs1 },
-  { id: 'r32-13', stage: 'Round of 32', homeSource: { type: 'best3rd', rank: 1  }, awaySource: { type: 'best3rd', rank: 2  }, date: '2026-07-04', timeLocal: '15:00', tz: 'ET', venue: 'Mercedes-Benz Stadium',   city: 'Atlanta, GA',           ...BC.fox },
-  { id: 'r32-14', stage: 'Round of 32', homeSource: { type: 'best3rd', rank: 3  }, awaySource: { type: 'best3rd', rank: 4  }, date: '2026-07-04', timeLocal: '19:00', tz: 'ET', venue: 'Estadio BBVA',            city: 'Monterrey, Mexico',     ...BC.fs1 },
-  { id: 'r32-15', stage: 'Round of 32', homeSource: { type: 'best3rd', rank: 5  }, awaySource: { type: 'best3rd', rank: 6  }, date: '2026-07-05', timeLocal: '15:00', tz: 'ET', venue: 'Estadio Akron',           city: 'Guadalajara, Mexico',   ...BC.fox },
-  { id: 'r32-16', stage: 'Round of 32', homeSource: { type: 'best3rd', rank: 7  }, awaySource: { type: 'best3rd', rank: 8  }, date: '2026-07-05', timeLocal: '19:00', tz: 'ET', venue: "Levi's Stadium",          city: 'Santa Clara, CA',       ...BC.fs1 },
+  { id: 'r32-13', stage: 'Round of 32', homeSource: { type: 'best3rd', rank: 1 }, awaySource: { type: 'best3rd', rank: 2 }, date: '2026-07-04', timeLocal: '15:00', tz: 'ET', venue: 'Mercedes-Benz Stadium',   city: 'Atlanta, GA',           ...BC.fox },
+  { id: 'r32-14', stage: 'Round of 32', homeSource: { type: 'best3rd', rank: 3 }, awaySource: { type: 'best3rd', rank: 4 }, date: '2026-07-04', timeLocal: '19:00', tz: 'ET', venue: 'Estadio BBVA',            city: 'Monterrey, Mexico',     ...BC.fs1 },
+  { id: 'r32-15', stage: 'Round of 32', homeSource: { type: 'best3rd', rank: 5 }, awaySource: { type: 'best3rd', rank: 6 }, date: '2026-07-05', timeLocal: '15:00', tz: 'ET', venue: 'Estadio Akron',           city: 'Guadalajara, Mexico',   ...BC.fox },
+  { id: 'r32-16', stage: 'Round of 32', homeSource: { type: 'best3rd', rank: 7 }, awaySource: { type: 'best3rd', rank: 8 }, date: '2026-07-05', timeLocal: '19:00', tz: 'ET', venue: "Levi's Stadium",          city: 'Santa Clara, CA',       ...BC.fs1 },
   // Round of 16
   { id: 'r16-1', stage: 'Round of 16', homeSource: { type: 'winner', matchId: 'r32-1'  }, awaySource: { type: 'winner', matchId: 'r32-2'  }, date: '2026-07-07', timeLocal: '15:00', tz: 'ET', venue: 'MetLife Stadium',   city: 'East Rutherford, NJ', ...BC.fox },
   { id: 'r16-2', stage: 'Round of 16', homeSource: { type: 'winner', matchId: 'r32-3'  }, awaySource: { type: 'winner', matchId: 'r32-4'  }, date: '2026-07-07', timeLocal: '19:00', tz: 'ET', venue: "AT&T Stadium",      city: 'Arlington, TX',       ...BC.fs1 },
@@ -269,7 +341,7 @@ const KNOCKOUT_FIXTURES = [
   { id: 'sf-1', stage: 'Semifinals', homeSource: { type: 'winner', matchId: 'qf-1' }, awaySource: { type: 'winner', matchId: 'qf-2' }, date: '2026-07-18', timeLocal: '19:00', tz: 'ET', venue: 'MetLife Stadium', city: 'East Rutherford, NJ', ...BC.fox },
   { id: 'sf-2', stage: 'Semifinals', homeSource: { type: 'winner', matchId: 'qf-3' }, awaySource: { type: 'winner', matchId: 'qf-4' }, date: '2026-07-21', timeLocal: '19:00', tz: 'ET', venue: "AT&T Stadium",    city: 'Arlington, TX',       ...BC.fox },
   // Third Place
-  { id: 'tp-1', stage: 'Third Place', homeSource: { type: 'loser', matchId: 'sf-1' }, awaySource: { type: 'loser', matchId: 'sf-2' }, date: '2026-07-24', timeLocal: '14:00', tz: 'ET', venue: 'Hard Rock Stadium', city: 'Miami Gardens, FL',   ...BC.fox },
+  { id: 'tp-1', stage: 'Third Place', homeSource: { type: 'loser', matchId: 'sf-1' }, awaySource: { type: 'loser', matchId: 'sf-2' }, date: '2026-07-24', timeLocal: '14:00', tz: 'ET', venue: 'Hard Rock Stadium', city: 'Miami Gardens, FL', ...BC.fox },
   // Final
   { id: 'final', stage: 'Final', homeSource: { type: 'winner', matchId: 'sf-1' }, awaySource: { type: 'winner', matchId: 'sf-2' }, date: '2026-07-26', timeLocal: '17:00', tz: 'ET', venue: 'MetLife Stadium', city: 'East Rutherford, NJ', ...BC.fox },
 ];
@@ -278,7 +350,6 @@ const KNOCKOUT_FIXTURES = [
 export async function reseedAllMatches(onProgress) {
   const log = msg => { console.log(msg); onProgress && onProgress(msg); };
 
-  // 1. Delete all existing matches
   log('🗑️  Fetching existing matches to delete…');
   const snap = await getDocs(collection(db, 'matches'));
   log(`   Found ${snap.size} existing documents. Deleting…`);
@@ -290,7 +361,6 @@ export async function reseedAllMatches(onProgress) {
   }
   log(`✅ Deleted ${deleted} documents.`);
 
-  // 2. Seed group stage matches
   const groupMatches = buildGroupMatches();
   log(`\n⚽ Seeding ${groupMatches.length} group stage matches…`);
   let gCount = 0;
@@ -301,7 +371,6 @@ export async function reseedAllMatches(onProgress) {
     log(`   ✓ [${gCount}/${groupMatches.length}] ${id}`);
   }
 
-  // 3. Seed knockout fixtures
   log(`\n🏆 Seeding ${KNOCKOUT_FIXTURES.length} knockout fixtures…`);
   let kCount = 0;
   for (const fixture of KNOCKOUT_FIXTURES) {

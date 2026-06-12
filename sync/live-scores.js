@@ -25,7 +25,7 @@ const SCOREBOARD_URL      = 'https://site.api.espn.com/apis/site/v2/sports/socce
 const SCOREBOARD_DATE_URL = date => `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=${date}`;
 const SUMMARY_URL         = id   => `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/summary?event=${id}`;
 
-// ─── Team name normalisation ──────────────────────────────────────────────────
+// ─── Team name normalisation (must match seed.js) ────────────────────────────
 const TEAM_NAME_MAP = {
   'Mexico':                   'Mexico',
   'South Africa':             'South Africa',
@@ -106,7 +106,8 @@ function parseMinute(statusObj) {
 }
 
 // ─── Update a single Firestore match from an ESPN competition object ──────────
-// NOTE: seed.js stores teams as 'home' and 'away' (not 'homeTeam'/'awayTeam')
+// Looks up by home+away first, then tries the reverse (away+home) in case
+// ESPN and the seed disagree on which side is "home".
 async function updateMatchFromComp(comp) {
   const homeComp = comp.competitors?.find(c => c.homeAway === 'home');
   const awayComp = comp.competitors?.find(c => c.homeAway === 'away');
@@ -128,27 +129,41 @@ async function updateMatchFromComp(comp) {
   const homeScore = parseInt(homeComp.score ?? '0', 10);
   const awayScore = parseInt(awayComp.score ?? '0', 10);
 
-  // Match on 'home' + 'away' fields (as written by seed.js)
-  const snap = await db.collection('matches')
+  // Try home+away order first, then reverse
+  let snap = await db.collection('matches')
     .where('home', '==', home)
     .where('away', '==', away)
     .limit(1)
     .get();
 
   if (snap.empty) {
+    snap = await db.collection('matches')
+      .where('home', '==', away)
+      .where('away', '==', home)
+      .limit(1)
+      .get();
+  }
+
+  if (snap.empty) {
     console.warn(`  ⚠ No Firestore doc found for: ${home} vs ${away}`);
     return false;
   }
 
+  // Determine correct score orientation relative to how the doc is stored
+  const docData  = snap.docs[0].data();
+  const flipped  = docData.home === away; // ESPN home is our away
+  const finalHomeScore = flipped ? awayScore : homeScore;
+  const finalAwayScore = flipped ? homeScore : awayScore;
+
   await snap.docs[0].ref.update({
-    homeScore,
-    awayScore,
+    homeScore: finalHomeScore,
+    awayScore: finalAwayScore,
     status,
     minute,
     updatedAt: FieldValue.serverTimestamp(),
   });
 
-  console.log(`  ✓ Updated: ${home} ${homeScore}–${awayScore} ${away}  [${status}${minute ? ` ${minute}'` : ''}]`);
+  console.log(`  ✓ Updated: ${docData.home} ${finalHomeScore}–${finalAwayScore} ${docData.away}  [${status}${minute ? ` ${minute}'` : ''}]`);
   return true;
 }
 
@@ -210,10 +225,8 @@ async function backfillPastMatches() {
 async function syncScores() {
   console.log(`[${new Date().toISOString()}] Starting live-scores sync…`);
 
-  // 1. Backfill any past matches still "scheduled"
   await backfillPastMatches();
 
-  // 2. Sync today's live scoreboard
   console.log("  Fetching today's scoreboard from ESPN…");
   const sbRes = await fetch(SCOREBOARD_URL, { headers: HEADERS });
   if (!sbRes.ok) { console.error(`Scoreboard fetch failed: ${sbRes.status}`); process.exit(1); }
