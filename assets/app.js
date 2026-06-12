@@ -245,22 +245,27 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
   }
 
   // ─── Stage label ────────────────────────────────────────────────────────────────────
-  const stageKeyToLabel = key => ({
-    R32:'Round of 32', R16:'Round of 16', QF:'Quarter-Finals', SF:'Semi-Finals', '3P':'Third Place', F:'Final'
-  }[key] || (/^[A-Z]$/.test(key) ? `Group ${key}` : key));
+  // NOTE: single uppercase letter check must come BEFORE the map lookup so that
+  // group keys like 'F' resolve to 'Group F' and not 'Final'.
+  const stageKeyToLabel = key => {
+    if (/^[A-Z]$/.test(key)) return `Group ${key}`;
+    return { R32:'Round of 32', R16:'Round of 16', QF:'Quarter-Finals', SF:'Semi-Finals', '3P':'Third Place', F:'Final' }[key] || key;
+  };
 
   // ─── Populate filters (Matches tab) ───────────────────────────────────────────────
   function populateMatchFilters() {
     const dateEl  = document.getElementById('match-date-filter');
     const stageEl = document.getElementById('match-group-filter');
     const venueEl = document.getElementById('match-venue-filter');
+    // Use allPredMatches() so knockout rounds appear alongside group stage matches
+    const allMatches = allPredMatches();
     if (dateEl) {
       const dates = [...new Set(allTabMatches().map(m => m.date).filter(Boolean))].sort();
       dateEl.innerHTML = '<option value="all">All Dates</option>' +
         dates.map(d => `<option value="${d}">${formatDateHeader(d)}</option>`).join('');
     }
     if (stageEl) {
-      const stages = [...new Set(allTabMatches().map(m => m.group || m.stage).filter(Boolean))];
+      const stages = [...new Set(allMatches.map(m => m.group || m.stage).filter(Boolean))];
       stageEl.innerHTML = '<option value="all">All Matches</option>' +
         stages.map(s => `<option value="${s}">${stageKeyToLabel(s)}</option>`).join('');
     }
