@@ -1,5 +1,5 @@
-// World Cup 2026 App — Firebase-connected
-import { WC_GROUPS, WC_MATCHES, WC_KNOCKOUT_FIXTURES } from './data.js';
+// World Cup 2026 App — Firebase-connected, data sourced entirely from Firestore
+import { WC_KNOCKOUT_FIXTURES } from './data.js';
 import { signUp, signIn, logOut, watchAuth } from './auth.js';
 import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, saveBracketPicks, getBracketPicks } from './db.js';
 
@@ -11,13 +11,86 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
   let activeTab        = 'groups';
   let activePredSubtab = 'my-picks';
   let userPredictions  = {};  // matchId → {home, away}
-  let liveMatches      = WC_MATCHES.slice();
+  let liveMatches      = [];  // populated entirely from Firestore via watchMatches()
   let unsubPredictions = null;
   let bracketPicks     = {};  // matchId (string) → 'home'|'away'
   let bracketSaveTimer = null;
 
+  // WC_GROUPS is derived dynamically from liveMatches (Firestore)
+  // Returns [{id, teams:[{name,flag}]}] sorted A–L
+  function buildGroups() {
+    const map = {};
+    liveMatches.forEach(m => {
+      const g = m.group;
+      if (!g) return;
+      if (!map[g]) map[g] = {};
+      const hn = teamName(m.home);
+      const an = teamName(m.away);
+      if (hn) map[g][hn] = { name: hn, flag: TEAM_FLAGS[hn] || '' };
+      if (an) map[g][an] = { name: an, flag: TEAM_FLAGS[an] || '' };
+    });
+    return Object.keys(map).sort().map(id => ({
+      id,
+      teams: Object.values(map[id]).sort((a, b) => a.name.localeCompare(b.name))
+    }));
+  }
+
   function allPredMatches() { return [...liveMatches, ...WC_KNOCKOUT_FIXTURES]; }
   function allTabMatches()  { return liveMatches.slice(); }
+
+  // ─── Team flag lookup (client-side, Firestore stores names only) ─────────────
+  const TEAM_FLAGS = {
+    'Mexico':               '🇲🇽',
+    'South Africa':         '🇿🇦',
+    'South Korea':          '🇰🇷',
+    'Czechia':              '🇨🇿',
+    'Canada':               '🇨🇦',
+    'Bosnia-Herzegovina':   '🇧🇦',
+    'Qatar':                '🇶🇦',
+    'Switzerland':          '🇨🇭',
+    'Brazil':               '🇧🇷',
+    'Morocco':              '🇲🇦',
+    'Haiti':                '🇭🇹',
+    'Scotland':             '🏴󠁧󠁢󠁳󠁣󠁴󠁿',
+    'USA':                  '🇺🇸',
+    'United States':        '🇺🇸',
+    'Paraguay':             '🇵🇾',
+    'Australia':            '🇦🇺',
+    'Türkiye':              '🇹🇷',
+    'Turkey':               '🇹🇷',
+    'Germany':              '🇩🇪',
+    'Curaçao':              '🇨🇼',
+    'Ivory Coast':          '🇨🇮',
+    'Ecuador':              '🇪🇨',
+    'Netherlands':          '🇳🇱',
+    'Japan':                '🇯🇵',
+    'Sweden':               '🇸🇪',
+    'Tunisia':              '🇹🇳',
+    'Belgium':              '🇧🇪',
+    'Egypt':                '🇪🇬',
+    'Iran':                 '🇮🇷',
+    'New Zealand':          '🇳🇿',
+    'Spain':                '🇪🇸',
+    'Cape Verde':           '🇨🇻',
+    'Saudi Arabia':         '🇸🇦',
+    'Uruguay':              '🇺🇾',
+    'France':               '🇫🇷',
+    'Senegal':              '🇸🇳',
+    'Iraq':                 '🇮🇶',
+    'Norway':               '🇳🇴',
+    'Argentina':            '🇦🇷',
+    'Algeria':              '🇩🇿',
+    'Austria':              '🇦🇹',
+    'Jordan':               '🇯🇴',
+    'Portugal':             '🇵🇹',
+    'Congo DR':             '🇨🇩',
+    'Uzbekistan':           '🇺🇿',
+    'Colombia':             '🇨🇴',
+    'England':              '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+    'Croatia':              '🇭🇷',
+    'Ghana':                '🇬🇭',
+    'Panama':               '🇵🇦',
+  };
 
   // ─── Bracket rounds ───────────────────────────────────────────────────────
   const BRACKET_ROUNDS = [
@@ -32,9 +105,18 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
   const ADMIN_UIDS = ['rvR3HclRnhXAOd3rgk7sO0s3F7v1'];
 
   // ─── Team helpers ──────────────────────────────────────────────────────────
+  // Firestore stores team names as plain strings; objects are accepted too for
+  // backwards-compat and knockout fixture stubs.
   function teamName(t)    { return (t && typeof t === 'object') ? t.name : (t || ''); }
-  function teamFlag(t)    { return (t && typeof t === 'object') ? (t.flag || '') : ''; }
-  function teamDisplay(t) { return teamFlag(t) ? `${teamFlag(t)} ${teamName(t)}` : teamName(t); }
+  function teamFlag(t) {
+    if (t && typeof t === 'object') return t.flag || TEAM_FLAGS[t.name] || '';
+    return TEAM_FLAGS[t] || '';
+  }
+  function teamDisplay(t) {
+    const f = teamFlag(t);
+    const n = teamName(t);
+    return f ? `${f} ${n}` : n;
+  }
 
   // ─── Date formatting ──────────────────────────────────────────────────────────
   function formatDateHeader(isoDate) {
@@ -191,26 +273,11 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
   document.getElementById('pred-group-filter')?.addEventListener('change', renderPredictions);
   document.getElementById('pred-team-filter')?.addEventListener('input', renderPredictions);
 
-  // ─── Live match data ──────────────────────────────────────────────────────────
+  // ─── Live match data — sole source of truth from Firestore ───────────────────
   watchMatches(allMatches => {
-    allMatches.forEach(um => {
-      let idx = liveMatches.findIndex(m => m.id === um.id);
-      if (idx === -1) {
-        const umHome = teamName(um.home).toLowerCase();
-        const umAway = teamName(um.away).toLowerCase();
-        if (umHome || umAway) {
-          idx = liveMatches.findIndex(m =>
-            teamName(m.home).toLowerCase() === umHome &&
-            teamName(m.away).toLowerCase() === umAway
-          );
-        }
-      }
-      if (idx !== -1) {
-        liveMatches[idx] = { ...liveMatches[idx], ...um };
-      } else {
-        liveMatches.push(um);
-      }
-    });
+    // Replace liveMatches entirely from Firestore; doc.id IS the canonical match ID.
+    liveMatches = allMatches;
+    populateMatchFilters();
     if (authResolved) renderAll();
   });
 
@@ -280,7 +347,8 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     const grid = document.getElementById('groups-grid');
     if (!grid) return;
     grid.innerHTML = '';
-    WC_GROUPS.forEach(group => {
+    const groups = buildGroups();
+    groups.forEach(group => {
       const groupMatches = liveMatches.filter(m => m.group === group.id);
       const standings = calcPoints(group.teams, groupMatches);
       const card = document.createElement('div');
@@ -399,8 +467,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     else if (m.status === 'ht')                         statusBadge = '<span class="status-badge status-ht">HT</span>';
     else if (m.status === 'ft' || m.status === 'final') statusBadge = '<span class="status-badge status-ft">FT</span>';
 
-    // Score column: always read-only on the Matches page (isPred=false).
-    // Only show prediction inputs on the Predictions page (isPred=true).
     let scoreColHtml = '';
     if (isPred && currentUser) {
       const pred = userPredictions[m.id] || {};
@@ -419,8 +485,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
           <span class="pred-error"  hidden></span>
         </div>`;
     } else {
-      // Read-only score display — used for both the Matches page (all users incl. admin)
-      // and the Predictions page when not signed in.
       const hs  = m.homeScore != null ? m.homeScore : '–';
       const as_ = m.awayScore != null ? m.awayScore : '–';
       const cls = m.status === 'live' ? 'score-final score-live' : m.homeScore != null ? 'score-final' : 'score-final score-pending';
@@ -523,7 +587,8 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     }
     authPrompt?.setAttribute('hidden', '');
     container.innerHTML = '';
-    WC_GROUPS.forEach(group => {
+    const groups = buildGroups();
+    groups.forEach(group => {
       const groupMatches = liveMatches.filter(m => m.group === group.id);
       const predMatches  = groupMatches.map(m => {
         const pred = userPredictions[m.id];
@@ -613,7 +678,8 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     if (!source || typeof source === 'string') return null;
     if (source.type === 'group') {
       const gm = liveMatches.filter(m => m.group === source.group);
-      const group = WC_GROUPS.find(g => g.id === source.group);
+      const groups = buildGroups();
+      const group = groups.find(g => g.id === source.group);
       if (!group) return null;
       const standings = calcPoints(group.teams, gm.map(m => {
         const pred = userPredictions[m.id];
@@ -667,9 +733,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       container.appendChild(section);
     });
   }
-
-  populateMatchFilters();
-  renderGroups();
 
   window._wc = { getAllMatches() { return [...liveMatches]; } };
 
