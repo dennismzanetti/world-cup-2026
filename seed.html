@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Seed Firestore Matches</title>
+  <style>
+    body { font-family: monospace; padding: 2rem; background: #111; color: #0f0; }
+    #log { white-space: pre-wrap; }
+    .done  { color: #0f0; font-weight: bold; }
+    .error { color: #f55; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h2 style="color:#fff">Firestore Match Seeder</h2>
+  <p style="color:#aaa">Seeding matches from <code>assets/data.js</code> — check the log below and the browser console.</p>
+  <div id="log">Starting…\n</div>
+
+  <script type="module">
+    import { seedMatches } from './seed.js';
+
+    const log = document.getElementById('log');
+    const append = (msg, cls) => {
+      const line = document.createElement('div');
+      if (cls) line.className = cls;
+      line.textContent = msg;
+      log.appendChild(line);
+    };
+
+    // Patch console.log so progress shows on-screen too
+    const origLog = console.log.bind(console);
+    console.log = (...args) => {
+      origLog(...args);
+      const msg = args.join(' ');
+      append(msg, msg.startsWith('✅') ? 'done' : '');
+    };
+
+    try {
+      await seedMatches();
+      append('🎉 Done! You can close this tab.', 'done');
+    } catch (err) {
+      append('❌ Error: ' + err.message, 'error');
+      console.error(err);
+    }
+  </script>
+</body>
+</html>
