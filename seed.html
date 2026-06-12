@@ -6,27 +6,23 @@
   <style>
     body { font-family: monospace; padding: 2rem; background: #111; color: #ccc; }
     h2   { color: #fff; }
-    .btn-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
     #login-form { display: flex; flex-direction: column; gap: .75rem; max-width: 320px; margin-bottom: 2rem; }
     #login-form input  { padding: .5rem .75rem; border-radius: 6px; border: 1px solid #444; background: #222; color: #fff; font-size: 1rem; }
     #login-form button { padding: .5rem 1rem; border-radius: 6px; border: none; background: #0a84ff; color: #fff; font-size: 1rem; cursor: pointer; }
     #login-error { color: #f55; min-height: 1.2rem; }
-    button.seed-btn { padding: .6rem 1.2rem; border-radius: 6px; border: none; font-size: 1rem; cursor: pointer; font-family: monospace; }
-    button.seed-btn:disabled { opacity: .4; cursor: not-allowed; }
-    #btn-group-stage  { background: #0a84ff; color: #fff; }
-    #btn-knockout     { background: #30d158; color: #000; }
-    #btn-ko-overwrite { background: #ff453a; color: #fff; }
-    #log { white-space: pre-wrap; margin-top: 1rem; }
-    .done   { color: #0f0; font-weight: bold; }
-    .error  { color: #f55; font-weight: bold; }
-    .info   { color: #aaa; }
-    .warn   { color: #fa0; }
-    .uid    { color: #7df; font-weight: bold; }
+    #btn-reseed { padding: .75rem 1.5rem; border-radius: 6px; border: none; background: #ff453a; color: #fff; font-size: 1.1rem; cursor: pointer; font-family: monospace; font-weight: bold; display: none; }
+    #btn-reseed:disabled { opacity: .4; cursor: not-allowed; }
+    #log { white-space: pre-wrap; margin-top: 1.5rem; line-height: 1.6; }
+    .done  { color: #0f0; font-weight: bold; }
+    .error { color: #f55; font-weight: bold; }
+    .info  { color: #aaa; }
+    .warn  { color: #fa0; }
+    .uid   { color: #7df; font-weight: bold; }
   </style>
 </head>
 <body>
-  <h2>Firestore Match Seeder</h2>
-  <p class="info">Sign in with your admin account, then choose what to seed.</p>
+  <h2>🌍 Firestore Match Seeder</h2>
+  <p class="info">Sign in, then click Re-seed to delete all existing matches and write all 107 fresh.</p>
 
   <form id="login-form">
     <input id="email"    type="email"    placeholder="Admin email"    required autocomplete="username">
@@ -35,12 +31,7 @@
     <div id="login-error"></div>
   </form>
 
-  <!-- Seed action buttons — hidden until signed in -->
-  <div class="btn-row" id="seed-btns" hidden>
-    <button class="seed-btn" id="btn-group-stage">Seed Group Stage Matches</button>
-    <button class="seed-btn" id="btn-knockout">Seed Knockout Fixtures (merge)</button>
-    <button class="seed-btn" id="btn-ko-overwrite">⚠️ Re-seed Knockout (overwrite)</button>
-  </div>
+  <button id="btn-reseed">⚠️ Delete All &amp; Re-seed All Matches (72 group + 35 knockout)</button>
 
   <div id="log"></div>
 
@@ -48,27 +39,19 @@
     import { signInWithEmailAndPassword, getIdTokenResult } from
       'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
     import { auth } from './assets/firebase.js';
-    import { seedMatches } from './seed.js';
-    import { seedKnockoutMatches } from './assets/db.js';
-    import { KNOCKOUT_FIXTURES } from './seed-knockout.js';
+    import { reseedAllMatches } from './seed.js';
 
-    const log   = document.getElementById('log');
-    const errEl = document.getElementById('login-error');
-    const form  = document.getElementById('login-form');
-    const seedBtns = document.getElementById('seed-btns');
+    const logEl  = document.getElementById('log');
+    const errEl  = document.getElementById('login-error');
+    const form   = document.getElementById('login-form');
+    const btn    = document.getElementById('btn-reseed');
 
     const append = (msg, cls = 'info') => {
       const line = document.createElement('div');
       line.className = cls;
       line.textContent = msg;
-      log.appendChild(line);
-    };
-
-    const origLog = console.log.bind(console);
-    console.log = (...args) => {
-      origLog(...args);
-      const msg = args.join(' ');
-      append(msg, msg.startsWith('✅') ? 'done' : 'info');
+      logEl.appendChild(line);
+      logEl.scrollTop = logEl.scrollHeight;
     };
 
     form.addEventListener('submit', async e => {
@@ -76,66 +59,47 @@
       errEl.textContent = '';
       const email    = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
-      const btn = form.querySelector('button');
-      btn.disabled = true;
-      btn.textContent = 'Signing in…';
+      const signInBtn = form.querySelector('button');
+      signInBtn.disabled = true;
+      signInBtn.textContent = 'Signing in…';
 
       try {
         const cred = await signInWithEmailAndPassword(auth, email, password);
         const user = cred.user;
         form.hidden = true;
-        seedBtns.removeAttribute('hidden');
+        btn.style.display = 'inline-block';
 
         append(`✓ Signed in as: ${user.email}`, 'done');
         append(`  UID: ${user.uid}`, 'uid');
-        append(`  Email verified: ${user.emailVerified}`, 'info');
 
         const EXPECTED_UID = 'rvR3HclRnhXAOd3rgk7sO0s3F7v1';
         if (user.uid === EXPECTED_UID) {
-          append(`  ✅ UID matches ADMIN_UIDS`, 'done');
+          append('  ✅ UID matches admin', 'done');
         } else {
-          append(`  ⚠️ UID does NOT match expected admin UID!`, 'warn');
+          append('  ⚠️ UID does NOT match expected admin UID!', 'warn');
           append(`  Expected: ${EXPECTED_UID}`, 'warn');
           append(`  Got:      ${user.uid}`, 'warn');
         }
 
-        const tokenResult = await getIdTokenResult(user, true);
-        append(`  Token issued at: ${tokenResult.issuedAtTime}`, 'info');
-
-        // ── Group stage seed button ──────────────────────────────────────────
-        document.getElementById('btn-group-stage').addEventListener('click', async () => {
-          log.innerHTML = '';
-          append('Seeding group stage matches…', 'info');
+        btn.addEventListener('click', async () => {
+          if (!confirm('This will DELETE all existing match documents and re-seed 107 matches from scratch. Continue?')) return;
+          btn.disabled = true;
+          btn.textContent = 'Seeding…';
+          logEl.innerHTML = '';
           try {
-            await seedMatches();
-            append('🎉 Group stage seed complete!', 'done');
+            await reseedAllMatches(msg => append(msg, msg.startsWith('✅') || msg.startsWith('🎉') ? 'done' : msg.startsWith('⚠️') ? 'warn' : 'info'));
+            btn.textContent = '✅ Done';
           } catch (err) {
             append('❌ ' + err.message, 'error');
+            btn.disabled = false;
+            btn.textContent = '⚠️ Delete All & Re-seed All Matches';
           }
-        });
-
-        // ── Knockout seed button (merge — preserves existing scores) ─────────
-        document.getElementById('btn-knockout').addEventListener('click', async () => {
-          log.innerHTML = '';
-          append(`Seeding ${KNOCKOUT_FIXTURES.length} knockout fixtures (merge)…`, 'info');
-          const { ok, err } = await seedKnockoutMatches(KNOCKOUT_FIXTURES, true);
-          append(`🎉 Done — ${ok} seeded, ${err} errors.`, err > 0 ? 'warn' : 'done');
-        });
-
-        // ── Knockout overwrite button (destructive — clears scores) ──────────
-        document.getElementById('btn-ko-overwrite').addEventListener('click', async () => {
-          if (!confirm('This will OVERWRITE all knockout match data including any scores. Continue?')) return;
-          log.innerHTML = '';
-          append(`Re-seeding ${KNOCKOUT_FIXTURES.length} knockout fixtures (overwrite)…`, 'warn');
-          const { ok, err } = await seedKnockoutMatches(KNOCKOUT_FIXTURES, false);
-          append(`🎉 Done — ${ok} seeded, ${err} errors.`, err > 0 ? 'warn' : 'done');
         });
 
       } catch (err) {
         errEl.textContent = err.message;
-        btn.disabled = false;
-        btn.textContent = 'Sign In';
-        append('❌ ' + err.message, 'error');
+        signInBtn.disabled = false;
+        signInBtn.textContent = 'Sign In';
       }
     });
   </script>
