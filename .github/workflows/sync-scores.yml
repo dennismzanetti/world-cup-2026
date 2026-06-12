@@ -42,6 +42,6 @@ jobs:
 
       - name: Run live-scores sync
         working-directory: sync
-        run: node live-scores.js
+        run: node live-scores.js --force-reseed
         env:
           FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
