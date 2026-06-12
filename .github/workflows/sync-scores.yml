@@ -9,6 +9,9 @@
 #                                     with Firestore read/write permissions
 #
 # No FOOTBALL_DATA_API_KEY needed anymore — ESPN API is public.
+#
+# Manual trigger: use workflow_dispatch with force_reseed=true to delete all
+# existing match docs and re-seed from scratch (e.g. after schema changes).
 
 name: Sync Live Scores
 
@@ -16,6 +19,11 @@ on:
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:
+    inputs:
+      force_reseed:
+        description: 'Force delete + reseed all matches from matches.json'
+        type: boolean
+        default: false
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -42,6 +50,6 @@ jobs:
 
       - name: Run live-scores sync
         working-directory: sync
-        run: node live-scores.js --force-reseed
+        run: node live-scores.js ${{ github.event.inputs.force_reseed == 'true' && '--force-reseed' || '' }}
         env:
           FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
