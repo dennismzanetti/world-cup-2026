@@ -1,6 +1,6 @@
 // sync/live-scores.js
 // Fetches live World Cup 2026 scores via ESPN APIs and writes to Firestore.
-// Auto-seeds matches from data/matches.json if collection is empty.
+// Upserts missing matches from data/matches.json on every run (idempotent).
 // Backfills any past matches still marked "scheduled" by querying ESPN by date.
 // No API key needed.
 // Requires: FIREBASE_SERVICE_ACCOUNT_JSON (GitHub Secret)
@@ -10,7 +10,7 @@ import { readFile } from 'fs/promises';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
-// ─── Firebase Admin Init ──────────────────────────────────────────────────────
+// ─── Firebase Admin Init ───────────────────────────────────────────────────────────────────────────────
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
 
 console.log(`[init] project_id   : ${serviceAccount.project_id}`);
@@ -18,11 +18,7 @@ console.log(`[init] client_email : ${serviceAccount.client_email}`);
 console.log(`[init] Firestore DB : wc2026`);
 
 const app = initializeApp({ credential: cert(serviceAccount) });
-
-// Pass the named database ID directly to getFirestore — this is the correct
-// approach for firebase-admin. Calling settings({ databaseId }) after the fact
-// is unreliable and causes gRPC NOT_FOUND errors.
-const db = getFirestore(app, 'wc2026');
+const db  = getFirestore(app, 'wc2026');
 
 const HEADERS = { 'User-Agent': 'world-cup-2026-sync/1.0' };
 
@@ -30,30 +26,36 @@ const SCOREBOARD_URL      = 'https://site.api.espn.com/apis/site/v2/sports/socce
 const SCOREBOARD_DATE_URL = date => `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=${date}`;
 const SUMMARY_URL         = id   => `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/summary?event=${id}`;
 
-// ─── Auto-seed if matches collection is empty ─────────────────────────────────
-async function ensureSeeded() {
-  const sample = await db.collection('matches').limit(1).get();
-  if (!sample.empty) {
-    console.log('  matches collection already seeded — skipping.');
-    return;
-  }
-  console.log('  matches collection is empty — seeding from data/matches.json…');
+// ─── Upsert all matches from data/matches.json (idempotent) ─────────────────────────────────
+// Uses matchNumber as a stable lookup key. Adds missing docs, skips existing.
+async function upsertMissingMatches() {
   const raw     = await readFile(new URL('../data/matches.json', import.meta.url), 'utf8');
   const matches = JSON.parse(raw);
 
-  // Firestore batch limit is 500 writes
+  // Fetch all existing matchNumbers from Firestore in one query
+  const existing = await db.collection('matches').get();
+  const existingNums = new Set(existing.docs.map(d => d.data().matchNumber));
+
+  const missing = matches.filter(m => !existingNums.has(m.matchNumber));
+
+  if (!missing.length) {
+    console.log(`  All ${matches.length} matches already in Firestore — skipping upsert.`);
+    return;
+  }
+
+  console.log(`  Adding ${missing.length} missing match(es) to Firestore…`);
   const CHUNK = 500;
-  for (let i = 0; i < matches.length; i += CHUNK) {
+  for (let i = 0; i < missing.length; i += CHUNK) {
     const batch = db.batch();
-    for (const m of matches.slice(i, i + CHUNK)) {
+    for (const m of missing.slice(i, i + CHUNK)) {
       batch.set(db.collection('matches').doc(m.id), m);
     }
     await batch.commit();
   }
-  console.log(`  ✓ Seeded ${matches.length} matches.`);
+  console.log(`  ✓ Added ${missing.length} match(es).`);
 }
 
-// ─── Team name normalisation ──────────────────────────────────────────────────
+// ─── Team name normalisation ──────────────────────────────────────────────────────────────────────────────
 const TEAM_NAME_MAP = {
   'Mexico':                   'Mexico',
   'South Africa':             'South Africa',
@@ -71,8 +73,8 @@ const TEAM_NAME_MAP = {
   'Morocco':                  'Morocco',
   'Haiti':                    'Haiti',
   'Scotland':                 'Scotland',
-  'USA':                      'USA',
-  'United States':            'USA',
+  'USA':                      'United States',
+  'United States':            'United States',
   'Paraguay':                 'Paraguay',
   'Australia':                'Australia',
   'Turkey':                   'Türkiye',
@@ -81,7 +83,7 @@ const TEAM_NAME_MAP = {
   'Curaçao':                  'Curaçao',
   'Curacao':                  'Curaçao',
   "Cote d'Ivoire":            'Ivory Coast',
-  "Côte d'Ivoire":            'Ivory Coast',
+  "Çôte d'Ivoire":            'Ivory Coast',
   'Ivory Coast':              'Ivory Coast',
   'Ecuador':                  'Ecuador',
   'Netherlands':              'Netherlands',
@@ -94,6 +96,7 @@ const TEAM_NAME_MAP = {
   'New Zealand':              'New Zealand',
   'Spain':                    'Spain',
   'Cape Verde':               'Cape Verde',
+  'Cabo Verde':               'Cape Verde',
   'Saudi Arabia':             'Saudi Arabia',
   'Uruguay':                  'Uruguay',
   'France':                   'France',
@@ -132,7 +135,7 @@ function parseMinute(statusObj) {
   return isNaN(mins) || mins === 0 ? null : mins;
 }
 
-// ─── Update a single Firestore match from an ESPN competition object ──────────
+// ─── Update a single Firestore match from an ESPN competition object ──────────────
 async function updateMatchFromComp(comp) {
   const homeComp = comp.competitors?.find(c => c.homeAway === 'home');
   const awayComp = comp.competitors?.find(c => c.homeAway === 'away');
@@ -154,28 +157,11 @@ async function updateMatchFromComp(comp) {
   const homeScore = parseInt(homeComp.score ?? '0', 10);
   const awayScore = parseInt(awayComp.score ?? '0', 10);
 
-  // Try homeTeam match first, then fall back to USA alias
-  let snap = await db.collection('matches')
+  const snap = await db.collection('matches')
     .where('homeTeam', '==', homeTeam)
     .where('awayTeam', '==', awayTeam)
     .limit(1)
     .get();
-
-  // If not found, try the alternate "United States" → "USA" mapping in Firestore
-  if (snap.empty && homeTeam === 'USA') {
-    snap = await db.collection('matches')
-      .where('homeTeam', '==', 'United States')
-      .where('awayTeam', '==', awayTeam)
-      .limit(1)
-      .get();
-  }
-  if (snap.empty && awayTeam === 'USA') {
-    snap = await db.collection('matches')
-      .where('homeTeam', '==', homeTeam)
-      .where('awayTeam', '==', 'United States')
-      .limit(1)
-      .get();
-  }
 
   if (snap.empty) {
     console.warn(`  ⚠ No Firestore doc: ${homeTeam} vs ${awayTeam}`);
@@ -191,7 +177,7 @@ async function updateMatchFromComp(comp) {
   return true;
 }
 
-// ─── Fetch ESPN events for a given YYYYMMDD date string ──────────────────────
+// ─── Fetch ESPN events for a given YYYYMMDD date string ────────────────────────────────
 async function fetchEventsByDate(dateStr) {
   const url = SCOREBOARD_DATE_URL(dateStr);
   console.log(`  Fetching scoreboard for date ${dateStr}…`);
@@ -204,11 +190,10 @@ async function fetchEventsByDate(dateStr) {
   return data.events ?? [];
 }
 
-// ─── Backfill: find past matches still "scheduled" in Firestore ───────────────
+// ─── Backfill: find past matches still "scheduled" in Firestore ───────────────────────
 async function backfillPastMatches() {
-  const todayStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const todayStr = new Date().toISOString().slice(0, 10);
 
-  // Query Firestore for matches with status "scheduled" and date < today
   const snap = await db.collection('matches')
     .where('status', '==', 'scheduled')
     .get();
@@ -223,14 +208,12 @@ async function backfillPastMatches() {
     return;
   }
 
-  // Group by date so we make one ESPN request per date, not per match
   const dateSet = new Set(pastMatches.map(doc => doc.data().date));
   console.log(`  Backfilling ${pastMatches.length} past match(es) across ${dateSet.size} date(s)…`);
 
   let backfilled = 0;
 
   for (const date of dateSet) {
-    // ESPN expects dates as YYYYMMDD (no dashes)
     const espnDate = date.replace(/-/g, '');
     const events   = await fetchEventsByDate(espnDate);
 
@@ -248,16 +231,17 @@ async function backfillPastMatches() {
   console.log(`  Backfill done — ${backfilled} document(s) updated.`);
 }
 
-// ─── Main sync: today's live/recent scoreboard ───────────────────────────────
+// ─── Main sync ───────────────────────────────────────────────────────────────────────────────
 async function syncScores() {
   console.log(`[${new Date().toISOString()}] Starting sync…`);
 
-  await ensureSeeded();
+  // 1. Ensure all 104 matches are in Firestore (idempotent upsert)
+  await upsertMissingMatches();
 
-  // 1. Backfill any past matches that were missed
+  // 2. Backfill any past matches that are still "scheduled"
   await backfillPastMatches();
 
-  // 2. Sync today's live scoreboard
+  // 3. Sync today's live scoreboard
   console.log('  Fetching today\'s scoreboard from ESPN…');
   const sbRes = await fetch(SCOREBOARD_URL, { headers: HEADERS });
   if (!sbRes.ok) { console.error(`Scoreboard error: ${sbRes.status}`); process.exit(1); }
