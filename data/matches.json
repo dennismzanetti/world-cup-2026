@@ -1,6 +1,6 @@
 [
   {
-    "id": "m001-mexi-sout",
+    "id": "m001-mexi-soaf",
     "matchNumber": 1,
     "stage": "Group",
     "group": "A",
@@ -19,7 +19,7 @@
     "awayScore": 0
   },
   {
-    "id": "m002-sout-czec",
+    "id": "m002-skor-czec",
     "matchNumber": 2,
     "stage": "Group",
     "group": "A",
@@ -48,7 +48,7 @@
     "city": "Toronto",
     "country": "Canada",
     "homeTeam": "Canada",
-    "awayTeam": "Bosnia and Herzegovina",
+    "awayTeam": "Bosnia-Herzegovina",
     "tvEnglish": ["FOX/FS1"],
     "tvSpanish": ["Telemundo/Universo"],
     "streaming": ["FOX Sports App", "Peacock", "ViX"],
@@ -77,7 +77,7 @@
   },
   {
     "id": "m005-hait-scot",
-    "matchNumber": 5,
+    "matchNumber": 8,
     "stage": "Group",
     "group": "C",
     "date": "2026-06-14",
@@ -95,8 +95,8 @@
     "awayScore": null
   },
   {
-    "id": "m006-aust-türk",
-    "matchNumber": 6,
+    "id": "m006-aust-turk",
+    "matchNumber": 5,
     "stage": "Group",
     "group": "D",
     "date": "2026-06-13",
@@ -134,7 +134,7 @@
   },
   {
     "id": "m008-qata-swit",
-    "matchNumber": 8,
+    "matchNumber": 6,
     "stage": "Group",
     "group": "B",
     "date": "2026-06-13",
@@ -153,7 +153,7 @@
   },
   {
     "id": "m009-ivor-ecua",
-    "matchNumber": 9,
+    "matchNumber": 11,
     "stage": "Group",
     "group": "E",
     "date": "2026-06-14",
@@ -172,7 +172,7 @@
   },
   {
     "id": "m010-germ-cura",
-    "matchNumber": 10,
+    "matchNumber": 9,
     "stage": "Group",
     "group": "E",
     "date": "2026-06-14",
@@ -191,7 +191,7 @@
   },
   {
     "id": "m011-neth-japa",
-    "matchNumber": 11,
+    "matchNumber": 10,
     "stage": "Group",
     "group": "F",
     "date": "2026-06-14",
@@ -229,7 +229,7 @@
   },
   {
     "id": "m013-saud-urug",
-    "matchNumber": 13,
+    "matchNumber": 14,
     "stage": "Group",
     "group": "H",
     "date": "2026-06-15",
@@ -248,7 +248,7 @@
   },
   {
     "id": "m014-spai-cape",
-    "matchNumber": 14,
+    "matchNumber": 13,
     "stage": "Group",
     "group": "H",
     "date": "2026-06-15",
@@ -267,7 +267,7 @@
   },
   {
     "id": "m015-iran-newz",
-    "matchNumber": 15,
+    "matchNumber": 16,
     "stage": "Group",
     "group": "G",
     "date": "2026-06-16",
@@ -286,7 +286,7 @@
   },
   {
     "id": "m016-belg-egyp",
-    "matchNumber": 16,
+    "matchNumber": 15,
     "stage": "Group",
     "group": "G",
     "date": "2026-06-15",
@@ -343,7 +343,7 @@
   },
   {
     "id": "m019-arge-alge",
-    "matchNumber": 19,
+    "matchNumber": 20,
     "stage": "Group",
     "group": "J",
     "date": "2026-06-17",
@@ -362,7 +362,7 @@
   },
   {
     "id": "m020-aust-jord",
-    "matchNumber": 20,
+    "matchNumber": 19,
     "stage": "Group",
     "group": "J",
     "date": "2026-06-16",
@@ -381,7 +381,7 @@
   },
   {
     "id": "m021-ghan-pana",
-    "matchNumber": 21,
+    "matchNumber": 22,
     "stage": "Group",
     "group": "L",
     "date": "2026-06-17",
@@ -400,7 +400,7 @@
   },
   {
     "id": "m022-engl-croa",
-    "matchNumber": 22,
+    "matchNumber": 21,
     "stage": "Group",
     "group": "L",
     "date": "2026-06-17",
@@ -456,7 +456,7 @@
     "awayScore": null
   },
   {
-    "id": "m025-czec-sout",
+    "id": "m025-czec-soaf",
     "matchNumber": 25,
     "stage": "Group",
     "group": "A",
@@ -485,7 +485,7 @@
     "city": "Los Angeles",
     "country": "USA",
     "homeTeam": "Switzerland",
-    "awayTeam": "Bosnia and Herzegovina",
+    "awayTeam": "Bosnia-Herzegovina",
     "tvEnglish": ["FOX/FS1"],
     "tvSpanish": ["Telemundo/Universo"],
     "streaming": ["FOX Sports App", "Peacock", "ViX"],
@@ -513,7 +513,7 @@
     "awayScore": null
   },
   {
-    "id": "m028-mexi-sout",
+    "id": "m028-mexi-skor",
     "matchNumber": 28,
     "stage": "Group",
     "group": "A",
@@ -533,7 +533,7 @@
   },
   {
     "id": "m029-braz-hait",
-    "matchNumber": 29,
+    "matchNumber": 31,
     "stage": "Group",
     "group": "C",
     "date": "2026-06-20",
@@ -570,8 +570,8 @@
     "awayScore": null
   },
   {
-    "id": "m031-türk-para",
-    "matchNumber": 31,
+    "id": "m031-turk-para",
+    "matchNumber": 32,
     "stage": "Group",
     "group": "D",
     "date": "2026-06-20",
@@ -590,7 +590,7 @@
   },
   {
     "id": "m032-unit-aust",
-    "matchNumber": 32,
+    "matchNumber": 29,
     "stage": "Group",
     "group": "D",
     "date": "2026-06-19",
@@ -609,7 +609,7 @@
   },
   {
     "id": "m033-germ-ivor",
-    "matchNumber": 33,
+    "matchNumber": 34,
     "stage": "Group",
     "group": "E",
     "date": "2026-06-20",
@@ -628,7 +628,7 @@
   },
   {
     "id": "m034-ecua-cura",
-    "matchNumber": 34,
+    "matchNumber": 35,
     "stage": "Group",
     "group": "E",
     "date": "2026-06-21",
@@ -647,7 +647,7 @@
   },
   {
     "id": "m035-neth-swed",
-    "matchNumber": 35,
+    "matchNumber": 33,
     "stage": "Group",
     "group": "F",
     "date": "2026-06-20",
@@ -685,7 +685,7 @@
   },
   {
     "id": "m037-urug-cape",
-    "matchNumber": 37,
+    "matchNumber": 40,
     "stage": "Group",
     "group": "H",
     "date": "2026-06-21",
@@ -742,7 +742,7 @@
   },
   {
     "id": "m040-newz-egyp",
-    "matchNumber": 40,
+    "matchNumber": 41,
     "stage": "Group",
     "group": "G",
     "date": "2026-06-22",
@@ -761,7 +761,7 @@
   },
   {
     "id": "m041-norw-sene",
-    "matchNumber": 41,
+    "matchNumber": 45,
     "stage": "Group",
     "group": "I",
     "date": "2026-06-23",
@@ -818,7 +818,7 @@
   },
   {
     "id": "m044-jord-alge",
-    "matchNumber": 44,
+    "matchNumber": 46,
     "stage": "Group",
     "group": "J",
     "date": "2026-06-23",
@@ -837,7 +837,7 @@
   },
   {
     "id": "m045-engl-ghan",
-    "matchNumber": 45,
+    "matchNumber": 47,
     "stage": "Group",
     "group": "L",
     "date": "2026-06-23",
@@ -856,7 +856,7 @@
   },
   {
     "id": "m046-pana-croa",
-    "matchNumber": 46,
+    "matchNumber": 48,
     "stage": "Group",
     "group": "L",
     "date": "2026-06-23",
@@ -875,7 +875,7 @@
   },
   {
     "id": "m047-port-uzbe",
-    "matchNumber": 47,
+    "matchNumber": 44,
     "stage": "Group",
     "group": "K",
     "date": "2026-06-23",
@@ -894,7 +894,7 @@
   },
   {
     "id": "m048-colo-cong",
-    "matchNumber": 48,
+    "matchNumber": 55,
     "stage": "Group",
     "group": "K",
     "date": "2026-06-24",
@@ -913,7 +913,7 @@
   },
   {
     "id": "m049-scot-braz",
-    "matchNumber": 49,
+    "matchNumber": 51,
     "stage": "Group",
     "group": "C",
     "date": "2026-06-24",
@@ -932,7 +932,7 @@
   },
   {
     "id": "m050-moro-hait",
-    "matchNumber": 50,
+    "matchNumber": 52,
     "stage": "Group",
     "group": "C",
     "date": "2026-06-24",
@@ -951,7 +951,7 @@
   },
   {
     "id": "m051-swit-cana",
-    "matchNumber": 51,
+    "matchNumber": 49,
     "stage": "Group",
     "group": "B",
     "date": "2026-06-24",
@@ -970,7 +970,7 @@
   },
   {
     "id": "m052-bosn-qata",
-    "matchNumber": 52,
+    "matchNumber": 50,
     "stage": "Group",
     "group": "B",
     "date": "2026-06-24",
@@ -978,7 +978,7 @@
     "venue": "Lumen Field",
     "city": "Seattle",
     "country": "USA",
-    "homeTeam": "Bosnia and Herzegovina",
+    "homeTeam": "Bosnia-Herzegovina",
     "awayTeam": "Qatar",
     "tvEnglish": ["FOX/FS1"],
     "tvSpanish": ["Telemundo/Universo"],
@@ -989,7 +989,7 @@
   },
   {
     "id": "m053-czec-mexi",
-    "matchNumber": 53,
+    "matchNumber": 54,
     "stage": "Group",
     "group": "A",
     "date": "2026-06-25",
@@ -1007,8 +1007,8 @@
     "awayScore": null
   },
   {
-    "id": "m054-sout-sout",
-    "matchNumber": 54,
+    "id": "m054-soaf-skor",
+    "matchNumber": 53,
     "stage": "Group",
     "group": "A",
     "date": "2026-06-25",
@@ -1027,7 +1027,7 @@
   },
   {
     "id": "m055-cura-ivor",
-    "matchNumber": 55,
+    "matchNumber": 57,
     "stage": "Group",
     "group": "E",
     "date": "2026-06-25",
@@ -1046,7 +1046,7 @@
   },
   {
     "id": "m056-ecua-germ",
-    "matchNumber": 56,
+    "matchNumber": 58,
     "stage": "Group",
     "group": "E",
     "date": "2026-06-25",
@@ -1065,7 +1065,7 @@
   },
   {
     "id": "m057-japa-swed",
-    "matchNumber": 57,
+    "matchNumber": 59,
     "stage": "Group",
     "group": "F",
     "date": "2026-06-25",
@@ -1084,7 +1084,7 @@
   },
   {
     "id": "m058-tuni-neth",
-    "matchNumber": 58,
+    "matchNumber": 60,
     "stage": "Group",
     "group": "F",
     "date": "2026-06-25",
@@ -1102,8 +1102,8 @@
     "awayScore": null
   },
   {
-    "id": "m059-türk-unit",
-    "matchNumber": 59,
+    "id": "m059-turk-unit",
+    "matchNumber": 62,
     "stage": "Group",
     "group": "D",
     "date": "2026-06-26",
@@ -1122,7 +1122,7 @@
   },
   {
     "id": "m060-para-aust",
-    "matchNumber": 60,
+    "matchNumber": 63,
     "stage": "Group",
     "group": "D",
     "date": "2026-06-26",
@@ -1141,7 +1141,7 @@
   },
   {
     "id": "m061-norw-fran",
-    "matchNumber": 61,
+    "matchNumber": 64,
     "stage": "Group",
     "group": "I",
     "date": "2026-06-26",
@@ -1160,7 +1160,7 @@
   },
   {
     "id": "m062-sene-iraq",
-    "matchNumber": 62,
+    "matchNumber": 65,
     "stage": "Group",
     "group": "I",
     "date": "2026-06-26",
@@ -1179,7 +1179,7 @@
   },
   {
     "id": "m063-egyp-iran",
-    "matchNumber": 63,
+    "matchNumber": 70,
     "stage": "Group",
     "group": "G",
     "date": "2026-06-27",
@@ -1198,7 +1198,7 @@
   },
   {
     "id": "m064-newz-belg",
-    "matchNumber": 64,
+    "matchNumber": 71,
     "stage": "Group",
     "group": "G",
     "date": "2026-06-27",
@@ -1217,7 +1217,7 @@
   },
   {
     "id": "m065-cape-saud",
-    "matchNumber": 65,
+    "matchNumber": 67,
     "stage": "Group",
     "group": "H",
     "date": "2026-06-27",
@@ -1236,7 +1236,7 @@
   },
   {
     "id": "m066-urug-spai",
-    "matchNumber": 66,
+    "matchNumber": 68,
     "stage": "Group",
     "group": "H",
     "date": "2026-06-27",
@@ -1255,7 +1255,7 @@
   },
   {
     "id": "m067-pana-engl",
-    "matchNumber": 67,
+    "matchNumber": 69,
     "stage": "Group",
     "group": "L",
     "date": "2026-06-27",
@@ -1274,7 +1274,7 @@
   },
   {
     "id": "m068-croa-ghan",
-    "matchNumber": 68,
+    "matchNumber": 72,
     "stage": "Group",
     "group": "L",
     "date": "2026-06-27",
@@ -1293,7 +1293,7 @@
   },
   {
     "id": "m069-alge-aust",
-    "matchNumber": 69,
+    "matchNumber": 56,
     "stage": "Group",
     "group": "J",
     "date": "2026-06-28",
@@ -1312,7 +1312,7 @@
   },
   {
     "id": "m070-jord-arge",
-    "matchNumber": 70,
+    "matchNumber": 61,
     "stage": "Group",
     "group": "J",
     "date": "2026-06-28",
@@ -1331,7 +1331,7 @@
   },
   {
     "id": "m071-colo-port",
-    "matchNumber": 71,
+    "matchNumber": 66,
     "stage": "Group",
     "group": "K",
     "date": "2026-06-27",
@@ -1350,7 +1350,7 @@
   },
   {
     "id": "m072-cong-uzbe",
-    "matchNumber": 72,
+    "matchNumber": 37,
     "stage": "Group",
     "group": "K",
     "date": "2026-06-27",
