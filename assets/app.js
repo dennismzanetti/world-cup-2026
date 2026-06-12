@@ -384,7 +384,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     const card     = document.createElement('div');
     card.className = 'match-card' + (m.status === 'live' ? ' match-card-live' : '');
     const stageLabel = m.group ? `Group ${m.group}` : stageKeyToLabel(m.stage || '');
-    const isAdmin    = currentUser && ADMIN_UIDS.includes(currentUser.uid);
     const isKnockout = !!m.homeSource;
     const hn = isKnockout && isPred
       ? (resolveKnockoutTeamForPreds(m.homeSource || m.home) || slotLabel(m.homeSource))
@@ -399,6 +398,9 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     if      (m.status === 'live')                       statusBadge = '<span class="status-badge status-live"><span class="live-dot"></span>Live</span>';
     else if (m.status === 'ht')                         statusBadge = '<span class="status-badge status-ht">HT</span>';
     else if (m.status === 'ft' || m.status === 'final') statusBadge = '<span class="status-badge status-ft">FT</span>';
+
+    // Score column: always read-only on the Matches page (isPred=false).
+    // Only show prediction inputs on the Predictions page (isPred=true).
     let scoreColHtml = '';
     if (isPred && currentUser) {
       const pred = userPredictions[m.id] || {};
@@ -416,23 +418,15 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
           <span class="pred-saved"  hidden>Saved ✓</span>
           <span class="pred-error"  hidden></span>
         </div>`;
-    } else if (!isPred && isAdmin) {
-      scoreColHtml = `
-        <div class="card-score-col">
-          <div class="score-inputs-wrap">
-            <input type="number" class="score-input" min="0" max="99" data-match="${m.id}" data-side="home" value="${m.homeScore != null ? m.homeScore : ''}" aria-label="${hn} score">
-            <span class="score-sep">–</span>
-            <input type="number" class="score-input" min="0" max="99" data-match="${m.id}" data-side="away" value="${m.awayScore != null ? m.awayScore : ''}" aria-label="${an} score">
-          </div>
-          <button class="btn-save save-score-btn" data-match="${m.id}">Save</button>
-          <span class="result-saved" style="display:none">Saved ✓</span>
-        </div>`;
     } else {
+      // Read-only score display — used for both the Matches page (all users incl. admin)
+      // and the Predictions page when not signed in.
       const hs  = m.homeScore != null ? m.homeScore : '–';
       const as_ = m.awayScore != null ? m.awayScore : '–';
       const cls = m.status === 'live' ? 'score-final score-live' : m.homeScore != null ? 'score-final' : 'score-final score-pending';
       scoreColHtml = `<div class="card-score-col"><span class="${cls}">${hs} – ${as_}</span></div>`;
     }
+
     const dtStr = [m.timeLocal, m.tz].filter(Boolean).join(' ');
     card.innerHTML = `
       <div class="card-header">
@@ -456,6 +450,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
         ${dtStr  ? `<span class="card-meta-item"><svg class="meta-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M5 1.5v3M11 1.5v3M2 7h12"/></svg>${dtStr}</span>` : ''}
       </div>` : ''}
       ${buildBroadcastRow(m)}`;
+
     if (isPred && currentUser) {
       card.querySelector('.save-pred-btn')?.addEventListener('click', async () => {
         const savingEl = card.querySelector('.pred-saving');
@@ -479,20 +474,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
           console.warn('[app] savePrediction error', err);
         }
         if (btn) btn.disabled = false;
-      });
-    }
-    if (!isPred && isAdmin) {
-      card.querySelector('.save-score-btn')?.addEventListener('click', async () => {
-        const btn     = card.querySelector('.save-score-btn');
-        const savedEl = card.querySelector('.result-saved');
-        const homeVal = parseInt(card.querySelector('[data-side="home"]')?.value);
-        const awayVal = parseInt(card.querySelector('[data-side="away"]')?.value);
-        if (isNaN(homeVal) || isNaN(awayVal)) return;
-        if (btn) btn.disabled = true;
-        try {
-          await updateMatchResult(m.id, { homeScore: homeVal, awayScore: awayVal, status: 'ft' });
-          if (savedEl) { savedEl.style.display = 'inline'; setTimeout(() => { savedEl.style.display = 'none'; if (btn) btn.disabled = false; }, 2000); }
-        } catch (err) { console.warn('[app] updateMatchResult error', err); if (btn) btn.disabled = false; }
       });
     }
     return card;
