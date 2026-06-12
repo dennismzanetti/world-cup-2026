@@ -322,29 +322,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
             </tr>`).join('')}
           </tbody>
         </table>`;
-      // Group matches section
-      const matchesWrap = document.createElement('div');
-      matchesWrap.className = 'group-matches-list';
-      groupMatches
-        .slice()
-        .sort((a, b) => {
-          const da = (a.date || '') + (a.timeLocal || '');
-          const db = (b.date || '') + (b.timeLocal || '');
-          return da < db ? -1 : da > db ? 1 : 0;
-        })
-        .forEach(m => {
-          const hs  = m.homeScore != null ? m.homeScore : '–';
-          const as_ = m.awayScore != null ? m.awayScore : '–';
-          const cls = m.status === 'live' ? 'score-final score-live' : m.homeScore != null ? 'score-final' : 'score-final score-pending';
-          const row = document.createElement('div');
-          row.className = 'group-match-row';
-          row.innerHTML = `
-            <span class="group-match-home">${teamFlag(m.home) ? `<span class="team-flag">${teamFlag(m.home)}</span>` : ''}<span>${teamName(m.home)}</span></span>
-            <span class="${cls}">${hs} – ${as_}</span>
-            <span class="group-match-away"><span>${teamName(m.away)}</span>${teamFlag(m.away) ? `<span class="team-flag">${teamFlag(m.away)}</span>` : ''}</span>`;
-          matchesWrap.appendChild(row);
-        });
-      card.appendChild(matchesWrap);
       container.appendChild(card);
     });
   }
