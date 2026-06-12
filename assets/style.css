@@ -421,8 +421,17 @@ a, button, [role="button"], input, select {
   font-weight: 600; font-size: var(--text-base);
   padding-top: 0.45rem; /* optically aligns team name with score inputs row */
 }
-.home-team { justify-content: flex-end; flex-direction: row-reverse; }
-.away-team { justify-content: flex-end; flex-direction: row-reverse; }
+/* Home team: flag then name, pushed to the right edge (toward score col) */
+.home-team {
+  justify-content: flex-end;
+  flex-direction: row-reverse;
+}
+/* Away team: name then flag, pushed to the left edge (toward score col),
+   so the name starts next to the score col and the flag sits at the far right */
+.away-team {
+  justify-content: flex-start;
+  flex-direction: row;
+}
 .team-flag { font-size: 1.4em; line-height: 1; }
 
 .card-score-col {
