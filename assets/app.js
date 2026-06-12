@@ -11,13 +11,48 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
   let activeTab        = 'groups';
   let activePredSubtab = 'my-picks';
   let userPredictions  = {};  // matchId → {home, away}
-  let liveMatches      = WC_MATCHES.slice();
+  let liveMatches      = WC_MATCHES.map(m => ({ ...m }));
+  let firestoreDocs    = [];  // latest snapshot from Firestore
   let unsubPredictions = null;
   let bracketPicks     = {};  // matchId (string) → 'home'|'away'
   let bracketSaveTimer = null;
 
   function allPredMatches() { return [...liveMatches, ...WC_KNOCKOUT_FIXTURES]; }
   function allTabMatches()  { return liveMatches.slice(); }
+
+  // Rebuild liveMatches from WC_MATCHES base + latest Firestore docs.
+  // Called on every Firestore snapshot so there is never stale state.
+  function applyFirestoreDocs() {
+    liveMatches = WC_MATCHES.map(m => ({ ...m }));
+    firestoreDocs.forEach(um => {
+      // Normalise id to string for comparison
+      const umId = String(um.id);
+
+      // 1. Exact id match
+      let idx = liveMatches.findIndex(m => String(m.id) === umId);
+
+      // 2. Fallback: home+away team name pair (case-insensitive)
+      if (idx === -1 && (um.home || um.away)) {
+        const umHome = teamName(um.home).toLowerCase();
+        const umAway = teamName(um.away).toLowerCase();
+        if (umHome || umAway) {
+          idx = liveMatches.findIndex(m =>
+            teamName(m.home).toLowerCase() === umHome &&
+            teamName(m.away).toLowerCase() === umAway
+          );
+        }
+      }
+
+      if (idx !== -1) {
+        // Merge only score/status fields — preserve static group/team metadata
+        const { homeScore, awayScore, status, updatedAt } = um;
+        if (homeScore  !== undefined) liveMatches[idx].homeScore  = homeScore;
+        if (awayScore  !== undefined) liveMatches[idx].awayScore  = awayScore;
+        if (status     !== undefined) liveMatches[idx].status     = status;
+        if (updatedAt  !== undefined) liveMatches[idx].updatedAt  = updatedAt;
+      }
+    });
+  }
 
   // ─── Bracket rounds ───────────────────────────────────────────────────────
   const BRACKET_ROUNDS = [
@@ -192,35 +227,11 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
   document.getElementById('pred-team-filter')?.addEventListener('input', renderPredictions);
 
   // ─── Live match data ──────────────────────────────────────────────────────────
-  // Merge Firestore docs into liveMatches.
-  // Strategy:
-  //   1. Match by exact `id` field.
-  //   2. Fallback: match by home/away team name pair (handles admin-assigned IDs).
-  //   3. If still unmatched, append as a new entry so no data is lost.
-  watchMatches(allMatches => {
-    allMatches.forEach(um => {
-      // Try exact id match first
-      let idx = liveMatches.findIndex(m => m.id === um.id);
-
-      // Fallback: match by home+away team names (case-insensitive)
-      if (idx === -1 && (um.home || um.away)) {
-        const umHome = teamName(um.home).toLowerCase();
-        const umAway = teamName(um.away).toLowerCase();
-        if (umHome || umAway) {
-          idx = liveMatches.findIndex(m =>
-            teamName(m.home).toLowerCase() === umHome &&
-            teamName(m.away).toLowerCase() === umAway
-          );
-        }
-      }
-
-      if (idx !== -1) {
-        // Merge Firestore fields over static data, preserving static group/team metadata
-        liveMatches[idx] = { ...liveMatches[idx], ...um };
-      }
-      // Note: we intentionally do NOT append unknown docs — group stage standings
-      // rely on WC_MATCHES having the full team objects with flags.
-    });
+  // On every Firestore snapshot, store the raw docs then rebuild liveMatches
+  // fresh from WC_MATCHES so there is never any stale or double-merged state.
+  watchMatches(allDocs => {
+    firestoreDocs = allDocs;
+    applyFirestoreDocs();
     if (authResolved) renderAll();
   });
 
