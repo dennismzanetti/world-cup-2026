@@ -290,9 +290,7 @@ a, button, [role="button"], input, select {
   .brand-name { display: none; }
   .main-content { padding-top: var(--space-4); }
   .container { padding: 0 var(--space-3); }
-  /* Reset alignment fix on mobile — use centered layout */
   .card-teams { grid-template-columns: 1fr var(--score-col-w) 1fr; padding: var(--space-2) var(--space-3); align-items: center; }
-  .card-team { padding-top: 0; }
   .standings-grid, .groups-grid { grid-template-columns: 1fr; }
   .sub-tab { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); }
   .bracket-round { min-width: 150px; }
@@ -409,29 +407,36 @@ a, button, [role="button"], input, select {
 .card-header-group { font-weight: 600; color: var(--color-accent); text-transform: uppercase; letter-spacing: 0.05em; }
 [data-theme="dark"] .card-header-group { color: var(--color-accent-hover); }
 
+/* 3-column grid: [home team] [score] [away team]
+   align-items: center puts all three on the same vertical midline */
 .card-teams {
   display: grid;
   grid-template-columns: 1fr var(--score-col-w) 1fr;
-  align-items: start; /* desktop: team names align to top of score col */
+  align-items: center;
   padding: var(--space-3) var(--space-4);
   gap: var(--space-2);
 }
+
 .card-team {
-  display: flex; align-items: center; gap: var(--space-2);
-  font-weight: 600; font-size: var(--text-base);
-  padding-top: 0.45rem; /* optically aligns team name with score inputs row */
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+  font-size: var(--text-base);
 }
-/* Home team: flag then name, pushed to the right edge (toward score col) */
+
+/* Home team: [flag] [name] — pushed to the RIGHT (toward score col) */
 .home-team {
   justify-content: flex-end;
   flex-direction: row-reverse;
 }
-/* Away team: name then flag, pushed to the left edge (toward score col),
-   so the name starts next to the score col and the flag sits at the far right */
+
+/* Away team: [name] [flag] — pushed to the RIGHT edge of the card */
 .away-team {
-  justify-content: flex-start;
+  justify-content: flex-end;
   flex-direction: row;
 }
+
 .team-flag { font-size: 1.4em; line-height: 1; }
 
 .card-score-col {
