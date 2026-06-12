@@ -422,7 +422,7 @@ a, button, [role="button"], input, select {
   padding-top: 0.45rem; /* optically aligns team name with score inputs row */
 }
 .home-team { justify-content: flex-end; flex-direction: row-reverse; }
-.away-team { justify-content: flex-start; }
+.away-team { justify-content: flex-end; flex-direction: row-reverse; }
 .team-flag { font-size: 1.4em; line-height: 1; }
 
 .card-score-col {
