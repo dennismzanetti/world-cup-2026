@@ -9,7 +9,7 @@
     #login-form { display: flex; flex-direction: column; gap: .75rem; max-width: 320px; margin-bottom: 2rem; }
     #login-form input  { padding: .5rem .75rem; border-radius: 6px; border: 1px solid #444; background: #222; color: #fff; font-size: 1rem; }
     #login-form button { padding: .5rem 1rem; border-radius: 6px; border: none; background: #0a84ff; color: #fff; font-size: 1rem; cursor: pointer; }
-    #login-error { color: #f55; }
+    #login-error { color: #f55; min-height: 1.2rem; }
     #log { white-space: pre-wrap; }
     .done  { color: #0f0; font-weight: bold; }
     .error { color: #f55; font-weight: bold; }
@@ -18,7 +18,7 @@
 </head>
 <body>
   <h2>Firestore Match Seeder</h2>
-  <p class="info">Sign in with your admin account, then click Seed.</p>
+  <p class="info">Sign in with your admin account, then the seed will run automatically.</p>
 
   <form id="login-form">
     <input id="email"    type="email"    placeholder="Admin email"    required autocomplete="username">
@@ -30,15 +30,14 @@
   <div id="log"></div>
 
   <script type="module">
-    import { signInWithEmailAndPassword, getAuth } from
+    import { signInWithEmailAndPassword } from
       'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-    import { app } from './assets/firebase.js';
+    import { auth } from './assets/firebase.js';
     import { seedMatches } from './seed.js';
 
-    const auth    = getAuth(app);
-    const log     = document.getElementById('log');
-    const errEl   = document.getElementById('login-error');
-    const form    = document.getElementById('login-form');
+    const log   = document.getElementById('log');
+    const errEl = document.getElementById('login-error');
+    const form  = document.getElementById('login-form');
 
     const append = (msg, cls) => {
       const line = document.createElement('div');
@@ -47,7 +46,6 @@
       log.appendChild(line);
     };
 
-    // Patch console.log so progress shows on-screen
     const origLog = console.log.bind(console);
     console.log = (...args) => {
       origLog(...args);
