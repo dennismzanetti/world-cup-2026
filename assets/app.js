@@ -192,10 +192,34 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
   document.getElementById('pred-team-filter')?.addEventListener('input', renderPredictions);
 
   // ─── Live match data ──────────────────────────────────────────────────────────
+  // Merge Firestore docs into liveMatches.
+  // Strategy:
+  //   1. Match by exact `id` field.
+  //   2. Fallback: match by home/away team name pair (handles admin-assigned IDs).
+  //   3. If still unmatched, append as a new entry so no data is lost.
   watchMatches(allMatches => {
     allMatches.forEach(um => {
-      const idx = liveMatches.findIndex(m => m.id === um.id);
-      if (idx !== -1) liveMatches[idx] = { ...liveMatches[idx], ...um };
+      // Try exact id match first
+      let idx = liveMatches.findIndex(m => m.id === um.id);
+
+      // Fallback: match by home+away team names (case-insensitive)
+      if (idx === -1 && (um.home || um.away)) {
+        const umHome = teamName(um.home).toLowerCase();
+        const umAway = teamName(um.away).toLowerCase();
+        if (umHome || umAway) {
+          idx = liveMatches.findIndex(m =>
+            teamName(m.home).toLowerCase() === umHome &&
+            teamName(m.away).toLowerCase() === umAway
+          );
+        }
+      }
+
+      if (idx !== -1) {
+        // Merge Firestore fields over static data, preserving static group/team metadata
+        liveMatches[idx] = { ...liveMatches[idx], ...um };
+      }
+      // Note: we intentionally do NOT append unknown docs — group stage standings
+      // rely on WC_MATCHES having the full team objects with flags.
     });
     if (authResolved) renderAll();
   });
@@ -298,6 +322,29 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
             </tr>`).join('')}
           </tbody>
         </table>`;
+      // Group matches section
+      const matchesWrap = document.createElement('div');
+      matchesWrap.className = 'group-matches-list';
+      groupMatches
+        .slice()
+        .sort((a, b) => {
+          const da = (a.date || '') + (a.timeLocal || '');
+          const db = (b.date || '') + (b.timeLocal || '');
+          return da < db ? -1 : da > db ? 1 : 0;
+        })
+        .forEach(m => {
+          const hs  = m.homeScore != null ? m.homeScore : '–';
+          const as_ = m.awayScore != null ? m.awayScore : '–';
+          const cls = m.status === 'live' ? 'score-final score-live' : m.homeScore != null ? 'score-final' : 'score-final score-pending';
+          const row = document.createElement('div');
+          row.className = 'group-match-row';
+          row.innerHTML = `
+            <span class="group-match-home">${teamFlag(m.home) ? `<span class="team-flag">${teamFlag(m.home)}</span>` : ''}<span>${teamName(m.home)}</span></span>
+            <span class="${cls}">${hs} – ${as_}</span>
+            <span class="group-match-away"><span>${teamName(m.away)}</span>${teamFlag(m.away) ? `<span class="team-flag">${teamFlag(m.away)}</span>` : ''}</span>`;
+          matchesWrap.appendChild(row);
+        });
+      card.appendChild(matchesWrap);
       container.appendChild(card);
     });
   }
