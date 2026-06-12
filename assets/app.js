@@ -1,5 +1,4 @@
 // World Cup 2026 App — Firebase-connected, data sourced entirely from Firestore
-import { WC_KNOCKOUT_FIXTURES } from './data.js';
 import { signUp, signIn, logOut, watchAuth } from './auth.js';
 import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, saveBracketPicks, getBracketPicks } from './db.js';
 
@@ -11,16 +10,39 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
   let activeTab        = 'groups';
   let activePredSubtab = 'my-picks';
   let userPredictions  = {};  // matchId → {home, away}
-  let liveMatches      = [];  // populated entirely from Firestore via watchMatches()
+  let liveMatches      = [];  // ALL matches (group + knockout) from Firestore
   let unsubPredictions = null;
   let bracketPicks     = {};  // matchId (string) → 'home'|'away'
   let bracketSaveTimer = null;
 
+  // ─── Knockout stage round definitions (IDs must match Firestore doc IDs) ──────
+  const BRACKET_ROUNDS = [
+    { label: 'Round of 32',    stage: 'Round of 32',    ids: ['r32-1','r32-2','r32-3','r32-4','r32-5','r32-6','r32-7','r32-8','r32-9','r32-10','r32-11','r32-12','r32-13','r32-14','r32-15','r32-16'] },
+    { label: 'Round of 16',    stage: 'Round of 16',    ids: ['r16-1','r16-2','r16-3','r16-4','r16-5','r16-6','r16-7','r16-8'] },
+    { label: 'Quarter-Finals', stage: 'Quarterfinals',  ids: ['qf-1','qf-2','qf-3','qf-4'] },
+    { label: 'Semi-Finals',    stage: 'Semifinals',     ids: ['sf-1','sf-2'] },
+    { label: 'Final',          stage: 'Final',          ids: ['final'] },
+  ];
+
+  // Flat set of all knockout match IDs (used to distinguish group vs knockout)
+  const KNOCKOUT_IDS = new Set(BRACKET_ROUNDS.flatMap(r => r.ids));
+
+  // Helper: get knockout fixture from liveMatches by id
+  function getKnockoutFixture(id) {
+    return liveMatches.find(m => m.id === id) || null;
+  }
+
+  // Group-stage matches only (have a `group` field and are not knockout IDs)
+  function groupMatches()   { return liveMatches.filter(m => m.group && !KNOCKOUT_IDS.has(m.id)); }
+  // All matches for the predictions tab (group + knockout from Firestore)
+  function allPredMatches() { return liveMatches.slice(); }
+  // Matches tab shows group stage only
+  function allTabMatches()  { return groupMatches(); }
+
   // WC_GROUPS is derived dynamically from liveMatches (Firestore)
-  // Returns [{id, teams:[{name,flag}]}] sorted A–L
   function buildGroups() {
     const map = {};
-    liveMatches.forEach(m => {
+    groupMatches().forEach(m => {
       const g = m.group;
       if (!g) return;
       if (!map[g]) map[g] = {};
@@ -34,9 +56,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       teams: Object.values(map[id]).sort((a, b) => a.name.localeCompare(b.name))
     }));
   }
-
-  function allPredMatches() { return [...liveMatches, ...WC_KNOCKOUT_FIXTURES]; }
-  function allTabMatches()  { return liveMatches.slice(); }
 
   // ─── Team flag lookup (client-side, Firestore stores names only) ─────────────
   const TEAM_FLAGS = {
@@ -91,15 +110,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     'Ghana':                '🇬🇭',
     'Panama':               '🇵🇦',
   };
-
-  // ─── Bracket rounds ───────────────────────────────────────────────────────
-  const BRACKET_ROUNDS = [
-    { label: 'Round of 32',    ids: ['r32-1','r32-2','r32-3','r32-4','r32-5','r32-6','r32-7','r32-8','r32-9','r32-10','r32-11','r32-12','r32-13','r32-14','r32-15','r32-16'] },
-    { label: 'Round of 16',    ids: ['r16-1','r16-2','r16-3','r16-4','r16-5','r16-6','r16-7','r16-8'] },
-    { label: 'Quarter-Finals', ids: ['qf-1','qf-2','qf-3','qf-4'] },
-    { label: 'Semi-Finals',    ids: ['sf-1','sf-2'] },
-    { label: 'Final',          ids: ['final'] },
-  ];
 
   // ─── Admin UIDs ──────────────────────────────────────────────────────────────
   const ADMIN_UIDS = ['rvR3HclRnhXAOd3rgk7sO0s3F7v1'];
@@ -349,8 +359,8 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     grid.innerHTML = '';
     const groups = buildGroups();
     groups.forEach(group => {
-      const groupMatches = liveMatches.filter(m => m.group === group.id);
-      const standings = calcPoints(group.teams, groupMatches);
+      const groupMatchList = groupMatches().filter(m => m.group === group.id);
+      const standings = calcPoints(group.teams, groupMatchList);
       const card = document.createElement('div');
       card.className = 'group-card';
       card.innerHTML = `
@@ -452,7 +462,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     const card     = document.createElement('div');
     card.className = 'match-card' + (m.status === 'live' ? ' match-card-live' : '');
     const stageLabel = m.group ? `Group ${m.group}` : stageKeyToLabel(m.stage || '');
-    const isKnockout = !!m.homeSource;
+    const isKnockout = KNOCKOUT_IDS.has(m.id);
     const hn = isKnockout && isPred
       ? (resolveKnockoutTeamForPreds(m.homeSource || m.home) || slotLabel(m.homeSource))
       : teamName(m.home);
@@ -589,8 +599,8 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     container.innerHTML = '';
     const groups = buildGroups();
     groups.forEach(group => {
-      const groupMatches = liveMatches.filter(m => m.group === group.id);
-      const predMatches  = groupMatches.map(m => {
+      const groupMatchList = groupMatches().filter(m => m.group === group.id);
+      const predMatches  = groupMatchList.map(m => {
         const pred = userPredictions[m.id];
         return pred ? { ...m, homeScore: pred.home, awayScore: pred.away } : m;
       });
@@ -668,16 +678,17 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
 
   function slotLabel(source) {
     if (!source) return '?';
-    if (source.type === 'group') return `${source.pos === 1 ? '1st' : '2nd'} Group ${source.group}`;
+    if (source.type === 'group')   return `${source.pos === 1 ? '1st' : '2nd'} Group ${source.group}`;
     if (source.type === 'best3rd') return `Best 3rd #${source.rank}`;
-    if (source.type === 'winner') return `Winner R${source.match}`;
+    if (source.type === 'winner')  return `Winner R${source.matchId || source.match}`;
+    if (source.type === 'loser')   return `Loser R${source.matchId || source.match}`;
     return '?';
   }
 
   function resolveKnockoutTeamForPreds(source) {
     if (!source || typeof source === 'string') return null;
     if (source.type === 'group') {
-      const gm = liveMatches.filter(m => m.group === source.group);
+      const gm = groupMatches().filter(m => m.group === source.group);
       const groups = buildGroups();
       const group = groups.find(g => g.id === source.group);
       if (!group) return null;
@@ -702,7 +713,8 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       const grid = document.createElement('div');
       grid.className = 'bracket-matchups';
       round.ids.forEach(matchId => {
-        const fixture = WC_KNOCKOUT_FIXTURES.find(f => f.id === matchId);
+        // Fixture comes directly from Firestore via liveMatches
+        const fixture = getKnockoutFixture(matchId);
         if (!fixture) return;
         const hn = currentUser
           ? (resolveKnockoutTeamForPreds(fixture.homeSource) || slotLabel(fixture.homeSource))
