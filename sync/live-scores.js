@@ -1,13 +1,11 @@
 // sync/live-scores.js
-// Fetches live World Cup 2026 scores via ESPN APIs and writes to Firestore.
-// Upserts (overwrites) all matches from data/matches.json on every run.
-// Pass --force-reseed to delete all existing match docs first, then re-seed.
+// Fetches live World Cup 2026 scores from ESPN and updates existing Firestore match docs.
+// Matches must already exist in Firestore (seeded via seed.html).
 // Backfills any past matches still marked "scheduled" by querying ESPN by date.
 // No API key needed.
 // Requires: FIREBASE_SERVICE_ACCOUNT_JSON (GitHub Secret)
 
 import fetch from 'node-fetch';
-import { readFile } from 'fs/promises';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
@@ -21,56 +19,11 @@ console.log(`[init] Firestore DB : wc2026`);
 const app = initializeApp({ credential: cert(serviceAccount) });
 const db  = getFirestore(app, 'wc2026');
 
-const FORCE_RESEED = process.argv.includes('--force-reseed');
-
 const HEADERS = { 'User-Agent': 'world-cup-2026-sync/1.0' };
 
 const SCOREBOARD_URL      = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard';
 const SCOREBOARD_DATE_URL = date => `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=${date}`;
 const SUMMARY_URL         = id   => `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/summary?event=${id}`;
-
-// ─── Delete all docs in a collection (chunked) ───────────────────────────────
-async function deleteCollection(colRef) {
-  const snap = await colRef.get();
-  if (snap.empty) return;
-  const CHUNK = 500;
-  for (let i = 0; i < snap.docs.length; i += CHUNK) {
-    const batch = db.batch();
-    snap.docs.slice(i, i + CHUNK).forEach(d => batch.delete(d.ref));
-    await batch.commit();
-  }
-  console.log(`  ✓ Deleted ${snap.docs.length} existing doc(s).`);
-}
-
-// ─── Seed / upsert all matches from data/matches.json ────────────────────────
-// Normal run  : overwrites every doc (batch.set without merge so stale fields are cleared).
-// --force-reseed: deletes all docs first, then writes fresh.
-async function upsertMatches() {
-  const raw     = await readFile(new URL('../data/matches.json', import.meta.url), 'utf8');
-  const matches = JSON.parse(raw);
-
-  if (FORCE_RESEED) {
-    console.log('  --force-reseed: deleting all existing match docs…');
-    await deleteCollection(db.collection('matches'));
-  } else {
-    // In a normal run, fetch existing matchNumbers so we can report what's new vs overwritten.
-    const existing    = await db.collection('matches').get();
-    const existingIds = new Set(existing.docs.map(d => d.id));
-    const newCount    = matches.filter(m => !existingIds.has(m.id)).length;
-    console.log(`  Upserting ${matches.length} match(es) — ${newCount} new, ${matches.length - newCount} overwritten…`);
-  }
-
-  const CHUNK = 500;
-  for (let i = 0; i < matches.length; i += CHUNK) {
-    const batch = db.batch();
-    for (const m of matches.slice(i, i + CHUNK)) {
-      // batch.set without merge: completely replaces the doc (clears any stale fields)
-      batch.set(db.collection('matches').doc(m.id), m);
-    }
-    await batch.commit();
-  }
-  console.log(`  ✓ ${matches.length} match(es) written to Firestore.`);
-}
 
 // ─── Team name normalisation ──────────────────────────────────────────────────
 const TEAM_NAME_MAP = {
@@ -167,13 +120,14 @@ async function updateMatchFromComp(comp) {
   console.log(`  -> ${homeTeam} vs ${awayTeam} | state=${statusObj?.type?.state} | clock=${statusObj?.displayClock} | score=${homeComp.score}-${awayComp.score}`);
 
   if (status === 'scheduled') {
-    console.log(`  Skipping (not started).`);
+    console.log(`     Skipping (not started).`);
     return false;
   }
 
   const homeScore = parseInt(homeComp.score ?? '0', 10);
   const awayScore = parseInt(awayComp.score ?? '0', 10);
 
+  // Match by homeTeam + awayTeam fields already seeded in Firestore
   const snap = await db.collection('matches')
     .where('homeTeam', '==', homeTeam)
     .where('awayTeam', '==', awayTeam)
@@ -181,20 +135,23 @@ async function updateMatchFromComp(comp) {
     .get();
 
   if (snap.empty) {
-    console.warn(`  ⚠ No Firestore doc: ${homeTeam} vs ${awayTeam}`);
+    console.warn(`  ⚠ No Firestore doc found for: ${homeTeam} vs ${awayTeam}`);
     return false;
   }
 
   await snap.docs[0].ref.update({
-    homeScore, awayScore, status, minute,
+    homeScore,
+    awayScore,
+    status,
+    minute,
     updatedAt: FieldValue.serverTimestamp(),
   });
 
-  console.log(`  ✓ ${homeTeam} ${homeScore} : ${awayScore} ${awayTeam}  [${status}${minute ? ` ${minute}'` : ''}]`);
+  console.log(`  ✓ Updated: ${homeTeam} ${homeScore}–${awayScore} ${awayTeam}  [${status}${minute ? ` ${minute}'` : ''}]`);
   return true;
 }
 
-// ─── Fetch ESPN events for a given YYYYMMDD date string ──────────────────────
+// ─── Fetch ESPN events for a YYYYMMDD date string ────────────────────────────
 async function fetchEventsByDate(dateStr) {
   const url = SCOREBOARD_DATE_URL(dateStr);
   console.log(`  Fetching scoreboard for date ${dateStr}…`);
@@ -207,7 +164,7 @@ async function fetchEventsByDate(dateStr) {
   return data.events ?? [];
 }
 
-// ─── Backfill: find past matches still "scheduled" in Firestore ──────────────
+// ─── Backfill: update past matches still "scheduled" in Firestore ─────────────
 async function backfillPastMatches() {
   const todayStr = new Date().toISOString().slice(0, 10);
 
@@ -250,22 +207,24 @@ async function backfillPastMatches() {
 
 // ─── Main sync ────────────────────────────────────────────────────────────────
 async function syncScores() {
-  console.log(`[${new Date().toISOString()}] Starting sync… ${FORCE_RESEED ? '(FORCE RESEED)' : ''}`);
+  console.log(`[${new Date().toISOString()}] Starting live-scores sync…`);
 
-  // 1. Write all matches from matches.json to Firestore (always overwrites)
-  await upsertMatches();
-
-  // 2. Backfill any past matches that are still "scheduled"
+  // 1. Backfill any past matches still "scheduled"
   await backfillPastMatches();
 
-  // 3. Sync today's live scoreboard
+  // 2. Sync today's live scoreboard
   console.log("  Fetching today's scoreboard from ESPN…");
   const sbRes = await fetch(SCOREBOARD_URL, { headers: HEADERS });
-  if (!sbRes.ok) { console.error(`Scoreboard error: ${sbRes.status}`); process.exit(1); }
-  const sbData  = await sbRes.json();
-  const events  = sbData.events ?? [];
+  if (!sbRes.ok) { console.error(`Scoreboard fetch failed: ${sbRes.status}`); process.exit(1); }
+
+  const sbData = await sbRes.json();
+  const events = sbData.events ?? [];
   console.log(`  Scoreboard returned ${events.length} event(s).`);
-  if (!events.length) { console.log('  No matches today.'); return; }
+
+  if (!events.length) {
+    console.log('  No matches today.');
+    return;
+  }
 
   let updated = 0;
 
@@ -275,10 +234,10 @@ async function syncScores() {
 
     const sumRes = await fetch(SUMMARY_URL(eventId), { headers: HEADERS });
     if (!sumRes.ok) { console.warn(`  Summary error ${sumRes.status} for event ${eventId}`); continue; }
-    const sumData = await sumRes.json();
 
-    const comp = sumData.header?.competitions?.[0];
-    if (!comp) { console.warn('  No competition found in summary'); continue; }
+    const sumData = await sumRes.json();
+    const comp    = sumData.header?.competitions?.[0];
+    if (!comp) { console.warn('  No competition found in summary.'); continue; }
 
     const didUpdate = await updateMatchFromComp(comp);
     if (didUpdate) updated++;
