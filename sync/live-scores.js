@@ -91,6 +91,16 @@ const TEAM_NAME_MAP = {
 
 function normalise(name) { return TEAM_NAME_MAP[name] ?? name; }
 
+// ─── Slug helper (mirrors seed.js makeMatchId) ────────────────────────────────
+function slug(s) {
+  return (s || '').toLowerCase()
+    .replace(/[çć]/g, 'c').replace(/[üú]/g, 'u').replace(/[ñ]/g, 'n')
+    .replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+}
+function makeMatchId(date, home, away) {
+  return [date, slug(home), 'vs', slug(away)].join('-');
+}
+
 function parseStatus(statusObj) {
   const state = statusObj?.type?.state;
   const name  = statusObj?.type?.name ?? '';
@@ -105,10 +115,48 @@ function parseMinute(statusObj) {
   return isNaN(mins) || mins === 0 ? null : mins;
 }
 
+// ─── Find Firestore doc for a match ──────────────────────────────────────────
+// Strategy (in order):
+//   1. Field query: home == A, away == B
+//   2. Field query: home == B, away == A  (ESPN/seed home-away swap)
+//   3. Direct doc ID lookup: {date}-{slug(A)}-vs-{slug(B)}
+//   4. Direct doc ID lookup: {date}-{slug(B)}-vs-{slug(A)}
+// Returns { docRef, docData, flipped } or null.
+async function findMatchDoc(home, away, dateStr) {
+  // 1 & 2: field queries
+  for (const [h, a] of [[home, away], [away, home]]) {
+    const snap = await db.collection('matches')
+      .where('home', '==', h)
+      .where('away', '==', a)
+      .limit(1)
+      .get();
+    if (!snap.empty) {
+      const d = snap.docs[0];
+      return { docRef: d.ref, docData: d.data(), flipped: h !== home };
+    }
+  }
+
+  // 3 & 4: slug-based doc ID lookup (works even when field names are stale)
+  if (dateStr) {
+    for (const [h, a] of [[home, away], [away, home]]) {
+      const id  = makeMatchId(dateStr, h, a);
+      const ref = db.collection('matches').doc(id);
+      const d   = await ref.get();
+      if (d.exists) {
+        console.log(`     (matched via doc ID: ${id})`);
+        const data = d.data();
+        // flipped = the ESPN "home" team is stored as "away" in the doc
+        const flipped = data.home !== home && data.away === home;
+        return { docRef: ref, docData: data, flipped };
+      }
+    }
+  }
+
+  return null;
+}
+
 // ─── Update a single Firestore match from an ESPN competition object ──────────
-// Looks up by home+away first, then tries the reverse (away+home) in case
-// ESPN and the seed disagree on which side is "home".
-async function updateMatchFromComp(comp) {
+async function updateMatchFromComp(comp, dateStr) {
   const homeComp = comp.competitors?.find(c => c.homeAway === 'home');
   const awayComp = comp.competitors?.find(c => c.homeAway === 'away');
   if (!homeComp || !awayComp) return false;
@@ -129,33 +177,18 @@ async function updateMatchFromComp(comp) {
   const homeScore = parseInt(homeComp.score ?? '0', 10);
   const awayScore = parseInt(awayComp.score ?? '0', 10);
 
-  // Try home+away order first, then reverse
-  let snap = await db.collection('matches')
-    .where('home', '==', home)
-    .where('away', '==', away)
-    .limit(1)
-    .get();
+  const result = await findMatchDoc(home, away, dateStr);
 
-  if (snap.empty) {
-    snap = await db.collection('matches')
-      .where('home', '==', away)
-      .where('away', '==', home)
-      .limit(1)
-      .get();
-  }
-
-  if (snap.empty) {
-    console.warn(`  ⚠ No Firestore doc found for: ${home} vs ${away}`);
+  if (!result) {
+    console.warn(`  ⚠ No Firestore doc found for: ${home} vs ${away} (date: ${dateStr})`);
     return false;
   }
 
-  // Determine correct score orientation relative to how the doc is stored
-  const docData  = snap.docs[0].data();
-  const flipped  = docData.home === away; // ESPN home is our away
+  const { docRef, docData, flipped } = result;
   const finalHomeScore = flipped ? awayScore : homeScore;
   const finalAwayScore = flipped ? homeScore : awayScore;
 
-  await snap.docs[0].ref.update({
+  await docRef.update({
     homeScore: finalHomeScore,
     awayScore: finalAwayScore,
     status,
@@ -178,6 +211,12 @@ async function fetchEventsByDate(dateStr) {
   }
   const data = await res.json();
   return data.events ?? [];
+}
+
+// ─── Extract YYYY-MM-DD from an ESPN event object ────────────────────────────
+function eventDate(event) {
+  // event.date is ISO like "2026-06-11T19:00Z"
+  return (event.date ?? '').slice(0, 10) || null;
 }
 
 // ─── Backfill: update past matches still "scheduled" in Firestore ─────────────
@@ -213,7 +252,7 @@ async function backfillPastMatches() {
       const sumData = await sumRes.json();
       const comp    = sumData.header?.competitions?.[0];
       if (!comp) continue;
-      const updated = await updateMatchFromComp(comp);
+      const updated = await updateMatchFromComp(comp, date);
       if (updated) backfilled++;
     }
   }
@@ -244,6 +283,7 @@ async function syncScores() {
 
   for (const event of events) {
     const eventId = event.id;
+    const date    = eventDate(event);
     console.log(`  Fetching summary for event ${eventId} (${event.name})…`);
 
     const sumRes = await fetch(SUMMARY_URL(eventId), { headers: HEADERS });
@@ -253,7 +293,7 @@ async function syncScores() {
     const comp    = sumData.header?.competitions?.[0];
     if (!comp) { console.warn('  No competition found in summary.'); continue; }
 
-    const didUpdate = await updateMatchFromComp(comp);
+    const didUpdate = await updateMatchFromComp(comp, date);
     if (didUpdate) updated++;
   }
 
