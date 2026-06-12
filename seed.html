@@ -4,21 +4,42 @@
   <meta charset="UTF-8">
   <title>Seed Firestore Matches</title>
   <style>
-    body { font-family: monospace; padding: 2rem; background: #111; color: #0f0; }
+    body { font-family: monospace; padding: 2rem; background: #111; color: #ccc; }
+    h2   { color: #fff; }
+    #login-form { display: flex; flex-direction: column; gap: .75rem; max-width: 320px; margin-bottom: 2rem; }
+    #login-form input  { padding: .5rem .75rem; border-radius: 6px; border: 1px solid #444; background: #222; color: #fff; font-size: 1rem; }
+    #login-form button { padding: .5rem 1rem; border-radius: 6px; border: none; background: #0a84ff; color: #fff; font-size: 1rem; cursor: pointer; }
+    #login-error { color: #f55; }
     #log { white-space: pre-wrap; }
     .done  { color: #0f0; font-weight: bold; }
     .error { color: #f55; font-weight: bold; }
+    .info  { color: #aaa; }
   </style>
 </head>
 <body>
-  <h2 style="color:#fff">Firestore Match Seeder</h2>
-  <p style="color:#aaa">Seeding matches from <code>assets/data.js</code> — check the log below and the browser console.</p>
-  <div id="log">Starting…\n</div>
+  <h2>Firestore Match Seeder</h2>
+  <p class="info">Sign in with your admin account, then click Seed.</p>
+
+  <form id="login-form">
+    <input id="email"    type="email"    placeholder="Admin email"    required autocomplete="username">
+    <input id="password" type="password" placeholder="Admin password" required autocomplete="current-password">
+    <button type="submit">Sign In &amp; Seed</button>
+    <div id="login-error"></div>
+  </form>
+
+  <div id="log"></div>
 
   <script type="module">
+    import { signInWithEmailAndPassword, getAuth } from
+      'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+    import { app } from './assets/firebase.js';
     import { seedMatches } from './seed.js';
 
-    const log = document.getElementById('log');
+    const auth    = getAuth(app);
+    const log     = document.getElementById('log');
+    const errEl   = document.getElementById('login-error');
+    const form    = document.getElementById('login-form');
+
     const append = (msg, cls) => {
       const line = document.createElement('div');
       if (cls) line.className = cls;
@@ -26,21 +47,35 @@
       log.appendChild(line);
     };
 
-    // Patch console.log so progress shows on-screen too
+    // Patch console.log so progress shows on-screen
     const origLog = console.log.bind(console);
     console.log = (...args) => {
       origLog(...args);
       const msg = args.join(' ');
-      append(msg, msg.startsWith('✅') ? 'done' : '');
+      append(msg, msg.startsWith('✅') ? 'done' : 'info');
     };
 
-    try {
-      await seedMatches();
-      append('🎉 Done! You can close this tab.', 'done');
-    } catch (err) {
-      append('❌ Error: ' + err.message, 'error');
-      console.error(err);
-    }
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      errEl.textContent = '';
+      const email    = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const btn = form.querySelector('button');
+      btn.disabled = true;
+      btn.textContent = 'Signing in…';
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        form.hidden = true;
+        append('Signed in. Starting seed…', 'info');
+        await seedMatches();
+        append('🎉 Done! You can close this tab.', 'done');
+      } catch (err) {
+        errEl.textContent = err.message;
+        btn.disabled = false;
+        btn.textContent = 'Sign In & Seed';
+        append('❌ ' + err.message, 'error');
+      }
+    });
   </script>
 </body>
 </html>
