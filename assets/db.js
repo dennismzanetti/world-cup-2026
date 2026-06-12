@@ -37,6 +37,36 @@ export async function updateMatchResult(matchId, { homeScore, awayScore }) {
   }, { merge: true });
 }
 
+/**
+ * Seed (or overwrite) a set of knockout fixture stubs into the matches collection.
+ * Each fixture is written as a separate doc using its id field as the document ID.
+ * Uses setDoc with merge:false so that existing result data is preserved only
+ * when the caller explicitly passes merge:true.
+ *
+ * @param {Array<Object>} fixtures  - Array of fixture objects; each must have an `id` field.
+ * @param {boolean}       [merge=true] - If true, merges with existing doc (preserves scores).
+ *                                       If false, overwrites entirely.
+ */
+export async function seedKnockoutMatches(fixtures, merge = true) {
+  const results = { ok: 0, err: 0 };
+  for (const fixture of fixtures) {
+    const { id, ...data } = fixture;
+    if (!id) { results.err++; continue; }
+    try {
+      await setDoc(doc(db, 'matches', id), {
+        ...data,
+        seededAt: serverTimestamp(),
+      }, { merge });
+      results.ok++;
+      console.log(`✅ ${id} seeded`);
+    } catch (err) {
+      results.err++;
+      console.error(`❌ ${id} failed:`, err.message);
+    }
+  }
+  return results;
+}
+
 // ============================================================
 // USER PREDICTIONS
 // ============================================================

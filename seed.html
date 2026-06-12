@@ -6,10 +6,16 @@
   <style>
     body { font-family: monospace; padding: 2rem; background: #111; color: #ccc; }
     h2   { color: #fff; }
+    .btn-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
     #login-form { display: flex; flex-direction: column; gap: .75rem; max-width: 320px; margin-bottom: 2rem; }
     #login-form input  { padding: .5rem .75rem; border-radius: 6px; border: 1px solid #444; background: #222; color: #fff; font-size: 1rem; }
     #login-form button { padding: .5rem 1rem; border-radius: 6px; border: none; background: #0a84ff; color: #fff; font-size: 1rem; cursor: pointer; }
     #login-error { color: #f55; min-height: 1.2rem; }
+    button.seed-btn { padding: .6rem 1.2rem; border-radius: 6px; border: none; font-size: 1rem; cursor: pointer; font-family: monospace; }
+    button.seed-btn:disabled { opacity: .4; cursor: not-allowed; }
+    #btn-group-stage  { background: #0a84ff; color: #fff; }
+    #btn-knockout     { background: #30d158; color: #000; }
+    #btn-ko-overwrite { background: #ff453a; color: #fff; }
     #log { white-space: pre-wrap; margin-top: 1rem; }
     .done   { color: #0f0; font-weight: bold; }
     .error  { color: #f55; font-weight: bold; }
@@ -20,14 +26,21 @@
 </head>
 <body>
   <h2>Firestore Match Seeder</h2>
-  <p class="info">Sign in with your admin account, then the seed will run automatically.</p>
+  <p class="info">Sign in with your admin account, then choose what to seed.</p>
 
   <form id="login-form">
     <input id="email"    type="email"    placeholder="Admin email"    required autocomplete="username">
     <input id="password" type="password" placeholder="Admin password" required autocomplete="current-password">
-    <button type="submit">Sign In &amp; Seed</button>
+    <button type="submit">Sign In</button>
     <div id="login-error"></div>
   </form>
+
+  <!-- Seed action buttons — hidden until signed in -->
+  <div class="btn-row" id="seed-btns" hidden>
+    <button class="seed-btn" id="btn-group-stage">Seed Group Stage Matches</button>
+    <button class="seed-btn" id="btn-knockout">Seed Knockout Fixtures (merge)</button>
+    <button class="seed-btn" id="btn-ko-overwrite">⚠️ Re-seed Knockout (overwrite)</button>
+  </div>
 
   <div id="log"></div>
 
@@ -36,10 +49,13 @@
       'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
     import { auth } from './assets/firebase.js';
     import { seedMatches } from './seed.js';
+    import { seedKnockoutMatches } from './assets/db.js';
+    import { KNOCKOUT_FIXTURES } from './seed-knockout.js';
 
     const log   = document.getElementById('log');
     const errEl = document.getElementById('login-error');
     const form  = document.getElementById('login-form');
+    const seedBtns = document.getElementById('seed-btns');
 
     const append = (msg, cls = 'info') => {
       const line = document.createElement('div');
@@ -68,38 +84,58 @@
         const cred = await signInWithEmailAndPassword(auth, email, password);
         const user = cred.user;
         form.hidden = true;
+        seedBtns.removeAttribute('hidden');
 
-        // —— Auth diagnostics ——
         append(`✓ Signed in as: ${user.email}`, 'done');
-        append(`  UID:          ${user.uid}`, 'uid');
+        append(`  UID: ${user.uid}`, 'uid');
         append(`  Email verified: ${user.emailVerified}`, 'info');
 
         const EXPECTED_UID = 'rvR3HclRnhXAOd3rgk7sO0s3F7v1';
         if (user.uid === EXPECTED_UID) {
-          append(`  ✅ UID matches ADMIN_UIDS — should have write access`, 'done');
+          append(`  ✅ UID matches ADMIN_UIDS`, 'done');
         } else {
           append(`  ⚠️ UID does NOT match expected admin UID!`, 'warn');
           append(`  Expected: ${EXPECTED_UID}`, 'warn');
           append(`  Got:      ${user.uid}`, 'warn');
-          append(`  Fix: update ADMIN_UIDS in app.js and the Firestore rule to use UID above.`, 'warn');
         }
 
-        // Force-refresh token and show claims
         const tokenResult = await getIdTokenResult(user, true);
         append(`  Token issued at: ${tokenResult.issuedAtTime}`, 'info');
-        append(`  Auth time:       ${tokenResult.authTime}`, 'info');
 
-        // Check which Firestore database is being targeted
-        append(`Starting seed on Firestore database 'wc2026'…`, 'info');
+        // ── Group stage seed button ──────────────────────────────────────────
+        document.getElementById('btn-group-stage').addEventListener('click', async () => {
+          log.innerHTML = '';
+          append('Seeding group stage matches…', 'info');
+          try {
+            await seedMatches();
+            append('🎉 Group stage seed complete!', 'done');
+          } catch (err) {
+            append('❌ ' + err.message, 'error');
+          }
+        });
 
-        await seedMatches();
-        append('🎉 Done! You can close this tab.', 'done');
+        // ── Knockout seed button (merge — preserves existing scores) ─────────
+        document.getElementById('btn-knockout').addEventListener('click', async () => {
+          log.innerHTML = '';
+          append(`Seeding ${KNOCKOUT_FIXTURES.length} knockout fixtures (merge)…`, 'info');
+          const { ok, err } = await seedKnockoutMatches(KNOCKOUT_FIXTURES, true);
+          append(`🎉 Done — ${ok} seeded, ${err} errors.`, err > 0 ? 'warn' : 'done');
+        });
+
+        // ── Knockout overwrite button (destructive — clears scores) ──────────
+        document.getElementById('btn-ko-overwrite').addEventListener('click', async () => {
+          if (!confirm('This will OVERWRITE all knockout match data including any scores. Continue?')) return;
+          log.innerHTML = '';
+          append(`Re-seeding ${KNOCKOUT_FIXTURES.length} knockout fixtures (overwrite)…`, 'warn');
+          const { ok, err } = await seedKnockoutMatches(KNOCKOUT_FIXTURES, false);
+          append(`🎉 Done — ${ok} seeded, ${err} errors.`, err > 0 ? 'warn' : 'done');
+        });
+
       } catch (err) {
         errEl.textContent = err.message;
         btn.disabled = false;
-        btn.textContent = 'Sign In & Seed';
+        btn.textContent = 'Sign In';
         append('❌ ' + err.message, 'error');
-        append('  Full error: ' + JSON.stringify(err.code), 'error');
       }
     });
   </script>
