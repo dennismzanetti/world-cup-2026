@@ -1,6 +1,7 @@
 // sync/live-scores.js
 // Fetches live World Cup 2026 scores via ESPN APIs and writes to Firestore.
-// Upserts missing matches from data/matches.json on every run (idempotent).
+// Upserts (overwrites) all matches from data/matches.json on every run.
+// Pass --force-reseed to delete all existing match docs first, then re-seed.
 // Backfills any past matches still marked "scheduled" by querying ESPN by date.
 // No API key needed.
 // Requires: FIREBASE_SERVICE_ACCOUNT_JSON (GitHub Secret)
@@ -10,7 +11,7 @@ import { readFile } from 'fs/promises';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
-// ─── Firebase Admin Init ───────────────────────────────────────────────────────────────────────────────
+// ─── Firebase Admin Init ──────────────────────────────────────────────────────
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
 
 console.log(`[init] project_id   : ${serviceAccount.project_id}`);
@@ -20,42 +21,58 @@ console.log(`[init] Firestore DB : wc2026`);
 const app = initializeApp({ credential: cert(serviceAccount) });
 const db  = getFirestore(app, 'wc2026');
 
+const FORCE_RESEED = process.argv.includes('--force-reseed');
+
 const HEADERS = { 'User-Agent': 'world-cup-2026-sync/1.0' };
 
 const SCOREBOARD_URL      = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard';
 const SCOREBOARD_DATE_URL = date => `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=${date}`;
 const SUMMARY_URL         = id   => `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/summary?event=${id}`;
 
-// ─── Upsert all matches from data/matches.json (idempotent) ─────────────────────────────────
-// Uses matchNumber as a stable lookup key. Adds missing docs, skips existing.
-async function upsertMissingMatches() {
+// ─── Delete all docs in a collection (chunked) ───────────────────────────────
+async function deleteCollection(colRef) {
+  const snap = await colRef.get();
+  if (snap.empty) return;
+  const CHUNK = 500;
+  for (let i = 0; i < snap.docs.length; i += CHUNK) {
+    const batch = db.batch();
+    snap.docs.slice(i, i + CHUNK).forEach(d => batch.delete(d.ref));
+    await batch.commit();
+  }
+  console.log(`  ✓ Deleted ${snap.docs.length} existing doc(s).`);
+}
+
+// ─── Seed / upsert all matches from data/matches.json ────────────────────────
+// Normal run  : overwrites every doc (batch.set without merge so stale fields are cleared).
+// --force-reseed: deletes all docs first, then writes fresh.
+async function upsertMatches() {
   const raw     = await readFile(new URL('../data/matches.json', import.meta.url), 'utf8');
   const matches = JSON.parse(raw);
 
-  // Fetch all existing matchNumbers from Firestore in one query
-  const existing = await db.collection('matches').get();
-  const existingNums = new Set(existing.docs.map(d => d.data().matchNumber));
-
-  const missing = matches.filter(m => !existingNums.has(m.matchNumber));
-
-  if (!missing.length) {
-    console.log(`  All ${matches.length} matches already in Firestore — skipping upsert.`);
-    return;
+  if (FORCE_RESEED) {
+    console.log('  --force-reseed: deleting all existing match docs…');
+    await deleteCollection(db.collection('matches'));
+  } else {
+    // In a normal run, fetch existing matchNumbers so we can report what's new vs overwritten.
+    const existing    = await db.collection('matches').get();
+    const existingIds = new Set(existing.docs.map(d => d.id));
+    const newCount    = matches.filter(m => !existingIds.has(m.id)).length;
+    console.log(`  Upserting ${matches.length} match(es) — ${newCount} new, ${matches.length - newCount} overwritten…`);
   }
 
-  console.log(`  Adding ${missing.length} missing match(es) to Firestore…`);
   const CHUNK = 500;
-  for (let i = 0; i < missing.length; i += CHUNK) {
+  for (let i = 0; i < matches.length; i += CHUNK) {
     const batch = db.batch();
-    for (const m of missing.slice(i, i + CHUNK)) {
+    for (const m of matches.slice(i, i + CHUNK)) {
+      // batch.set without merge: completely replaces the doc (clears any stale fields)
       batch.set(db.collection('matches').doc(m.id), m);
     }
     await batch.commit();
   }
-  console.log(`  ✓ Added ${missing.length} match(es).`);
+  console.log(`  ✓ ${matches.length} match(es) written to Firestore.`);
 }
 
-// ─── Team name normalisation ──────────────────────────────────────────────────────────────────────────────
+// ─── Team name normalisation ──────────────────────────────────────────────────
 const TEAM_NAME_MAP = {
   'Mexico':                   'Mexico',
   'South Africa':             'South Africa',
@@ -135,7 +152,7 @@ function parseMinute(statusObj) {
   return isNaN(mins) || mins === 0 ? null : mins;
 }
 
-// ─── Update a single Firestore match from an ESPN competition object ──────────────
+// ─── Update a single Firestore match from an ESPN competition object ──────────
 async function updateMatchFromComp(comp) {
   const homeComp = comp.competitors?.find(c => c.homeAway === 'home');
   const awayComp = comp.competitors?.find(c => c.homeAway === 'away');
@@ -177,7 +194,7 @@ async function updateMatchFromComp(comp) {
   return true;
 }
 
-// ─── Fetch ESPN events for a given YYYYMMDD date string ────────────────────────────────
+// ─── Fetch ESPN events for a given YYYYMMDD date string ──────────────────────
 async function fetchEventsByDate(dateStr) {
   const url = SCOREBOARD_DATE_URL(dateStr);
   console.log(`  Fetching scoreboard for date ${dateStr}…`);
@@ -190,7 +207,7 @@ async function fetchEventsByDate(dateStr) {
   return data.events ?? [];
 }
 
-// ─── Backfill: find past matches still "scheduled" in Firestore ───────────────────────
+// ─── Backfill: find past matches still "scheduled" in Firestore ──────────────
 async function backfillPastMatches() {
   const todayStr = new Date().toISOString().slice(0, 10);
 
@@ -231,18 +248,18 @@ async function backfillPastMatches() {
   console.log(`  Backfill done — ${backfilled} document(s) updated.`);
 }
 
-// ─── Main sync ───────────────────────────────────────────────────────────────────────────────
+// ─── Main sync ────────────────────────────────────────────────────────────────
 async function syncScores() {
-  console.log(`[${new Date().toISOString()}] Starting sync…`);
+  console.log(`[${new Date().toISOString()}] Starting sync… ${FORCE_RESEED ? '(FORCE RESEED)' : ''}`);
 
-  // 1. Ensure all 104 matches are in Firestore (idempotent upsert)
-  await upsertMissingMatches();
+  // 1. Write all matches from matches.json to Firestore (always overwrites)
+  await upsertMatches();
 
   // 2. Backfill any past matches that are still "scheduled"
   await backfillPastMatches();
 
   // 3. Sync today's live scoreboard
-  console.log('  Fetching today\'s scoreboard from ESPN…');
+  console.log("  Fetching today's scoreboard from ESPN…");
   const sbRes = await fetch(SCOREBOARD_URL, { headers: HEADERS });
   if (!sbRes.ok) { console.error(`Scoreboard error: ${sbRes.status}`); process.exit(1); }
   const sbData  = await sbRes.json();
