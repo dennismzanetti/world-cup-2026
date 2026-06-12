@@ -29,7 +29,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
   ];
 
   // ─── Admin UIDs ──────────────────────────────────────────────────────────────
-  const ADMIN_UIDS = ['EAi3lYhlSFYGaqm9F87BdJb1Vrg1'];
+  const ADMIN_UIDS = ['rvR3HclRnhXAOd3rgk7sO0s3F7v1'];
 
   // ─── Team helpers ──────────────────────────────────────────────────────────
   function teamName(t)    { return (t && typeof t === 'object') ? t.name : (t || ''); }
@@ -192,17 +192,9 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
   document.getElementById('pred-team-filter')?.addEventListener('input', renderPredictions);
 
   // ─── Live match data ──────────────────────────────────────────────────────────
-  // Merge Firestore docs into liveMatches.
-  // Strategy:
-  //   1. Match by exact `id` field.
-  //   2. Fallback: match by home/away team name pair (handles admin-assigned IDs).
-  //   3. If still unmatched, append as a new entry so no data is lost.
   watchMatches(allMatches => {
     allMatches.forEach(um => {
-      // Try exact id match first
       let idx = liveMatches.findIndex(m => m.id === um.id);
-
-      // Fallback: match by home+away team name pair
       if (idx === -1) {
         const umHome = teamName(um.home).toLowerCase();
         const umAway = teamName(um.away).toLowerCase();
@@ -213,11 +205,9 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
           );
         }
       }
-
       if (idx !== -1) {
         liveMatches[idx] = { ...liveMatches[idx], ...um };
       } else {
-        // Unknown match — append so it still renders
         liveMatches.push(um);
       }
     });
@@ -244,20 +234,15 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     return Object.values(stats).sort((a,b) => b.pts-a.pts || b.gd-a.gd || b.gf-a.gf || teamName(a.team).localeCompare(teamName(b.team)));
   }
 
-  // ─── Stage label ────────────────────────────────────────────────────────────────────
-  // NOTE: single uppercase letter check must come BEFORE the map lookup so that
-  // group keys like 'F' resolve to 'Group F' and not 'Final'.
   const stageKeyToLabel = key => {
     if (/^[A-Z]$/.test(key)) return `Group ${key}`;
     return { R32:'Round of 32', R16:'Round of 16', QF:'Quarter-Finals', SF:'Semi-Finals', '3P':'Third Place', F:'Final' }[key] || key;
   };
 
-  // ─── Populate filters (Matches tab) ───────────────────────────────────────────────
   function populateMatchFilters() {
     const dateEl  = document.getElementById('match-date-filter');
     const stageEl = document.getElementById('match-group-filter');
     const venueEl = document.getElementById('match-venue-filter');
-    // Use allPredMatches() so knockout rounds appear alongside group stage matches
     const allMatches = allPredMatches();
     if (dateEl) {
       const dates = [...new Set(allTabMatches().map(m => m.date).filter(Boolean))].sort();
@@ -291,7 +276,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     }
   }
 
-  // ─── Groups tab ───────────────────────────────────────────────────────────────────
   function renderGroups() {
     const grid = document.getElementById('groups-grid');
     if (!grid) return;
@@ -336,7 +320,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     });
   }
 
-  // ─── Render by date ────────────────────────────────────────────────────────────────
   function renderByDate(container, matches, isPred) {
     const sorted = [...matches].sort((a, b) => {
       const da = a.date || '';
@@ -361,7 +344,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     });
   }
 
-  // ─── Matches tab ──────────────────────────────────────────────────────────────────
   function renderMatches() {
     const container = document.getElementById('matches-list');
     if (!container) return;
@@ -380,10 +362,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     renderByDate(container, matches, false);
   }
 
-  // ─── Broadcaster row builder ─────────────────────────────────────────────────────
-  // TV icon SVG
   const TV_ICON = `<svg class="meta-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M5 13.5h6M8 13v.5"/></svg>`;
-  // Stream icon SVG
   const STREAM_ICON = `<svg class="meta-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 4.5C3 4.5 1 6 1 8s2 3.5 2 3.5M13 4.5s2 1.5 2 3.5-2 3.5-2 3.5M5.5 6.5S4.5 7 4.5 8s1 1.5 1 1.5M10.5 6.5S11.5 7 11.5 8s-1 1.5-1 1.5"/><circle cx="8" cy="8" r="1.25" fill="currentColor" stroke="none"/></svg>`;
 
   function buildBroadcastRow(m) {
@@ -391,7 +370,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     const tvEn  = Array.isArray(m.tvEnglish)  ? m.tvEnglish  : (m.tvEnglish  ? [m.tvEnglish]  : []);
     const tvEs  = Array.isArray(m.tvSpanish)  ? m.tvSpanish  : (m.tvSpanish  ? [m.tvSpanish]  : []);
     const strm  = Array.isArray(m.streaming)  ? m.streaming  : (m.streaming  ? [m.streaming]  : []);
-
     if (tvEn.length || tvEs.length) {
       const combined = [...new Set([...tvEn, ...tvEs])];
       parts.push(`<span class="card-meta-item">${TV_ICON}${combined.map(c => `<span class="broadcaster-chip">${c}</span>`).join('')}</span>`);
@@ -402,7 +380,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     return parts.length ? `<div class="card-meta card-meta-broadcast">${parts.join('')}</div>` : '';
   }
 
-  // ─── Match card ────────────────────────────────────────────────────────────────────
   function buildMatchCard(m, isPred) {
     const card     = document.createElement('div');
     card.className = 'match-card' + (m.status === 'live' ? ' match-card-live' : '');
@@ -521,7 +498,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     return card;
   }
 
-  // ─── Predictions (My Picks) ────────────────────────────────────────────────────────
   function renderPredictions() {
     const container  = document.getElementById('predictions-list');
     const authPrompt = document.getElementById('predictions-auth-prompt');
@@ -555,7 +531,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     renderByDate(container, matches, true);
   }
 
-  // ─── Predicted Group Standings ─────────────────────────────────────────────────────
   function renderPredGroupStandings() {
     const container  = document.getElementById('pred-group-standings-container');
     const authPrompt = document.getElementById('pred-group-standings-auth-prompt');
@@ -611,7 +586,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     });
   }
 
-  // ─── Prediction Accuracy ────────────────────────────────────────────────────────────
   function renderPredStandings() {
     const container  = document.getElementById('pred-standings-container');
     const authPrompt = document.getElementById('pred-standings-auth-prompt');
@@ -646,7 +620,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       </div>`;
   }
 
-  // ─── Knockout bracket ────────────────────────────────────────────────────────────────
   function slotLabel(source) {
     if (!source) return '?';
     if (source.type === 'group') return `${source.pos === 1 ? '1st' : '2nd'} Group ${source.group}`;
@@ -714,11 +687,9 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     });
   }
 
-  // ─── Initial render ────────────────────────────────────────────────────────────────
   populateMatchFilters();
   renderGroups();
 
-  // Expose for debugging
   window._wc = { getAllMatches() { return [...liveMatches]; } };
 
 })();

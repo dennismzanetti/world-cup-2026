@@ -2,26 +2,20 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Admin UID allowed to write matches
-    function isAdmin() {
-      return request.auth != null
-        && request.auth.uid == 'EAi3lYhlSFYGaqm9F87BdJb1Vrg1';
-    }
-
-    // MATCHES — public read, admin write only
+    // ── Matches (admin-controlled) ─────────────────────────────────────────
     match /matches/{matchId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if request.auth != null
+        && request.auth.uid == 'rvR3HclRnhXAOd3rgk7sO0s3F7v1';
     }
 
-    // USERS — each user can only read and write their own profile
-    match /users/{userId} {
+    // ── User subcollections (predictions, bracket) ─────────────────────
+    match /users/{userId}/{document=**} {
       allow read, write: if request.auth != null
         && request.auth.uid == userId;
     }
 
-    // PREDICTIONS — signed-in users can read all predictions,
-    // but can only create/update/delete their own
+    // ── Top-level predictions (for leaderboard/standings reads) ───────────
     match /predictions/{predictionId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null
@@ -29,5 +23,6 @@ service cloud.firestore {
       allow update, delete: if request.auth != null
         && resource.data.userId == request.auth.uid;
     }
+
   }
 }
