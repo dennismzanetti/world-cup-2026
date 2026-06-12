@@ -106,18 +106,19 @@ function parseMinute(statusObj) {
 }
 
 // ─── Update a single Firestore match from an ESPN competition object ──────────
+// NOTE: seed.js stores teams as 'home' and 'away' (not 'homeTeam'/'awayTeam')
 async function updateMatchFromComp(comp) {
   const homeComp = comp.competitors?.find(c => c.homeAway === 'home');
   const awayComp = comp.competitors?.find(c => c.homeAway === 'away');
   if (!homeComp || !awayComp) return false;
 
-  const homeTeam  = normalise(homeComp.team.displayName);
-  const awayTeam  = normalise(awayComp.team.displayName);
+  const home      = normalise(homeComp.team.displayName);
+  const away      = normalise(awayComp.team.displayName);
   const statusObj = comp.status;
   const status    = parseStatus(statusObj);
   const minute    = parseMinute(statusObj);
 
-  console.log(`  -> ${homeTeam} vs ${awayTeam} | state=${statusObj?.type?.state} | clock=${statusObj?.displayClock} | score=${homeComp.score}-${awayComp.score}`);
+  console.log(`  -> ${home} vs ${away} | state=${statusObj?.type?.state} | clock=${statusObj?.displayClock} | score=${homeComp.score}-${awayComp.score}`);
 
   if (status === 'scheduled') {
     console.log(`     Skipping (not started).`);
@@ -127,15 +128,15 @@ async function updateMatchFromComp(comp) {
   const homeScore = parseInt(homeComp.score ?? '0', 10);
   const awayScore = parseInt(awayComp.score ?? '0', 10);
 
-  // Match by homeTeam + awayTeam fields already seeded in Firestore
+  // Match on 'home' + 'away' fields (as written by seed.js)
   const snap = await db.collection('matches')
-    .where('homeTeam', '==', homeTeam)
-    .where('awayTeam', '==', awayTeam)
+    .where('home', '==', home)
+    .where('away', '==', away)
     .limit(1)
     .get();
 
   if (snap.empty) {
-    console.warn(`  ⚠ No Firestore doc found for: ${homeTeam} vs ${awayTeam}`);
+    console.warn(`  ⚠ No Firestore doc found for: ${home} vs ${away}`);
     return false;
   }
 
@@ -147,7 +148,7 @@ async function updateMatchFromComp(comp) {
     updatedAt: FieldValue.serverTimestamp(),
   });
 
-  console.log(`  ✓ Updated: ${homeTeam} ${homeScore}–${awayScore} ${awayTeam}  [${status}${minute ? ` ${minute}'` : ''}]`);
+  console.log(`  ✓ Updated: ${home} ${homeScore}–${awayScore} ${away}  [${status}${minute ? ` ${minute}'` : ''}]`);
   return true;
 }
 
