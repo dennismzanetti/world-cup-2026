@@ -222,6 +222,7 @@ function buildGroupMatches() {
           tvEnglish:  meta.tvEnglish  || ['FOX / FS1'],
           tvSpanish:  meta.tvSpanish  || ['Telemundo'],
           streaming:  meta.streaming  || ['FOX One', 'Peacock'],
+          status:     'scheduled',
           homeScore:  null,
           awayScore:  null,
         });
@@ -313,6 +314,7 @@ export async function reseedAllMatches(onProgress) {
       awayflag:  null,
       homeScore: null,
       awayScore: null,
+      status:    'scheduled',
       sourceUpdatedAt: serverTimestamp(),
     });
     kCount++;
