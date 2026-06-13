@@ -1090,3 +1090,93 @@ a, button, [role="button"], input, select {
   background: var(--color-accent);
   color: var(--color-text-inverse);
 }
+
+/* ============================================================
+   PREDICTION RESULT — FINISHED MATCH CARDS
+   ============================================================ */
+
+/* Score column layout for finished prediction cards */
+.pred-score-col--finished {
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+}
+
+/* Final score — larger and prominent */
+.pred-score-col--finished .score-final {
+  font-size: 1.8rem;
+  color: var(--color-text);
+}
+
+/* Row showing "Your pick: X – Y" */
+.pred-result-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.pred-result-label {
+  font-weight: 500;
+  color: var(--color-text-faint);
+}
+.pred-result-score {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+
+/* Outcome badge */
+.pred-outcome-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  background: var(--color-surface-offset);
+  color: var(--color-text-faint);
+}
+
+/* Exact score — gold */
+.pred-outcome--exact .pred-outcome-badge {
+  background: var(--color-primary-highlight);
+  color: var(--color-primary-active);
+}
+.pred-outcome--exact .pred-result-score {
+  color: var(--color-primary-active);
+}
+[data-theme="dark"] .pred-outcome--exact .pred-outcome-badge {
+  background: var(--color-primary-highlight);
+  color: var(--color-primary);
+}
+[data-theme="dark"] .pred-outcome--exact .pred-result-score {
+  color: var(--color-primary);
+}
+
+/* Correct result — green */
+.pred-outcome--correct .pred-outcome-badge {
+  background: var(--color-success-highlight);
+  color: var(--color-success);
+}
+.pred-outcome--correct .pred-result-score {
+  color: var(--color-success);
+}
+
+/* Wrong — red */
+.pred-outcome--wrong .pred-outcome-badge {
+  background: var(--color-error-highlight);
+  color: var(--color-error);
+}
+.pred-outcome--wrong .pred-result-score {
+  color: var(--color-error);
+}
+
+/* No prediction made */
+.pred-outcome--none .pred-outcome-badge {
+  background: var(--color-surface-offset);
+  color: var(--color-text-faint);
+}
