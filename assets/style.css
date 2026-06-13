@@ -182,7 +182,7 @@ a, button, [role="button"], input, select {
 .icon-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
 
 /* ============================================================
-   LAYOUT — HEADER
+   LAYOUT — HEADER (Desktop)
    ============================================================ */
 
 .site-header {
@@ -191,6 +191,7 @@ a, button, [role="button"], input, select {
   box-shadow: var(--shadow-md);
 }
 
+/* Desktop: single row, brand + nav + actions side by side */
 .header-inner {
   max-width: var(--content-default);
   margin: 0 auto;
@@ -243,52 +244,58 @@ a, button, [role="button"], input, select {
 #sign-out-btn { font-size: var(--text-xs); }
 
 /* ============================================================
-   MOBILE HEADER — tabs always on screen, never scroll off
+   MOBILE HEADER — two-row layout, nav always fully visible
+
+   Strategy: on mobile, .header-inner switches to flex-wrap so
+   .header-brand and .header-actions share the first row, and
+   .main-nav is forced onto its own full-width second row via
+   flex-basis:100%. No JS, no order tricks needed.
    ============================================================ */
 @media (max-width: 600px) {
-  .site-header {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: stretch;
-  }
+  /* Allow header-inner to wrap into two rows */
   .header-inner {
-    flex: 1 1 100%;
+    flex-wrap: wrap;
+    height: auto;
     padding: 0 var(--space-3);
-    gap: var(--space-2);
-    height: 3rem;
+    gap: 0;
+  }
+
+  /* Row 1: brand on left, actions on right */
+  .header-brand {
+    flex: 1;
+    height: 2.75rem;
+    align-items: center;
   }
   .brand-name { display: none; }
 
-  /* Nav row sits below the header-inner row, full width */
-  .main-nav {
-    order: 3;
-    flex: none;
-    width: 100%;
-    height: auto;
-    /* Grid: 3 equal columns, one per tab — guaranteed to fit */
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    border-top: 1px solid rgba(255,255,255,0.1);
-    overflow: visible;
-  }
-  .nav-btn {
-    flex: unset;
-    display: flex;
+  .header-actions {
+    height: 2.75rem;
     align-items: center;
-    justify-content: center;
-    height: 2.5rem;
-    padding: 0 var(--space-1);
-    font-size: 0.78rem;
-    letter-spacing: 0.03em;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    min-width: 0;
   }
 
+  /* Row 2: nav takes full width, pushes onto its own line */
+  .main-nav {
+    flex: 0 0 100%;   /* force new row */
+    width: 100%;
+    height: auto;
+    /* 3 equal columns — each tab always fits */
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border-top: 1px solid rgba(255,255,255,0.12);
+  }
+  .nav-btn {
+    height: 2.5rem;
+    padding: 0;
+    font-size: 0.8rem;
+    letter-spacing: 0.04em;
+    justify-content: center;
+    border-bottom: 2px solid transparent;
+  }
+
+  /* Content & layout tweaks */
   .main-content { padding-top: var(--space-4); }
   .container { padding: 0 var(--space-3); }
-  .card-teams { grid-template-columns: 1fr var(--score-col-w) 1fr; padding: var(--space-2) var(--space-3); align-items: center; }
+  .card-teams { grid-template-columns: 1fr var(--score-col-w) 1fr; padding: var(--space-2) var(--space-3); }
   .standings-grid, .groups-grid { grid-template-columns: 1fr; }
   .bracket-round { min-width: 150px; }
   .bracket-header { flex-direction: column; align-items: flex-start; }
@@ -601,7 +608,6 @@ a, button, [role="button"], input, select {
    PREDICTION ACCURACY TAB
    ============================================================ */
 
-/* Outer wrapper */
 .pred-stats {
   display: flex;
   flex-direction: column;
@@ -609,7 +615,6 @@ a, button, [role="button"], input, select {
   padding-top: var(--space-2);
 }
 
-/* Hero section: ring + right-side summary */
 .pred-accuracy-hero {
   display: flex;
   align-items: center;
@@ -621,7 +626,6 @@ a, button, [role="button"], input, select {
   padding: var(--space-8) var(--space-10);
 }
 
-/* SVG ring container */
 .accuracy-ring-wrap {
   position: relative;
   width: 180px;
@@ -669,10 +673,7 @@ a, button, [role="button"], input, select {
   margin-top: var(--space-1);
 }
 
-/* Right-side summary text */
-.accuracy-summary {
-  flex: 1;
-}
+.accuracy-summary { flex: 1; }
 .accuracy-title {
   font-family: var(--font-display);
   font-size: var(--text-xl);
@@ -715,9 +716,7 @@ a, button, [role="button"], input, select {
   background: var(--color-primary);
   transition: width 0.7s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.accuracy-bar-fill.bar-exact {
-  background: var(--color-success);
-}
+.accuracy-bar-fill.bar-exact { background: var(--color-success); }
 .accuracy-row-val {
   font-family: var(--font-display);
   font-size: 1rem;
@@ -728,7 +727,6 @@ a, button, [role="button"], input, select {
   flex-shrink: 0;
 }
 
-/* Stat cards grid */
 .pred-stat-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr));
@@ -738,7 +736,7 @@ a, button, [role="button"], input, select {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: var(--space-5) var(--space-5);
+  padding: var(--space-5);
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -746,14 +744,8 @@ a, button, [role="button"], input, select {
   box-shadow: var(--shadow-sm);
   transition: box-shadow var(--transition-interactive), transform var(--transition-interactive);
 }
-.pred-stat-card:hover {
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
-}
-.pred-stat-icon {
-  font-size: 1.4rem;
-  margin-bottom: var(--space-1);
-}
+.pred-stat-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.pred-stat-icon { font-size: 1.4rem; margin-bottom: var(--space-1); }
 .pred-stat-val {
   font-family: var(--font-display);
   font-size: 2.2rem;
@@ -768,15 +760,9 @@ a, button, [role="button"], input, select {
   letter-spacing: 0.05em;
 }
 
-/* No-data empty state for standings tab */
 .pred-stats-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: var(--space-16) var(--space-8);
-  color: var(--color-text-muted);
-  gap: var(--space-3);
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: var(--space-16) var(--space-8); color: var(--color-text-muted); gap: var(--space-3);
 }
 .pred-stats-empty-icon { font-size: 3rem; }
 .pred-stats-empty h3 { color: var(--color-text); font-family: var(--font-display); font-size: var(--text-lg); letter-spacing: 0.04em; }
@@ -861,16 +847,14 @@ a, button, [role="button"], input, select {
    PREDICTIONS SUB-TABS
    ============================================================ */
 
-/* Desktop: normal single-row flex tab bar */
+/* Desktop: single row underline tabs */
 .sub-tabs {
   display: flex;
   gap: var(--space-1);
   border-bottom: 2px solid var(--color-divider);
   margin-bottom: var(--space-4);
-  overflow-x: auto;
-  scrollbar-width: none;
+  /* No overflow-x scroll — on mobile we switch to grid below */
 }
-.sub-tabs::-webkit-scrollbar { display: none; }
 .sub-tab {
   flex-shrink: 0;
   background: none; border: none; cursor: pointer;
@@ -888,49 +872,35 @@ a, button, [role="button"], input, select {
 .sub-tab-panel.active { display: block; }
 
 /*
-  Mobile sub-tabs: switch to a 2×2 grid so all 4 tabs always fit on screen.
-  Each cell is a bordered tile; active tab gets gold text + bottom border.
-  No scrolling, no overflow.
+  Mobile sub-tabs: 2×2 grid.
+  All 4 tabs are always fully visible — no overflow, no scrolling.
+  Active tab highlighted with gold background tint.
 */
 @media (max-width: 600px) {
   .sub-tabs {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 0;
-    overflow: visible;
     border-bottom: none;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
+    overflow: hidden; /* clips child borders neatly */
     margin-bottom: var(--space-4);
-    background: var(--color-surface);
+    gap: 0;
   }
   .sub-tab {
-    flex-shrink: unset;
-    padding: var(--space-2) var(--space-2);
+    padding: var(--space-2) var(--space-1);
     font-size: 0.72rem;
-    letter-spacing: 0.01em;
     white-space: normal;
-    line-height: 1.25;
+    line-height: 1.3;
     text-align: center;
     border: none;
-    border-bottom: none;
     margin-bottom: 0;
-    border-right: 1px solid var(--color-border);
-    border-bottom: 1px solid var(--color-border);
-    /* Remove right border on even items (right column) */
-  }
-  /* Right column: no right border */
-  .sub-tab:nth-child(even) {
-    border-right: none;
-  }
-  /* Bottom row: no bottom border */
-  .sub-tab:nth-last-child(-n+2) {
-    border-bottom: none;
+    /* Internal borders between cells */
+    box-shadow: 1px 1px 0 0 var(--color-border);
   }
   .sub-tab.active {
     background: var(--color-primary-highlight);
     color: var(--color-primary-active);
-    border-bottom-color: transparent;
   }
   [data-theme="dark"] .sub-tab.active {
     background: var(--color-primary-highlight);
@@ -948,7 +918,6 @@ a, button, [role="button"], input, select {
    BRACKET
    ============================================================ */
 
-/* Progress header */
 .bracket-header {
   display: flex; align-items: center; justify-content: space-between;
   flex-wrap: wrap; gap: var(--space-3);
@@ -970,7 +939,6 @@ a, button, [role="button"], input, select {
   border-radius: var(--radius-full); transition: width 0.3s ease;
 }
 
-/* Horizontal scroll rail */
 .bracket-scroll {
   display: flex;
   gap: var(--space-5);
@@ -985,7 +953,6 @@ a, button, [role="button"], input, select {
 .bracket-scroll::-webkit-scrollbar-track { background: transparent; }
 .bracket-scroll::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: var(--radius-full); }
 
-/* One column per round */
 .bracket-round {
   min-width: 190px;
   max-width: 220px;
@@ -995,7 +962,6 @@ a, button, [role="button"], input, select {
   gap: var(--space-2);
 }
 
-/* Round title */
 .bracket-round-label {
   font-family: var(--font-display);
   font-size: 0.78rem;
@@ -1008,7 +974,6 @@ a, button, [role="button"], input, select {
   white-space: nowrap;
 }
 
-/* Individual matchup card */
 .bracket-match {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -1019,14 +984,12 @@ a, button, [role="button"], input, select {
   flex-direction: column;
 }
 
-/* Thin separator between home and away rows */
 .bracket-divider {
   height: 1px;
   background: var(--color-divider);
   flex-shrink: 0;
 }
 
-/* Team button rows */
 .bracket-team {
   display: block;
   width: 100%;
@@ -1044,14 +1007,9 @@ a, button, [role="button"], input, select {
   transition: background var(--transition-interactive), color var(--transition-interactive);
   line-height: 1.4;
 }
-.bracket-team:not(:disabled):hover {
-  background: var(--color-surface-offset);
-}
-.bracket-team:disabled {
-  cursor: default;
-}
+.bracket-team:not(:disabled):hover { background: var(--color-surface-offset); }
+.bracket-team:disabled { cursor: default; }
 
-/* Selected pick */
 .bracket-team.picked {
   background: var(--color-primary-highlight);
   color: var(--color-primary-active);
@@ -1062,21 +1020,18 @@ a, button, [role="button"], input, select {
   color: var(--color-primary);
 }
 
-/* TBD slot */
 .bracket-team.tbd {
   color: var(--color-text-faint);
   font-style: italic;
   cursor: default;
 }
 
-/* Actual winner after result */
 .bracket-team.actual-winner {
   background: var(--color-success-highlight);
   color: var(--color-success);
   font-weight: 700;
 }
 
-/* Wrong pick */
 .bracket-team.wrong-pick {
   background: var(--color-error-highlight);
   color: var(--color-error);
@@ -1148,7 +1103,6 @@ a, button, [role="button"], input, select {
   vertical-align: middle;
 }
 
-/* Group card title (used in renderGroups / renderPredGroupStandings) */
 .group-title {
   font-family: var(--font-display);
   font-size: 1.05rem;
@@ -1162,19 +1116,15 @@ a, button, [role="button"], input, select {
    PREDICTION RESULT — FINISHED MATCH CARDS
    ============================================================ */
 
-/* Score column layout for finished prediction cards */
 .pred-score-col--finished {
   gap: var(--space-2);
   padding: var(--space-1) 0;
 }
-
-/* Final score — larger and prominent */
 .pred-score-col--finished .score-final {
   font-size: 1.8rem;
   color: var(--color-text);
 }
 
-/* Row showing "Your pick: X – Y" */
 .pred-result-row {
   display: flex;
   align-items: center;
@@ -1183,17 +1133,13 @@ a, button, [role="button"], input, select {
   color: var(--color-text-muted);
   white-space: nowrap;
 }
-.pred-result-label {
-  font-weight: 500;
-  color: var(--color-text-faint);
-}
+.pred-result-label { font-weight: 500; color: var(--color-text-faint); }
 .pred-result-score {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--color-text-muted);
 }
 
-/* Outcome badge */
 .pred-outcome-badge {
   display: inline-flex;
   align-items: center;
@@ -1208,41 +1154,29 @@ a, button, [role="button"], input, select {
   color: var(--color-text-faint);
 }
 
-/* Exact score — gold */
 .pred-outcome--exact .pred-outcome-badge {
   background: var(--color-primary-highlight);
   color: var(--color-primary-active);
 }
-.pred-outcome--exact .pred-result-score {
-  color: var(--color-primary-active);
-}
+.pred-outcome--exact .pred-result-score { color: var(--color-primary-active); }
 [data-theme="dark"] .pred-outcome--exact .pred-outcome-badge {
   background: var(--color-primary-highlight);
   color: var(--color-primary);
 }
-[data-theme="dark"] .pred-outcome--exact .pred-result-score {
-  color: var(--color-primary);
-}
+[data-theme="dark"] .pred-outcome--exact .pred-result-score { color: var(--color-primary); }
 
-/* Correct result — green */
 .pred-outcome--correct .pred-outcome-badge {
   background: var(--color-success-highlight);
   color: var(--color-success);
 }
-.pred-outcome--correct .pred-result-score {
-  color: var(--color-success);
-}
+.pred-outcome--correct .pred-result-score { color: var(--color-success); }
 
-/* Wrong — red */
 .pred-outcome--wrong .pred-outcome-badge {
   background: var(--color-error-highlight);
   color: var(--color-error);
 }
-.pred-outcome--wrong .pred-result-score {
-  color: var(--color-error);
-}
+.pred-outcome--wrong .pred-result-score { color: var(--color-error); }
 
-/* No prediction made */
 .pred-outcome--none .pred-outcome-badge {
   background: var(--color-surface-offset);
   color: var(--color-text-faint);
