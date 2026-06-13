@@ -3,6 +3,7 @@
 # and writes them to Firestore so the web app updates in real time.
 #
 # Schedule: every 5 minutes (GitHub Actions minimum cron interval).
+# Also runs on every push to main (e.g. after a page refresh/deployment).
 #
 # Required GitHub Secret:
 #   FIREBASE_SERVICE_ACCOUNT_JSON   — full JSON of a Firebase service account
@@ -17,6 +18,9 @@ name: Sync Live Scores
 on:
   schedule:
     - cron: '*/5 * * * *'
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       force_reseed:
