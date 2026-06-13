@@ -8,10 +8,9 @@
 #   FIREBASE_SERVICE_ACCOUNT_JSON   — full JSON of a Firebase service account
 #                                     with Firestore read/write permissions
 #
-# No FOOTBALL_DATA_API_KEY needed anymore — ESPN API is public.
-#
-# Manual trigger: use workflow_dispatch with force_reseed=true to delete all
-# existing match docs and re-seed from scratch (e.g. after schema changes).
+# Manual triggers (workflow_dispatch inputs):
+#   force_reseed  — delete all match docs and re-seed from scratch
+#   debug         — dump Firestore docs + ESPN team names, then exit (no writes)
 
 name: Sync Live Scores
 
@@ -21,7 +20,11 @@ on:
   workflow_dispatch:
     inputs:
       force_reseed:
-        description: 'Force delete + reseed all matches from matches.json'
+        description: 'Force delete + reseed all matches from scratch'
+        type: boolean
+        default: false
+      debug:
+        description: 'Debug mode: dump Firestore docs + ESPN names (no writes)'
         type: boolean
         default: false
 
@@ -50,6 +53,14 @@ jobs:
 
       - name: Run live-scores sync
         working-directory: sync
-        run: node live-scores.js ${{ github.event.inputs.force_reseed == 'true' && '--force-reseed' || '' }}
+        run: |
+          ARGS=""
+          if [ "${{ github.event.inputs.force_reseed }}" = "true" ]; then
+            ARGS="$ARGS --force-reseed"
+          fi
+          if [ "${{ github.event.inputs.debug }}" = "true" ]; then
+            ARGS="$ARGS --debug"
+          fi
+          node live-scores.js $ARGS
         env:
           FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
