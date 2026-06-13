@@ -30,6 +30,15 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     'Round of 32', 'Round of 16', 'Quarterfinals', 'Semifinals', 'Final'
   ];
 
+  // ─── Today's date as YYYY-MM-DD (local) ───────────────────────────────────────
+  function getTodayStr() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
   // ─── Best 3rd place team calculation ──────────────────────────────────────────
   function calcBest3rdTeams() {
     const allGroups = buildGroups();
@@ -495,8 +504,12 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     const tabMatches = allTabMatches();
     if (dateEl) {
       const savedDate = dateEl.value;
+      const today = getTodayStr();
+      const todayExists = tabMatches.some(m => m.date === today);
       const dates = [...new Set(tabMatches.map(m => m.date).filter(Boolean))].sort();
-      dateEl.innerHTML = '<option value="all">All Dates</option>' +
+      dateEl.innerHTML =
+        '<option value="all">All Dates</option>' +
+        `<option value="today">📅 Today${todayExists ? '' : ' (no matches)'}</option>` +
         dates.map(d => `<option value="${d}">${formatDateHeader(d)}</option>`).join('');
       if (savedDate && savedDate !== 'all') dateEl.value = savedDate;
     }
@@ -521,8 +534,12 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     const stageEl = document.getElementById('pred-group-filter');
     if (dateEl) {
       const savedDate = dateEl.value;
+      const today = getTodayStr();
+      const todayExists = allPredMatches().some(m => m.date === today);
       const dates = [...new Set(allPredMatches().map(m => m.date).filter(Boolean))].sort();
-      dateEl.innerHTML = '<option value="all">All Dates</option>' +
+      dateEl.innerHTML =
+        '<option value="all">All Dates</option>' +
+        `<option value="today">📅 Today${todayExists ? '' : ' (no matches)'}</option>` +
         dates.map(d => `<option value="${d}">${formatDateHeader(d)}</option>`).join('');
       if (savedDate && savedDate !== 'all') dateEl.value = savedDate;
     }
@@ -612,7 +629,9 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     const venueVal = document.getElementById('match-venue-filter')?.value || 'all';
     const teamVal  = (document.getElementById('match-team-filter')?.value || '').toLowerCase().trim();
     let matches = allTabMatches();
-    if (dateVal  !== 'all') matches = matches.filter(m => m.date === dateVal);
+    // Resolve 'today' to the actual current date string
+    const resolvedDate = dateVal === 'today' ? getTodayStr() : dateVal;
+    if (resolvedDate !== 'all') matches = matches.filter(m => m.date === resolvedDate);
     if (stageVal !== 'all') matches = matches.filter(m => (m.group || m.stage) === stageVal);
     if (venueVal !== 'all') matches = matches.filter(m => m.venue === venueVal);
     if (teamVal)            matches = matches.filter(m =>
@@ -788,7 +807,9 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     const stageVal = document.getElementById('pred-group-filter')?.value || 'all';
     const teamVal  = (document.getElementById('pred-team-filter')?.value || '').toLowerCase().trim();
     let matches = allPredMatches();
-    if (dateVal  !== 'all') matches = matches.filter(m => m.date === dateVal);
+    // Resolve 'today' to the actual current date string
+    const resolvedDate = dateVal === 'today' ? getTodayStr() : dateVal;
+    if (resolvedDate !== 'all') matches = matches.filter(m => m.date === resolvedDate);
     if (stageVal !== 'all') matches = matches.filter(m => (m.group || m.stage) === stageVal);
     if (teamVal)            matches = matches.filter(m =>
       teamName(m.home).toLowerCase().includes(teamVal) || teamName(m.away).toLowerCase().includes(teamVal));
