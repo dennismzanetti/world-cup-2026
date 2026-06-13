@@ -27,6 +27,11 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
   // Flat set of all knockout match IDs (used to distinguish group vs knockout)
   const KNOCKOUT_IDS = new Set(BRACKET_ROUNDS.flatMap(r => r.ids));
 
+  // Ordered list of knockout stage values for sorting (group letters come before these)
+  const KNOCKOUT_STAGE_ORDER = [
+    'Round of 32', 'Round of 16', 'Quarterfinals', 'Semifinals', 'Final'
+  ];
+
   // Helper: get knockout fixture from liveMatches by id
   function getKnockoutFixture(id) {
     return liveMatches.find(m => m.id === id) || null;
@@ -36,8 +41,26 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
   function groupMatches()   { return liveMatches.filter(m => m.group && !KNOCKOUT_IDS.has(m.id)); }
   // All matches for the predictions tab (group + knockout from Firestore)
   function allPredMatches() { return liveMatches.slice(); }
-  // Matches tab shows group stage only
-  function allTabMatches()  { return groupMatches(); }
+  // Matches tab shows ALL matches (group + knockout)
+  function allTabMatches()  { return liveMatches.slice(); }
+
+  // Sort stage keys: group letters (A–L) first, then knockout rounds in order
+  function sortStages(stages) {
+    return stages.sort((a, b) => {
+      const aIsGroup = /^[A-Z]$/.test(a);
+      const bIsGroup = /^[A-Z]$/.test(b);
+      if (aIsGroup && bIsGroup) return a.localeCompare(b);
+      if (aIsGroup) return -1;
+      if (bIsGroup) return 1;
+      // Both knockout — sort by defined round order
+      const ai = KNOCKOUT_STAGE_ORDER.indexOf(a);
+      const bi = KNOCKOUT_STAGE_ORDER.indexOf(b);
+      if (ai === -1 && bi === -1) return a.localeCompare(b);
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+  }
 
   // Canonical "finished" check — Firestore sync writes 'finished'; legacy FT/final also accepted
   function isFinished(m) {
@@ -333,8 +356,8 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     }
     if (stageEl) {
       const savedStage = stageEl.value;
-      // Sort stages so single-letter group IDs (A–L) sort alphabetically
-      const stages = [...new Set(tabMatches.map(m => m.group || m.stage).filter(Boolean))].sort();
+      // Groups (A–L) first, then knockout rounds in tournament order
+      const stages = sortStages([...new Set(tabMatches.map(m => m.group || m.stage).filter(Boolean))]);
       stageEl.innerHTML = '<option value="all">All Matches</option>' +
         stages.map(s => `<option value="${s}">${stageKeyToLabel(s)}</option>`).join('');
       if (savedStage && savedStage !== 'all') stageEl.value = savedStage;
@@ -360,8 +383,8 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     }
     if (stageEl) {
       const savedStage = stageEl.value;
-      // Sort stages so single-letter group IDs (A–L) sort alphabetically
-      const stages = [...new Set(allPredMatches().map(m => m.group || m.stage).filter(Boolean))].sort();
+      // Groups (A–L) first, then knockout rounds in tournament order
+      const stages = sortStages([...new Set(allPredMatches().map(m => m.group || m.stage).filter(Boolean))]);
       stageEl.innerHTML = '<option value="all">All Matches</option>' +
         stages.map(s => `<option value="${s}">${stageKeyToLabel(s)}</option>`).join('');
       if (savedStage && savedStage !== 'all') stageEl.value = savedStage;
