@@ -15,7 +15,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
   let bracketPicks     = {};  // matchId (string) → 'home'|'away'
   let bracketSaveTimer = null;
 
-  // ─── Knockout stage round definitions (IDs must match Firestore doc IDs) ──────
+  // ─── Knockout stage round definitions ──────────────────────────────────────────
   const BRACKET_ROUNDS = [
     { label: 'Round of 32',    stage: 'Round of 32',    ids: ['r32-1','r32-2','r32-3','r32-4','r32-5','r32-6','r32-7','r32-8','r32-9','r32-10','r32-11','r32-12','r32-13','r32-14','r32-15','r32-16'] },
     { label: 'Round of 16',    stage: 'Round of 16',    ids: ['r16-1','r16-2','r16-3','r16-4','r16-5','r16-6','r16-7','r16-8'] },
@@ -75,7 +75,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     }));
   }
 
-  // ─── Team flag lookup ─────────────────────────────────────────────────────────
+  // ─── Team flag lookup ──────────────────────────────────────────────────────────
   const TEAM_FLAGS = {
     'Mexico':               '🇲🇽',
     'South Africa':         '🇿🇦',
@@ -129,10 +129,10 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     'Panama':               '🇵🇦',
   };
 
-  // ─── Admin UIDs ──────────────────────────────────────────────────────────────
+  // ─── Admin UIDs ────────────────────────────────────────────────────────────────
   const ADMIN_UIDS = ['rvR3HclRnhXAOd3rgk7sO0s3F7v1'];
 
-  // ─── Team helpers ──────────────────────────────────────────────────────────
+  // ─── Team helpers ──────────────────────────────────────────────────────────────
   function teamName(t)    { return (t && typeof t === 'object') ? t.name : (t || ''); }
   function teamFlag(t) {
     if (t && typeof t === 'object') return t.flag || TEAM_FLAGS[t.name] || '';
@@ -152,11 +152,11 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     return d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   }
 
-  // ─── Modal helpers ──────────────────────────────────────────────────────────
+  // ─── Modal helpers ────────────────────────────────────────────────────────────
   function openModal()  { document.getElementById('auth-modal')?.removeAttribute('hidden'); document.getElementById('auth-backdrop')?.removeAttribute('hidden'); }
   function closeModal() { document.getElementById('auth-modal')?.setAttribute('hidden', ''); document.getElementById('auth-backdrop')?.setAttribute('hidden', ''); }
 
-  // ─── Sub-tab switching ─────────────────────────────────────────────────────────
+  // ─── Sub-tab switching ────────────────────────────────────────────────────────
   function switchPredSubtab(id) {
     activePredSubtab = id;
     document.querySelectorAll('.sub-tab').forEach(btn => {
@@ -178,7 +178,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     if (id === 'pred-bracket')         renderKnockoutBracket();
   }
 
-  // ─── Main tab switching ─────────────────────────────────────────────────────────
+  // ─── Main tab switching ───────────────────────────────────────────────────────
   function switchTab(id) {
     activeTab = id;
     document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -194,7 +194,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     if (id === 'predictions') switchPredSubtab(activePredSubtab);
   }
 
-  // ─── Auth ───────────────────────────────────────────────────────────────────────────
+  // ─── Auth ─────────────────────────────────────────────────────────────────────
   watchAuth(async user => {
     if (unsubPredictions) { unsubPredictions(); unsubPredictions = null; }
     currentUser  = user;
@@ -234,7 +234,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     }
   }
 
-  // ─── Bracket picks persistence ───────────────────────────────────────────────────
+  // ─── Bracket picks persistence ────────────────────────────────────────────────
   function persistBracketPicks() {
     if (!currentUser) return;
     clearTimeout(bracketSaveTimer);
@@ -299,7 +299,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
   document.getElementById('pred-group-filter')?.addEventListener('change', renderPredictions);
   document.getElementById('pred-team-filter')?.addEventListener('input', renderPredictions);
 
-  // ─── Live match data — sole source of truth from Firestore ───────────────────
+  // ─── Live match data from Firestore ───────────────────────────────────────────
   watchMatches(allMatches => {
     liveMatches = allMatches;
     populateMatchFilters();
@@ -307,7 +307,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     if (authResolved) renderAll();
   });
 
-  // ─── Points calculator ──────────────────────────────────────────────────────────
+  // ─── Points calculator ────────────────────────────────────────────────────────
   function calcPoints(teams, matches) {
     const stats = {};
     teams.forEach(t => { const n = teamName(t); stats[n] = { team: t, played:0, won:0, drawn:0, lost:0, gf:0, ga:0, gd:0, pts:0 }; });
@@ -668,21 +668,18 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     });
   }
 
-  // ─── Prediction Accuracy Tab ──────────────────────────────────────────────────
+  // ─── Prediction Accuracy ─────────────────────────────────────────────────────
   function renderPredStandings() {
     const container  = document.getElementById('pred-standings-container');
     const authPrompt = document.getElementById('pred-standings-auth-prompt');
     if (!container) return;
-
     if (!currentUser) {
       authPrompt?.removeAttribute('hidden');
       container.innerHTML = '';
       return;
     }
     authPrompt?.setAttribute('hidden', '');
-
     const finishedMatches = liveMatches.filter(m => isFinished(m) && m.homeScore != null && m.awayScore != null);
-
     if (!finishedMatches.length) {
       container.innerHTML = `
         <div class="pred-stats-empty">
@@ -692,48 +689,35 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
         </div>`;
       return;
     }
-
     let exact = 0, correct = 0, predicted = 0;
     const total = finishedMatches.length;
-
     finishedMatches.forEach(m => {
       const pred = userPredictions[m.id];
       if (!pred || pred.home === undefined) return;
       predicted++;
-      const ph = pred.home, pa = pred.away;
-      const ah = m.homeScore, aa = m.awayScore;
+      const ph = pred.home, pa = pred.away, ah = m.homeScore, aa = m.awayScore;
       if (ph === ah && pa === aa) { exact++; correct++; }
       else if ((ph > pa && ah > aa) || (ph < pa && ah < aa) || (ph === pa && ah === aa)) correct++;
     });
-
     const pct      = predicted ? Math.round((correct   / predicted) * 100) : 0;
     const exactPct = predicted ? Math.round((exact      / predicted) * 100) : 0;
     const covPct   = total     ? Math.round((predicted / total)      * 100) : 0;
-
-    // SVG ring: r=70, circumference ≈ 439.82
     const R   = 70;
     const C   = +(2 * Math.PI * R).toFixed(2);
     const offset = +(C - (pct / 100) * C).toFixed(2);
-
     container.innerHTML = `
       <div class="pred-stats">
-
-        <!-- Hero: ring + breakdown -->
         <div class="pred-accuracy-hero">
           <div class="accuracy-ring-wrap" aria-label="${pct}% prediction accuracy">
             <svg viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg">
               <circle class="accuracy-ring-track" cx="90" cy="90" r="${R}"/>
-              <circle class="accuracy-ring-fill"
-                cx="90" cy="90" r="${R}"
-                stroke-dasharray="${C}"
-                stroke-dashoffset="${offset}"/>
+              <circle class="accuracy-ring-fill" cx="90" cy="90" r="${R}" stroke-dasharray="${C}" stroke-dashoffset="${offset}"/>
             </svg>
             <div class="accuracy-ring-center">
               <span class="accuracy-pct">${pct}%</span>
               <span class="accuracy-pct-label">Accuracy</span>
             </div>
           </div>
-
           <div class="accuracy-summary">
             <h2 class="accuracy-title">Prediction Accuracy</h2>
             <p class="accuracy-subtitle">${predicted} of ${total} finished match${total !== 1 ? 'es' : ''} predicted</p>
@@ -756,41 +740,24 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
             </div>
           </div>
         </div>
-
-        <!-- Stat cards -->
         <div class="pred-stat-cards">
-          <div class="pred-stat-card">
-            <span class="pred-stat-icon">🎯</span>
-            <span class="pred-stat-val">${exact}</span>
-            <span class="pred-stat-lbl">Exact Scores</span>
-          </div>
-          <div class="pred-stat-card">
-            <span class="pred-stat-icon">✅</span>
-            <span class="pred-stat-val">${correct}</span>
-            <span class="pred-stat-lbl">Correct Results</span>
-          </div>
-          <div class="pred-stat-card">
-            <span class="pred-stat-icon">📋</span>
-            <span class="pred-stat-val">${predicted}</span>
-            <span class="pred-stat-lbl">Matches Predicted</span>
-          </div>
-          <div class="pred-stat-card">
-            <span class="pred-stat-icon">⚽</span>
-            <span class="pred-stat-val">${total}</span>
-            <span class="pred-stat-lbl">Matches Played</span>
-          </div>
+          <div class="pred-stat-card"><span class="pred-stat-icon">🎯</span><span class="pred-stat-val">${exact}</span><span class="pred-stat-lbl">Exact Scores</span></div>
+          <div class="pred-stat-card"><span class="pred-stat-icon">✅</span><span class="pred-stat-val">${correct}</span><span class="pred-stat-lbl">Correct Results</span></div>
+          <div class="pred-stat-card"><span class="pred-stat-icon">📋</span><span class="pred-stat-val">${predicted}</span><span class="pred-stat-lbl">Matches Predicted</span></div>
+          <div class="pred-stat-card"><span class="pred-stat-icon">⚽</span><span class="pred-stat-val">${total}</span><span class="pred-stat-lbl">Matches Played</span></div>
         </div>
-
       </div>`;
   }
 
+  // ─── Slot / resolve helpers ───────────────────────────────────────────────────
   function slotLabel(source) {
-    if (!source) return '?';
-    if (source.type === 'group')   return `${source.pos === 1 ? '1st' : '2nd'} Group ${source.group}`;
+    if (!source) return 'TBD';
+    if (typeof source === 'string') return source;
+    if (source.type === 'group')   return `${source.pos === 1 ? '1st' : '2nd'} Grp ${source.group}`;
     if (source.type === 'best3rd') return `Best 3rd #${source.rank}`;
-    if (source.type === 'winner')  return `Winner R${source.matchId || source.match}`;
-    if (source.type === 'loser')   return `Loser R${source.matchId || source.match}`;
-    return '?';
+    if (source.type === 'winner')  return `W: ${source.matchId || source.match}`;
+    if (source.type === 'loser')   return `L: ${source.matchId || source.match}`;
+    return 'TBD';
   }
 
   function resolveKnockoutTeamForPreds(source) {
@@ -810,46 +777,125 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     return null;
   }
 
+  // ─── Knockout Bracket ─────────────────────────────────────────────────────────
   function renderKnockoutBracket() {
     const container = document.getElementById('pred-bracket-container');
     if (!container) return;
     container.innerHTML = '';
+
+    // Header bar
+    const header = document.createElement('div');
+    header.className = 'bracket-header';
+    const totalSlots = BRACKET_ROUNDS.reduce((n, r) => n + r.ids.length, 0);
+    const picked     = Object.keys(bracketPicks).length;
+    const pct        = totalSlots ? Math.round((picked / totalSlots) * 100) : 0;
+    header.innerHTML = `
+      <div class="bracket-progress">
+        <span>${picked} / ${totalSlots} picks made</span>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <span>${pct}%</span>
+      </div>`;
+    container.appendChild(header);
+
+    if (!currentUser) {
+      const prompt = document.createElement('div');
+      prompt.className = 'auth-prompt';
+      prompt.innerHTML = `<p>Sign in to make your bracket picks.</p>
+        <button class="btn btn-primary bracket-signin-btn">Sign In</button>`;
+      prompt.querySelector('.bracket-signin-btn').addEventListener('click', openModal);
+      container.appendChild(prompt);
+      return;
+    }
+
+    // Scroll rail
+    const rail = document.createElement('div');
+    rail.className = 'bracket-scroll';
+
     BRACKET_ROUNDS.forEach(round => {
-      const section = document.createElement('div');
-      section.className = 'bracket-round';
-      section.innerHTML = `<h3 class="bracket-round-label">${round.label}</h3>`;
-      const grid = document.createElement('div');
-      grid.className = 'bracket-matchups';
+      const col = document.createElement('div');
+      col.className = 'bracket-round';
+
+      const label = document.createElement('div');
+      label.className = 'bracket-round-label';
+      label.textContent = round.label;
+      col.appendChild(label);
+
       round.ids.forEach(matchId => {
         const fixture = getKnockoutFixture(matchId);
-        if (!fixture) return;
-        const hn = currentUser
+
+        // Build display names
+        const homeDisplay = fixture
           ? (resolveKnockoutTeamForPreds(fixture.homeSource) || slotLabel(fixture.homeSource))
-          : slotLabel(fixture.homeSource);
-        const an = currentUser
+          : 'TBD';
+        const awayDisplay = fixture
           ? (resolveKnockoutTeamForPreds(fixture.awaySource) || slotLabel(fixture.awaySource))
-          : slotLabel(fixture.awaySource);
+          : 'TBD';
+
         const pick = bracketPicks[matchId];
-        const matchup = document.createElement('div');
-        matchup.className = 'bracket-matchup';
-        matchup.innerHTML = `
-          <button class="bracket-team ${pick === 'home' ? 'picked' : ''}" data-match="${matchId}" data-side="home">${hn}</button>
-          <span class="bracket-vs">vs</span>
-          <button class="bracket-team ${pick === 'away' ? 'picked' : ''}" data-match="${matchId}" data-side="away">${an}</button>`;
-        matchup.querySelectorAll('.bracket-team').forEach(btn => {
-          btn.addEventListener('click', () => {
-            if (!currentUser) { openModal(); return; }
-            const side = btn.dataset.side;
-            bracketPicks[matchId] = side;
-            persistBracketPicks();
-            matchup.querySelectorAll('.bracket-team').forEach(b => b.classList.remove('picked'));
-            btn.classList.add('picked');
-          });
-        });
-        grid.appendChild(matchup);
+        const finished = fixture ? isFinished(fixture) : false;
+        const actualWinner = finished && fixture
+          ? (fixture.homeScore > fixture.awayScore ? 'home' : fixture.awayScore > fixture.homeScore ? 'away' : null)
+          : null;
+
+        const card = document.createElement('div');
+        card.className = 'bracket-match';
+
+        // Home row
+        const homeBtn = document.createElement('button');
+        homeBtn.className = 'bracket-team' +
+          (pick === 'home' ? ' picked' : '') +
+          (homeDisplay === 'TBD' ? ' tbd' : '') +
+          (actualWinner === 'home' ? ' actual-winner' : '') +
+          (finished && pick === 'home' && actualWinner !== 'home' ? ' wrong-pick' : '');
+        homeBtn.textContent = homeDisplay;
+        homeBtn.setAttribute('aria-pressed', String(pick === 'home'));
+        homeBtn.setAttribute('title', homeDisplay);
+        if (!finished) {
+          homeBtn.addEventListener('click', () => togglePick(matchId, 'home', card));
+        } else {
+          homeBtn.disabled = true;
+        }
+
+        // Divider
+        const divider = document.createElement('div');
+        divider.className = 'bracket-divider';
+        divider.setAttribute('aria-hidden', 'true');
+
+        // Away row
+        const awayBtn = document.createElement('button');
+        awayBtn.className = 'bracket-team' +
+          (pick === 'away' ? ' picked' : '') +
+          (awayDisplay === 'TBD' ? ' tbd' : '') +
+          (actualWinner === 'away' ? ' actual-winner' : '') +
+          (finished && pick === 'away' && actualWinner !== 'away' ? ' wrong-pick' : '');
+        awayBtn.textContent = awayDisplay;
+        awayBtn.setAttribute('aria-pressed', String(pick === 'away'));
+        awayBtn.setAttribute('title', awayDisplay);
+        if (!finished) {
+          awayBtn.addEventListener('click', () => togglePick(matchId, 'away', card));
+        } else {
+          awayBtn.disabled = true;
+        }
+
+        card.appendChild(homeBtn);
+        card.appendChild(divider);
+        card.appendChild(awayBtn);
+        col.appendChild(card);
       });
-      section.appendChild(grid);
-      container.appendChild(section);
+
+      rail.appendChild(col);
+    });
+
+    container.appendChild(rail);
+  }
+
+  function togglePick(matchId, side, card) {
+    if (!currentUser) { openModal(); return; }
+    bracketPicks[matchId] = side;
+    persistBracketPicks();
+    card.querySelectorAll('.bracket-team').forEach(b => {
+      b.classList.toggle('picked', b === (side === 'home' ? card.children[0] : card.children[2]));
+      b.setAttribute('aria-pressed', String(b.classList.contains('picked')));
     });
   }
 
