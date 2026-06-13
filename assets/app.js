@@ -195,6 +195,24 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     return d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   }
 
+  // ─── Parse time string to a sortable number (minutes since midnight) ──────────
+  function parseTimeMins(timeStr) {
+    if (!timeStr) return Infinity;
+    // Handle "HH:MM" or "H:MM AM/PM" or "HH:MM PM" formats
+    const ampm = /(\d{1,2}):(\d{2})\s*(am|pm)/i.exec(timeStr);
+    if (ampm) {
+      let h = parseInt(ampm[1], 10);
+      const min = parseInt(ampm[2], 10);
+      const meridiem = ampm[3].toLowerCase();
+      if (meridiem === 'pm' && h !== 12) h += 12;
+      if (meridiem === 'am' && h === 12) h = 0;
+      return h * 60 + min;
+    }
+    const hm = /(\d{1,2}):(\d{2})/.exec(timeStr);
+    if (hm) return parseInt(hm[1], 10) * 60 + parseInt(hm[2], 10);
+    return Infinity;
+  }
+
   // ─── Modal helpers ────────────────────────────────────────────────────────────
   function openModal()  { document.getElementById('auth-modal')?.removeAttribute('hidden'); document.getElementById('auth-backdrop')?.removeAttribute('hidden'); }
   function closeModal() { document.getElementById('auth-modal')?.setAttribute('hidden', ''); document.getElementById('auth-backdrop')?.setAttribute('hidden', ''); }
@@ -598,11 +616,15 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
   }
 
   function renderByDate(container, matches, isPred) {
+    // Sort by date ascending, then by kick-off time ascending within each date
     const sorted = [...matches].sort((a, b) => {
       const da = a.date || '';
       const db = b.date || '';
-      return da < db ? -1 : da > db ? 1 : 0;
+      if (da < db) return -1;
+      if (da > db) return  1;
+      return parseTimeMins(a.timeLocal) - parseTimeMins(b.timeLocal);
     });
+
     const groups = [], seen = {};
     sorted.forEach(m => {
       const key = m.date || '';
