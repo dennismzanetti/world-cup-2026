@@ -206,10 +206,18 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     });
     const predFilters = document.getElementById('pred-filters');
     if (predFilters) predFilters.hidden = (id !== 'my-picks');
+    // show/hide data toolbar only on my-picks when signed in
+    updateDataToolbarVisibility();
     if (id === 'my-picks')             renderPredictions();
     if (id === 'pred-group-standings') renderPredGroupStandings();
     if (id === 'pred-standings')       renderPredStandings();
     if (id === 'pred-bracket')         renderKnockoutBracket();
+  }
+
+  function updateDataToolbarVisibility() {
+    const toolbar = document.getElementById('data-toolbar');
+    if (!toolbar) return;
+    toolbar.hidden = !(currentUser && activePredSubtab === 'my-picks');
   }
 
   // ─── Main tab switching ───────────────────────────────────────────────────────
@@ -244,6 +252,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       signOutBtn?.removeAttribute('hidden');
       bracketPicks = await getBracketPicks(user.uid);
       renderAll();
+      updateDataToolbarVisibility();
       unsubPredictions = watchUserPredictions(user.uid, preds => {
         userPredictions = preds || {};
         renderAll();
@@ -255,6 +264,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       signOutBtn?.setAttribute('hidden', '');
       userPredictions = {};
       bracketPicks    = {};
+      updateDataToolbarVisibility();
       renderAll();
     }
   });
@@ -278,6 +288,111 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     }, 600);
   }
 
+  // ─── Export / Import (Backup & Restore) ──────────────────────────────────────
+
+  function setToolbarStatus(msg, isError) {
+    const el = document.getElementById('data-toolbar-status');
+    if (!el) return;
+    el.textContent = msg;
+    el.style.color = isError ? 'var(--color-error)' : 'var(--color-success)';
+    if (msg) setTimeout(() => { el.textContent = ''; }, 4000);
+  }
+
+  function handleExport() {
+    if (!currentUser) return;
+    const payload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      uid: currentUser.uid,
+      predictions: userPredictions,
+      bracketPicks: bracketPicks,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const date = new Date().toISOString().slice(0, 10);
+    a.href     = url;
+    a.download = `wc2026-predictions-${date}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setToolbarStatus('Exported ✓');
+  }
+
+  // Pending import data — set when file is chosen, cleared on cancel
+  let pendingImport = null;
+
+  function openImportModal() {
+    document.getElementById('import-modal')?.removeAttribute('hidden');
+    document.getElementById('import-backdrop')?.removeAttribute('hidden');
+  }
+  function closeImportModal() {
+    document.getElementById('import-modal')?.setAttribute('hidden', '');
+    document.getElementById('import-backdrop')?.setAttribute('hidden', '');
+    pendingImport = null;
+    // reset file input so the same file can be picked again
+    const fileInput = document.getElementById('import-file-input');
+    if (fileInput) fileInput.value = '';
+  }
+
+  function handleFileChosen(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (!data.predictions && !data.bracketPicks) {
+          setToolbarStatus('Invalid backup file.', true);
+          return;
+        }
+        // Update the modal description with counts
+        const predCount    = Object.keys(data.predictions  || {}).length;
+        const bracketCount = Object.keys(data.bracketPicks || {}).length;
+        const descEl = document.getElementById('import-modal-desc');
+        if (descEl) {
+          descEl.textContent =
+            `This will restore ${predCount} match prediction${predCount !== 1 ? 's' : ''} and ` +
+            `${bracketCount} bracket pick${bracketCount !== 1 ? 's' : ''} from the backup file ` +
+            `(exported ${data.exportedAt ? new Date(data.exportedAt).toLocaleDateString() : 'unknown date'}). ` +
+            `Your current predictions will be overwritten. This cannot be undone.`;
+        }
+        pendingImport = data;
+        openImportModal();
+      } catch {
+        setToolbarStatus('Could not read file — is it a valid JSON backup?', true);
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  async function confirmImport() {
+    if (!currentUser || !pendingImport) return;
+    closeImportModal();
+    setToolbarStatus('Restoring…');
+    try {
+      const preds   = pendingImport.predictions  || {};
+      const bracket = pendingImport.bracketPicks || {};
+
+      // Save predictions one by one
+      const predEntries = Object.entries(preds);
+      for (const [matchId, { home, away }] of predEntries) {
+        await savePrediction(currentUser.uid, matchId, home, away);
+      }
+
+      // Save bracket picks
+      await saveBracketPicks(currentUser.uid, bracket);
+
+      // Update local state immediately
+      userPredictions = { ...preds };
+      bracketPicks    = { ...bracket };
+      renderAll();
+      setToolbarStatus(`Restored ${predEntries.length} predictions ✓`);
+    } catch (err) {
+      console.warn('[app] import error', err);
+      setToolbarStatus('Restore failed — check console.', true);
+    }
+  }
+
   // ─── Event Listeners ──────────────────────────────────────────────────────────
   document.querySelectorAll('.nav-btn').forEach(btn =>
     btn.addEventListener('click', () => switchTab(btn.dataset.view)));
@@ -289,6 +404,13 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
   document.querySelectorAll('.pred-standings-signin-btn').forEach(btn => btn.addEventListener('click', openModal));
   document.getElementById('auth-close')?.addEventListener('click', closeModal);
   document.getElementById('auth-backdrop')?.addEventListener('click', closeModal);
+
+  // Backup / Restore
+  document.getElementById('export-btn')?.addEventListener('click', handleExport);
+  document.getElementById('import-file-input')?.addEventListener('change', handleFileChosen);
+  document.getElementById('import-confirm-btn')?.addEventListener('click', confirmImport);
+  document.getElementById('import-cancel-btn')?.addEventListener('click', closeImportModal);
+  document.getElementById('import-backdrop')?.addEventListener('click', closeImportModal);
 
   const authForm = document.getElementById('auth-form');
   let authFormMode = 'signin';
@@ -544,7 +666,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       : teamName(m.away);
     const hFlag = isKnockout ? '' : teamFlag(m.home);
     const aFlag = isKnockout ? '' : teamFlag(m.away);
-    const isLocked = finished;
     let statusBadge = '';
     if      (m.status === 'live')  statusBadge = '<span class="status-badge status-live"><span class="live-dot"></span>Live</span>';
     else if (m.status === 'ht')    statusBadge = '<span class="status-badge status-ht">HT</span>';
