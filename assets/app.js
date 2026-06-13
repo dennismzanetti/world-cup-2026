@@ -24,27 +24,20 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     { label: 'Final',          stage: 'Final',          ids: ['final'] },
   ];
 
-  // Flat set of all knockout match IDs (used to distinguish group vs knockout)
   const KNOCKOUT_IDS = new Set(BRACKET_ROUNDS.flatMap(r => r.ids));
 
-  // Ordered list of knockout stage values for sorting (group letters come before these)
   const KNOCKOUT_STAGE_ORDER = [
     'Round of 32', 'Round of 16', 'Quarterfinals', 'Semifinals', 'Final'
   ];
 
-  // Helper: get knockout fixture from liveMatches by id
   function getKnockoutFixture(id) {
     return liveMatches.find(m => m.id === id) || null;
   }
 
-  // Group-stage matches only (have a `group` field and are not knockout IDs)
   function groupMatches()   { return liveMatches.filter(m => m.group && !KNOCKOUT_IDS.has(m.id)); }
-  // All matches for the predictions tab (group + knockout from Firestore)
   function allPredMatches() { return liveMatches.slice(); }
-  // Matches tab shows ALL matches (group + knockout)
   function allTabMatches()  { return liveMatches.slice(); }
 
-  // Sort stage keys: group letters (A–L) first, then knockout rounds in order
   function sortStages(stages) {
     return stages.sort((a, b) => {
       const aIsGroup = /^[A-Z]$/.test(a);
@@ -52,7 +45,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       if (aIsGroup && bIsGroup) return a.localeCompare(b);
       if (aIsGroup) return -1;
       if (bIsGroup) return 1;
-      // Both knockout — sort by defined round order
       const ai = KNOCKOUT_STAGE_ORDER.indexOf(a);
       const bi = KNOCKOUT_STAGE_ORDER.indexOf(b);
       if (ai === -1 && bi === -1) return a.localeCompare(b);
@@ -62,12 +54,10 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     });
   }
 
-  // Canonical "finished" check — Firestore sync writes 'finished'; legacy FT/final also accepted
   function isFinished(m) {
     return m.status === 'finished' || m.status === 'ft' || m.status === 'final';
   }
 
-  // WC_GROUPS is derived dynamically from liveMatches (Firestore)
   function buildGroups() {
     const map = {};
     groupMatches().forEach(m => {
@@ -85,7 +75,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     }));
   }
 
-  // ─── Team flag lookup (client-side, Firestore stores names only) ─────────────
+  // ─── Team flag lookup ─────────────────────────────────────────────────────────
   const TEAM_FLAGS = {
     'Mexico':               '🇲🇽',
     'South Africa':         '🇿🇦',
@@ -356,7 +346,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     }
     if (stageEl) {
       const savedStage = stageEl.value;
-      // Groups (A–L) first, then knockout rounds in tournament order
       const stages = sortStages([...new Set(tabMatches.map(m => m.group || m.stage).filter(Boolean))]);
       stageEl.innerHTML = '<option value="all">All Matches</option>' +
         stages.map(s => `<option value="${s}">${stageKeyToLabel(s)}</option>`).join('');
@@ -383,7 +372,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     }
     if (stageEl) {
       const savedStage = stageEl.value;
-      // Groups (A–L) first, then knockout rounds in tournament order
       const stages = sortStages([...new Set(allPredMatches().map(m => m.group || m.stage).filter(Boolean))]);
       stageEl.innerHTML = '<option value="all">All Matches</option>' +
         stages.map(s => `<option value="${s}">${stageKeyToLabel(s)}</option>`).join('');
@@ -680,37 +668,119 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     });
   }
 
+  // ─── Prediction Accuracy Tab ──────────────────────────────────────────────────
   function renderPredStandings() {
     const container  = document.getElementById('pred-standings-container');
     const authPrompt = document.getElementById('pred-standings-auth-prompt');
     if (!container) return;
+
     if (!currentUser) {
       authPrompt?.removeAttribute('hidden');
       container.innerHTML = '';
       return;
     }
     authPrompt?.setAttribute('hidden', '');
+
     const finishedMatches = liveMatches.filter(m => isFinished(m) && m.homeScore != null && m.awayScore != null);
+
     if (!finishedMatches.length) {
-      container.innerHTML = '<p class="empty-filter-msg">No finished matches yet.</p>';
+      container.innerHTML = `
+        <div class="pred-stats-empty">
+          <div class="pred-stats-empty-icon">⏳</div>
+          <h3>No Results Yet</h3>
+          <p>Your accuracy will appear here once matches have finished.</p>
+        </div>`;
       return;
     }
-    let exact = 0, correct = 0, total = finishedMatches.length;
+
+    let exact = 0, correct = 0, predicted = 0;
+    const total = finishedMatches.length;
+
     finishedMatches.forEach(m => {
       const pred = userPredictions[m.id];
       if (!pred || pred.home === undefined) return;
+      predicted++;
       const ph = pred.home, pa = pred.away;
       const ah = m.homeScore, aa = m.awayScore;
       if (ph === ah && pa === aa) { exact++; correct++; }
       else if ((ph > pa && ah > aa) || (ph < pa && ah < aa) || (ph === pa && ah === aa)) correct++;
     });
-    const pct = total ? Math.round((correct / total) * 100) : 0;
+
+    const pct      = predicted ? Math.round((correct   / predicted) * 100) : 0;
+    const exactPct = predicted ? Math.round((exact      / predicted) * 100) : 0;
+    const covPct   = total     ? Math.round((predicted / total)      * 100) : 0;
+
+    // SVG ring: r=70, circumference ≈ 439.82
+    const R   = 70;
+    const C   = +(2 * Math.PI * R).toFixed(2);
+    const offset = +(C - (pct / 100) * C).toFixed(2);
+
     container.innerHTML = `
       <div class="pred-stats">
-        <div class="pred-stat-card"><span class="pred-stat-val">${exact}</span><span class="pred-stat-lbl">Exact scores</span></div>
-        <div class="pred-stat-card"><span class="pred-stat-val">${correct}</span><span class="pred-stat-lbl">Correct results</span></div>
-        <div class="pred-stat-card"><span class="pred-stat-val">${total}</span><span class="pred-stat-lbl">Matches played</span></div>
-        <div class="pred-stat-card"><span class="pred-stat-val">${pct}%</span><span class="pred-stat-lbl">Accuracy</span></div>
+
+        <!-- Hero: ring + breakdown -->
+        <div class="pred-accuracy-hero">
+          <div class="accuracy-ring-wrap" aria-label="${pct}% prediction accuracy">
+            <svg viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg">
+              <circle class="accuracy-ring-track" cx="90" cy="90" r="${R}"/>
+              <circle class="accuracy-ring-fill"
+                cx="90" cy="90" r="${R}"
+                stroke-dasharray="${C}"
+                stroke-dashoffset="${offset}"/>
+            </svg>
+            <div class="accuracy-ring-center">
+              <span class="accuracy-pct">${pct}%</span>
+              <span class="accuracy-pct-label">Accuracy</span>
+            </div>
+          </div>
+
+          <div class="accuracy-summary">
+            <h2 class="accuracy-title">Prediction Accuracy</h2>
+            <p class="accuracy-subtitle">${predicted} of ${total} finished match${total !== 1 ? 'es' : ''} predicted</p>
+            <div class="accuracy-breakdown">
+              <div class="accuracy-row">
+                <span class="accuracy-row-label">Correct result</span>
+                <div class="accuracy-bar-track"><div class="accuracy-bar-fill" style="width:${pct}%"></div></div>
+                <span class="accuracy-row-val">${pct}%</span>
+              </div>
+              <div class="accuracy-row">
+                <span class="accuracy-row-label">Exact score</span>
+                <div class="accuracy-bar-track"><div class="accuracy-bar-fill bar-exact" style="width:${exactPct}%"></div></div>
+                <span class="accuracy-row-val">${exactPct}%</span>
+              </div>
+              <div class="accuracy-row">
+                <span class="accuracy-row-label">Coverage</span>
+                <div class="accuracy-bar-track"><div class="accuracy-bar-fill" style="width:${covPct}%;opacity:0.55"></div></div>
+                <span class="accuracy-row-val">${covPct}%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stat cards -->
+        <div class="pred-stat-cards">
+          <div class="pred-stat-card">
+            <span class="pred-stat-icon">🎯</span>
+            <span class="pred-stat-val">${exact}</span>
+            <span class="pred-stat-lbl">Exact Scores</span>
+          </div>
+          <div class="pred-stat-card">
+            <span class="pred-stat-icon">✅</span>
+            <span class="pred-stat-val">${correct}</span>
+            <span class="pred-stat-lbl">Correct Results</span>
+          </div>
+          <div class="pred-stat-card">
+            <span class="pred-stat-icon">📋</span>
+            <span class="pred-stat-val">${predicted}</span>
+            <span class="pred-stat-lbl">Matches Predicted</span>
+          </div>
+          <div class="pred-stat-card">
+            <span class="pred-stat-icon">⚽</span>
+            <span class="pred-stat-val">${total}</span>
+            <span class="pred-stat-lbl">Matches Played</span>
+          </div>
+        </div>
+
       </div>`;
   }
 
