@@ -30,6 +30,58 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     'Round of 32', 'Round of 16', 'Quarterfinals', 'Semifinals', 'Final'
   ];
 
+  // ─── Best 3rd place team calculation ──────────────────────────────────────────
+  // 2026 World Cup: 12 groups (A–L), best 8 of 12 third-place teams advance.
+  // Ranking: pts → GD → GF → alphabetical (draws resolved by lots in reality).
+  //
+  // Official FIFA 2026 bracket assignment for best 3rd place teams:
+  // The 8 best 3rd-place teams are ranked 1–8 and placed into specific R32 slots.
+  // Slots that receive best-3rd teams are identified by source.type === 'best3rd'
+  // with source.rank (1 = best, 8 = worst of the qualified third-place teams).
+  //
+  // This function returns an array of 8 team objects sorted best → worst,
+  // each decorated with { ...standingsRow, group }.
+  // It uses the user's group-stage predictions if available, falling back to
+  // actual match scores.
+  function calcBest3rdTeams() {
+    const allGroups = buildGroups();
+    const thirdPlaceTeams = [];
+
+    allGroups.forEach(group => {
+      const gm = groupMatches().filter(m => m.group === group.id);
+      // Apply user's predictions over actual scores
+      const predMatches = gm.map(m => {
+        const pred = userPredictions[m.id];
+        return pred ? { ...m, homeScore: pred.home, awayScore: pred.away } : m;
+      });
+      const standings = calcPoints(group.teams, predMatches);
+      // index 2 = 3rd place
+      if (standings[2]) {
+        thirdPlaceTeams.push({ ...standings[2], group: group.id });
+      }
+    });
+
+    // Rank: pts desc → gd desc → gf desc → team name asc
+    thirdPlaceTeams.sort((a, b) =>
+      b.pts - a.pts ||
+      b.gd  - a.gd  ||
+      b.gf  - a.gf  ||
+      teamName(a.team).localeCompare(teamName(b.team))
+    );
+
+    // Return the best 8 (the number that advance in 2026)
+    return thirdPlaceTeams.slice(0, 8);
+  }
+
+  // Resolve a best-3rd slot to a display name.
+  // source = { type: 'best3rd', rank: 1..8 }  (1 = best 3rd place team)
+  function resolveBest3rd(rank) {
+    const teams = calcBest3rdTeams();
+    const entry = teams[rank - 1]; // rank is 1-indexed
+    if (!entry) return null;
+    return teamDisplay(entry.team);
+  }
+
   function getKnockoutFixture(id) {
     return liveMatches.find(m => m.id === id) || null;
   }
@@ -486,7 +538,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
 
   // ─── Prediction outcome helpers ───────────────────────────────────────────────
   function predOutcome(pred, match) {
-    // Returns 'exact', 'correct', 'wrong', or 'none' (no prediction made)
     if (!pred || pred.home === undefined || pred.away === undefined) return 'none';
     if (match.homeScore == null || match.awayScore == null) return 'none';
     const ph = pred.home, pa = pred.away;
@@ -524,7 +575,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       const aVal = pred.away !== undefined ? pred.away : '';
 
       if (finished && m.homeScore != null) {
-        // ── Finished: show final score + prediction result ──
         const outcome = predOutcome(pred, m);
         const hasPred = outcome !== 'none';
         const outcomeClass = hasPred ? `pred-outcome--${outcome}` : 'pred-outcome--none';
@@ -540,7 +590,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
             <span class="pred-outcome-badge ${outcomeClass}">${outcomeLabel}</span>
           </div>`;
       } else {
-        // ── Not finished: show score inputs ──
         scoreColHtml = `
           <div class="card-score-col">
             <div class="score-inputs-wrap">
@@ -786,19 +835,20 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
   function slotLabel(source) {
     if (!source) return 'TBD';
     if (typeof source === 'string') return source;
-    if (source.type === 'group')   return `${source.pos === 1 ? '1st' : '2nd'} Grp ${source.group}`;
+    if (source.type === 'group')   return `${source.pos === 1 ? '1st' : source.pos === 2 ? '2nd' : '3rd'} Grp ${source.group}`;
     if (source.type === 'best3rd') return `Best 3rd #${source.rank}`;
     if (source.type === 'winner')  return `W: ${source.matchId || source.match}`;
     if (source.type === 'loser')   return `L: ${source.matchId || source.match}`;
     return 'TBD';
   }
 
-  // Recursively resolve a team name for the bracket prediction view.
-  // Handles group-based slots, and winner-of-match slots by following bracketPicks.
+  // ─── Resolve team name for bracket prediction view ────────────────────────────
+  // Handles: group finishers (pos 1/2), best 3rd place (type='best3rd'),
+  // and winner-of-match sources by following bracketPicks recursively.
   function resolveKnockoutTeamForPreds(source) {
     if (!source || typeof source === 'string') return null;
 
-    // ── Group finisher (1st / 2nd place from a group) ────────────────────────
+    // ── 1st or 2nd place from a group ────────────────────────────────────────
     if (source.type === 'group') {
       const gm     = groupMatches().filter(m => m.group === source.group);
       const groups = buildGroups();
@@ -810,6 +860,14 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       }));
       const team = standings[source.pos - 1]?.team;
       return team ? teamDisplay(team) : null;
+    }
+
+    // ── Best 3rd place team by rank (1 = best, 8 = 8th best) ─────────────────
+    // source = { type: 'best3rd', rank: 1..8 }
+    // The user's group-stage predictions determine which teams finish 3rd in
+    // each group and how they rank against each other.
+    if (source.type === 'best3rd') {
+      return resolveBest3rd(source.rank);
     }
 
     // ── Winner of a previous knockout match ──────────────────────────────────
@@ -832,7 +890,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       if (!pick) return null; // not yet picked — slot stays TBD
 
       const pickedSource = pick === 'home' ? fixture.homeSource : fixture.awaySource;
-      // Recursively resolve the picked team (may itself be a winner/group source)
       return resolveKnockoutTeamForPreds(pickedSource)
         || (pick === 'home' ? teamDisplay(fixture.home) : teamDisplay(fixture.away))
         || null;
@@ -842,6 +899,26 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
   }
 
   // ─── Knockout Bracket ─────────────────────────────────────────────────────────
+  // Renders a panel above the bracket showing the ranked best-3rd-place teams
+  // so the user can see which teams will fill those slots.
+  function renderBest3rdPanel(container) {
+    const teams = calcBest3rdTeams();
+    if (!teams.length) return;
+
+    const panel = document.createElement('div');
+    panel.className = 'best3rd-panel';
+    panel.innerHTML = `
+      <div class="best3rd-header">
+        <span class="best3rd-title">🏅 Best 3rd Place Teams (from your predictions)</span>
+        <span class="best3rd-subtitle">Top 8 of 12 third-place teams advance to the Round of 32</span>
+      </div>
+      <div class="best3rd-list">
+        ${teams.map((t, i) => `
+          <div class="best3rd-item ${i < 8 ? 'advancing' : 'eliminated'}">\n            <span class="best3rd-rank">${i + 1}</span>\n            <span class="best3rd-team">${teamDisplay(t.team)}</span>\n            <span class="best3rd-group">Grp ${t.group}</span>\n            <span class="best3rd-stat">${t.pts} pts</span>\n            <span class="best3rd-stat">${t.gd >= 0 ? '+' : ''}${t.gd} GD</span>\n            <span class="best3rd-stat">${t.gf} GF</span>\n          </div>`).join('')}
+      </div>`;
+    container.appendChild(panel);
+  }
+
   function renderKnockoutBracket() {
     const container = document.getElementById('pred-bracket-container');
     if (!container) return;
@@ -871,6 +948,9 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       return;
     }
 
+    // Best 3rd place panel — shows which teams fill the "best 3rd" slots
+    renderBest3rdPanel(container);
+
     // Scroll rail
     const rail = document.createElement('div');
     rail.className = 'bracket-scroll';
@@ -887,7 +967,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       round.ids.forEach(matchId => {
         const fixture = getKnockoutFixture(matchId);
 
-        // Build display names — resolved from picks chain
         const homeDisplay = fixture
           ? (resolveKnockoutTeamForPreds(fixture.homeSource) || slotLabel(fixture.homeSource))
           : 'TBD';
@@ -904,11 +983,10 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
         const card = document.createElement('div');
         card.className = 'bracket-match';
 
-        // Home row
         const homeBtn = document.createElement('button');
         homeBtn.className = 'bracket-team' +
           (pick === 'home' ? ' picked' : '') +
-          (homeDisplay === 'TBD' ? ' tbd' : '') +
+          (homeDisplay === 'TBD' || homeDisplay.startsWith('Best 3rd') ? ' tbd' : '') +
           (actualWinner === 'home' ? ' actual-winner' : '') +
           (finished && pick === 'home' && actualWinner !== 'home' ? ' wrong-pick' : '');
         homeBtn.textContent = homeDisplay;
@@ -920,16 +998,14 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
           homeBtn.disabled = true;
         }
 
-        // Divider
         const divider = document.createElement('div');
         divider.className = 'bracket-divider';
         divider.setAttribute('aria-hidden', 'true');
 
-        // Away row
         const awayBtn = document.createElement('button');
         awayBtn.className = 'bracket-team' +
           (pick === 'away' ? ' picked' : '') +
-          (awayDisplay === 'TBD' ? ' tbd' : '') +
+          (awayDisplay === 'TBD' || awayDisplay.startsWith('Best 3rd') ? ' tbd' : '') +
           (actualWinner === 'away' ? ' actual-winner' : '') +
           (finished && pick === 'away' && actualWinner !== 'away' ? ' wrong-pick' : '');
         awayBtn.textContent = awayDisplay;
@@ -953,7 +1029,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     container.appendChild(rail);
   }
 
-  // Re-render the full bracket on every pick so downstream slots update immediately
   function togglePick(matchId, side) {
     if (!currentUser) { openModal(); return; }
     bracketPicks[matchId] = side;
