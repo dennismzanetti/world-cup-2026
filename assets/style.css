@@ -242,29 +242,10 @@ a, button, [role="button"], input, select {
 #auth-btn:hover { background: var(--color-primary-hover); }
 #sign-out-btn { font-size: var(--text-xs); }
 
+/* ============================================================
+   MOBILE HEADER — tabs always on screen, never scroll off
+   ============================================================ */
 @media (max-width: 600px) {
-  .main-nav {
-    order: 3;
-    flex: none;
-    width: 100%;
-    height: 2.5rem;
-    border-top: 1px solid rgba(255,255,255,0.1);
-    /* No overflow: auto — let tabs fill and shrink to fit */
-    overflow: visible;
-  }
-  .nav-btn {
-    /* Each tab takes equal share; shrink text to fit */
-    flex: 1;
-    min-width: 0;
-    justify-content: center;
-    padding: 0 var(--space-1);
-    font-size: 0.78rem;
-    letter-spacing: 0.03em;
-    height: 2.5rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
   .site-header {
     display: flex;
     flex-wrap: wrap;
@@ -274,8 +255,37 @@ a, button, [role="button"], input, select {
     flex: 1 1 100%;
     padding: 0 var(--space-3);
     gap: var(--space-2);
+    height: 3rem;
   }
   .brand-name { display: none; }
+
+  /* Nav row sits below the header-inner row, full width */
+  .main-nav {
+    order: 3;
+    flex: none;
+    width: 100%;
+    height: auto;
+    /* Grid: 3 equal columns, one per tab — guaranteed to fit */
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border-top: 1px solid rgba(255,255,255,0.1);
+    overflow: visible;
+  }
+  .nav-btn {
+    flex: unset;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 2.5rem;
+    padding: 0 var(--space-1);
+    font-size: 0.78rem;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
   .main-content { padding-top: var(--space-4); }
   .container { padding: 0 var(--space-3); }
   .card-teams { grid-template-columns: 1fr var(--score-col-w) 1fr; padding: var(--space-2) var(--space-3); align-items: center; }
@@ -851,40 +861,80 @@ a, button, [role="button"], input, select {
    PREDICTIONS SUB-TABS
    ============================================================ */
 
+/* Desktop: normal single-row flex tab bar */
 .sub-tabs {
   display: flex;
-  flex-wrap: wrap;           /* wrap to next line if needed instead of scrolling */
-  gap: 0;
+  gap: var(--space-1);
   border-bottom: 2px solid var(--color-divider);
   margin-bottom: var(--space-4);
-  /* No overflow: auto — no horizontal scroll */
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.sub-tabs::-webkit-scrollbar { display: none; }
 .sub-tab {
-  /* Allow shrinking to fit all tabs on screen */
-  flex: 1 1 auto;
-  min-width: 0;
+  flex-shrink: 0;
   background: none; border: none; cursor: pointer;
   font-size: var(--text-sm); font-weight: 600;
   color: var(--color-text-muted);
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-4);
   border-bottom: 2px solid transparent;
   margin-bottom: -2px;
   transition: color 0.15s, border-color 0.15s;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-align: center;
 }
 .sub-tab:hover { color: var(--color-text); }
 .sub-tab.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
 .sub-tab-panel { display: none; }
 .sub-tab-panel.active { display: block; }
 
-/* On very narrow screens, sub-tabs that can't share a line each get their own row */
-@media (max-width: 480px) {
+/*
+  Mobile sub-tabs: switch to a 2×2 grid so all 4 tabs always fit on screen.
+  Each cell is a bordered tile; active tab gets gold text + bottom border.
+  No scrolling, no overflow.
+*/
+@media (max-width: 600px) {
+  .sub-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    overflow: visible;
+    border-bottom: none;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-4);
+    background: var(--color-surface);
+  }
   .sub-tab {
-    font-size: var(--text-xs);
+    flex-shrink: unset;
     padding: var(--space-2) var(--space-2);
+    font-size: 0.72rem;
+    letter-spacing: 0.01em;
+    white-space: normal;
+    line-height: 1.25;
+    text-align: center;
+    border: none;
+    border-bottom: none;
+    margin-bottom: 0;
+    border-right: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
+    /* Remove right border on even items (right column) */
+  }
+  /* Right column: no right border */
+  .sub-tab:nth-child(even) {
+    border-right: none;
+  }
+  /* Bottom row: no bottom border */
+  .sub-tab:nth-last-child(-n+2) {
+    border-bottom: none;
+  }
+  .sub-tab.active {
+    background: var(--color-primary-highlight);
+    color: var(--color-primary-active);
+    border-bottom-color: transparent;
+  }
+  [data-theme="dark"] .sub-tab.active {
+    background: var(--color-primary-highlight);
+    color: var(--color-primary);
   }
 }
 
@@ -926,7 +976,6 @@ a, button, [role="button"], input, select {
   gap: var(--space-5);
   overflow-x: auto;
   padding-bottom: var(--space-4);
-  /* smooth scroll on touch */
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   scrollbar-color: var(--color-border) transparent;
