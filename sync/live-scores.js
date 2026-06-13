@@ -8,7 +8,7 @@
 //
 // Usage:
 //   node live-scores.js           # normal sync
-//   node live-scores.js --debug   # dump first 20 match docs + today's ESPN events, then exit
+//   node live-scores.js --debug   # dump Firestore docs + today's ESPN events, then exit
 
 import fetch from 'node-fetch';
 import { initializeApp, cert } from 'firebase-admin/app';
@@ -118,7 +118,6 @@ async function runDebug() {
   console.log('DEBUG MODE — dumping Firestore match docs');
   console.log('════════════════════════════════════════════════════\n');
 
-  // Dump all docs sorted by date (limit 30 so we see the first few match days)
   const snap = await db.collection('matches').orderBy('date').limit(30).get();
   console.log(`Total docs returned (limit 30): ${snap.size}\n`);
 
@@ -131,7 +130,6 @@ async function runDebug() {
     console.log('  ───');
   }
 
-  // Also show what ESPN returns for today so we can compare team name strings
   console.log('\n════════════════════════════════════════════════════');
   console.log("DEBUG MODE — today's ESPN scoreboard (raw team names)");
   console.log('════════════════════════════════════════════════════\n');
@@ -146,19 +144,15 @@ async function runDebug() {
     const hc = comp?.competitors?.find(c => c.homeAway === 'home');
     const ac = comp?.competitors?.find(c => c.homeAway === 'away');
     console.log(`  espnId : ${ev.id}`);
-    console.log(`  ESPN home (raw)       : "${hc?.team?.displayName}"  → normalised: "${normalise(hc?.team?.displayName)}"`);
-    console.log(`  ESPN away (raw)       : "${ac?.team?.displayName}"  → normalised: "${normalise(ac?.team?.displayName)}"`);
+    console.log(`  ESPN home (raw)  : "${hc?.team?.displayName}"  → normalised: "${normalise(hc?.team?.displayName)}"`);
+    console.log(`  ESPN away (raw)  : "${ac?.team?.displayName}"  → normalised: "${normalise(ac?.team?.displayName)}"`);
     console.log('  ───');
   }
 
-  console.log('\nDebug complete. Compare docId/home/away above to espnId/normalised names to identify the mismatch.');
+  console.log('\nDebug complete. Compare docId/home/away above to ESPN normalised names to identify any mismatch.');
 }
 
 // ─── Find Firestore doc for an ESPN event ─────────────────────────────────────
-// Strategy 1: espnId field lookup (set at seed time).
-// Strategy 2: home+away field query, both orderings.
-// Strategy 3: full collection scan — compares normalised home/away to every doc.
-//             Slow but self-healing; also patches espnId onto the doc it finds.
 async function findMatchDoc(espnEventId, home, away) {
   // Strategy 1: direct espnId lookup
   const byId = await db.collection('matches')
@@ -198,15 +192,14 @@ async function findMatchDoc(espnEventId, home, away) {
     ) {
       const flipped = normH !== home;
       console.log(`     ✓ Scan found: docId="${d.id}"  stored home="${f.home}" away="${f.away}" (flipped=${flipped})`);
-      // Patch espnId so future lookups use Strategy 1
       await d.ref.update({ espnId: espnEventId });
       console.log(`     ✓ Patched espnId=${espnEventId} onto ${d.id}`);
       return { docRef: d.ref, docData: f, flipped };
     }
   }
 
-  // Still nothing — log every doc's home/away so we can see the mismatch
-  console.warn(`     ✗ Full scan also found nothing. Stored home/away values for group-stage docs:`);
+  // Still nothing — dump all docs so we can see the mismatch
+  console.warn(`     ✗ Full scan also found nothing. All group-stage docs:`);
   for (const d of allSnap.docs) {
     const f = d.data();
     if (f.home && f.away) {
@@ -341,7 +334,7 @@ if (DEBUG) {
       if (!sumRes.ok) { console.warn(`  Summary error ${sumRes.status} for event ${event.id}`); continue; }
       const sumData = await sumRes.json();
       const comp    = sumData.header?.competitions?.[0];
-      if (!comp) { console.warn('  No competition found in summary.'); continue; }\
+      if (!comp) { console.warn('  No competition found in summary.'); continue; }
       const syntheticEvent = { id: event.id, competitions: [comp] };
       const didUpdate = await updateMatchFromEvent(syntheticEvent);
       if (didUpdate) updated++;
