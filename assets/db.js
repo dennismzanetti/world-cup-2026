@@ -2,17 +2,13 @@
 import { db } from './firebase.js';
 import {
   collection, doc, setDoc, getDoc, getDocs,
-  onSnapshot, serverTimestamp
+  onSnapshot, serverTimestamp, writeBatch
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // ============================================================
 // MATCHES (live / admin-controlled)
 // ============================================================
 
-/**
- * Watch all matches in Firestore and call cb(matches) on any change.
- * Sorting is handled client-side in app.js.
- */
 export function watchMatches(cb) {
   return onSnapshot(collection(db, 'matches'), snap => {
     if (snap.empty) { cb([]); return; }
@@ -24,9 +20,6 @@ export function watchMatches(cb) {
   });
 }
 
-/**
- * Admin: update a match score.
- */
 export async function updateMatchResult(matchId, { homeScore, awayScore }) {
   const ref = doc(db, 'matches', String(matchId));
   await setDoc(ref, {
@@ -37,16 +30,6 @@ export async function updateMatchResult(matchId, { homeScore, awayScore }) {
   }, { merge: true });
 }
 
-/**
- * Seed (or overwrite) a set of knockout fixture stubs into the matches collection.
- * Each fixture is written as a separate doc using its id field as the document ID.
- * Uses setDoc with merge:false so that existing result data is preserved only
- * when the caller explicitly passes merge:true.
- *
- * @param {Array<Object>} fixtures  - Array of fixture objects; each must have an `id` field.
- * @param {boolean}       [merge=true] - If true, merges with existing doc (preserves scores).
- *                                       If false, overwrites entirely.
- */
 export async function seedKnockoutMatches(fixtures, merge = true) {
   const results = { ok: 0, err: 0 };
   for (const fixture of fixtures) {
@@ -71,9 +54,6 @@ export async function seedKnockoutMatches(fixtures, merge = true) {
 // USER PREDICTIONS
 // ============================================================
 
-/**
- * Save a single match prediction for a user.
- */
 export async function savePrediction(uid, matchId, home, away) {
   const ref = doc(db, 'users', uid, 'predictions', String(matchId));
   await setDoc(ref, {
@@ -83,11 +63,6 @@ export async function savePrediction(uid, matchId, home, away) {
   }, { merge: true });
 }
 
-/**
- * Watch all predictions for a user in real-time.
- * Calls cb({ matchId: { home, away } }) on every change.
- * Returns an unsubscribe function.
- */
 export function watchUserPredictions(uid, cb) {
   return onSnapshot(collection(db, 'users', uid, 'predictions'), snap => {
     const result = {};
@@ -100,22 +75,14 @@ export function watchUserPredictions(uid, cb) {
 }
 
 // ============================================================
-// BRACKET PICKS (Firestore — no localStorage)
+// BRACKET PICKS
 // ============================================================
 
-/**
- * Save bracket picks object for a user.
- * picks = { 'r32-1': 'home', 'r32-2': 'away', ... }
- */
 export async function saveBracketPicks(uid, picks) {
   const ref = doc(db, 'users', uid, 'bracket', 'picks');
   await setDoc(ref, { ...picks, savedAt: serverTimestamp() }, { merge: true });
 }
 
-/**
- * Load bracket picks for a user (one-time fetch).
- * Returns { matchId: 'home'|'away', ... }
- */
 export async function getBracketPicks(uid) {
   const ref  = doc(db, 'users', uid, 'bracket', 'picks');
   const snap = await getDoc(ref);
@@ -123,4 +90,43 @@ export async function getBracketPicks(uid) {
   const data = snap.data();
   delete data.savedAt;
   return data;
+}
+
+// ============================================================
+// IMPORT: bulk-restore predictions + bracket picks
+// ============================================================
+
+/**
+ * Restore a user's predictions and bracket picks from a backup object.
+ * predictions: { matchId: { home, away } }
+ * bracketPicks: { matchId: 'home'|'away' }
+ * Uses batched writes (max 500 ops per batch).
+ */
+export async function importUserData(uid, { predictions = {}, bracketPicks = {} }) {
+  const BATCH_LIMIT = 499;
+  let batch = writeBatch(db);
+  let ops = 0;
+
+  const flush = async () => { await batch.commit(); batch = writeBatch(db); ops = 0; };
+
+  // Write predictions
+  for (const [matchId, val] of Object.entries(predictions)) {
+    if (val.home === undefined || val.away === undefined) continue;
+    const ref = doc(db, 'users', uid, 'predictions', String(matchId));
+    batch.set(ref, { home: Number(val.home), away: Number(val.away), savedAt: serverTimestamp() }, { merge: true });
+    if (++ops >= BATCH_LIMIT) await flush();
+  }
+
+  // Write bracket picks
+  const cleanPicks = {};
+  for (const [matchId, side] of Object.entries(bracketPicks)) {
+    if (side === 'home' || side === 'away') cleanPicks[matchId] = side;
+  }
+  if (Object.keys(cleanPicks).length) {
+    const ref = doc(db, 'users', uid, 'bracket', 'picks');
+    batch.set(ref, { ...cleanPicks, savedAt: serverTimestamp() }, { merge: true });
+    ops++;
+  }
+
+  if (ops > 0) await batch.commit();
 }

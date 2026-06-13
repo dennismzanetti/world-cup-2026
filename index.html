@@ -34,6 +34,17 @@
     </p>
   </div>
 
+  <!-- Import confirm modal -->
+  <div id="import-backdrop" class="modal-backdrop" hidden></div>
+  <div id="import-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="import-modal-title" hidden>
+    <h2 id="import-modal-title" class="modal-heading">Restore Predictions?</h2>
+    <p class="modal-sub" id="import-modal-desc">This will overwrite your current predictions and bracket picks with the backup file. This cannot be undone.</p>
+    <div class="modal-actions">
+      <button id="import-confirm-btn" class="btn btn-primary">Yes, Restore</button>
+      <button id="import-cancel-btn" class="btn btn-ghost">Cancel</button>
+    </div>
+  </div>
+
   <!-- Header -->
   <header class="site-header">
     <div class="header-inner">
@@ -132,6 +143,22 @@
             <p>Sign in to save and track your predictions across devices.</p>
             <button class="btn btn-primary" id="predict-signin-btn">Sign In to Predict</button>
           </div>
+
+          <!-- Export / Import toolbar (only visible when signed in) -->
+          <div id="data-toolbar" class="data-toolbar" hidden>
+            <span class="data-toolbar-label">Backup</span>
+            <button id="export-btn" class="btn btn-ghost btn-sm">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 2v8M5 7l3 3 3-3"/><path d="M2 11v1a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-1"/></svg>
+              Export
+            </button>
+            <label class="btn btn-ghost btn-sm import-label" for="import-file-input">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 10V2M5 5l3-3 3 3"/><path d="M2 11v1a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-1"/></svg>
+              Import
+            </label>
+            <input id="import-file-input" type="file" accept=".json" class="sr-only" />
+            <span id="data-toolbar-status" class="data-toolbar-status" aria-live="polite"></span>
+          </div>
+
           <div class="matches-filter" id="pred-filters" hidden>
             <label for="pred-date-filter">Date:</label>
             <select id="pred-date-filter">
@@ -179,6 +206,7 @@
     <span id="build-badge">Loading build&hellip;</span>
   </footer>
 
+  <!-- Hidden import file input handler -->
   <script type="module" src="assets/version.js"></script>
   <script type="module" src="assets/app.js"></script>
 </body>
