@@ -880,6 +880,7 @@ a, button, [role="button"], input, select {
    BRACKET
    ============================================================ */
 
+/* Progress header */
 .bracket-header {
   display: flex; align-items: center; justify-content: space-between;
   flex-wrap: wrap; gap: var(--space-3);
@@ -888,58 +889,133 @@ a, button, [role="button"], input, select {
   background: var(--color-surface); border: 1px solid var(--color-border);
   border-radius: var(--radius-lg); box-shadow: var(--shadow-sm);
 }
-.bracket-progress { display: flex; align-items: center; gap: var(--space-3); font-size: var(--text-sm); color: var(--color-text-muted); }
-.progress-bar { width: 120px; height: 6px; background: var(--color-surface-offset); border-radius: var(--radius-full); overflow: hidden; }
-.progress-fill { height: 100%; background: var(--color-primary); border-radius: var(--radius-full); transition: width 0.3s ease; }
-.bracket-actions { display: flex; gap: var(--space-2); }
+.bracket-progress {
+  display: flex; align-items: center; gap: var(--space-3);
+  font-size: var(--text-sm); color: var(--color-text-muted);
+}
+.progress-bar {
+  width: 120px; height: 6px;
+  background: var(--color-surface-offset); border-radius: var(--radius-full); overflow: hidden;
+}
+.progress-fill {
+  height: 100%; background: var(--color-primary);
+  border-radius: var(--radius-full); transition: width 0.3s ease;
+}
 
+/* Horizontal scroll rail */
 .bracket-scroll {
-  display: flex; gap: var(--space-4);
-  overflow-x: auto; padding-bottom: var(--space-4);
-  scrollbar-width: thin; scrollbar-color: var(--color-border) transparent;
+  display: flex;
+  gap: var(--space-5);
+  overflow-x: auto;
+  padding-bottom: var(--space-4);
+  /* smooth scroll on touch */
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+  align-items: flex-start;
 }
-.bracket-round { min-width: 180px; flex-shrink: 0; }
+.bracket-scroll::-webkit-scrollbar { height: 6px; }
+.bracket-scroll::-webkit-scrollbar-track { background: transparent; }
+.bracket-scroll::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: var(--radius-full); }
+
+/* One column per round */
+.bracket-round {
+  min-width: 190px;
+  max-width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Round title */
 .bracket-round-label {
-  font-family: var(--font-display); font-size: 0.85rem; letter-spacing: 0.06em;
-  color: var(--color-text-muted); text-transform: uppercase;
-  margin-bottom: var(--space-3);
-  display: flex; align-items: center; justify-content: space-between;
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  padding-bottom: var(--space-2);
+  border-bottom: 2px solid var(--color-divider);
+  margin-bottom: var(--space-1);
+  white-space: nowrap;
 }
+
+/* Individual matchup card */
 .bracket-match {
-  background: var(--color-surface); border: 1px solid var(--color-border);
-  border-radius: var(--radius-md); overflow: hidden; margin-bottom: var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
   box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
 }
+
+/* Thin separator between home and away rows */
+.bracket-divider {
+  height: 1px;
+  background: var(--color-divider);
+  flex-shrink: 0;
+}
+
+/* Team button rows */
 .bracket-team {
-  padding: var(--space-2) var(--space-3); font-size: var(--text-sm); font-weight: 500;
-  cursor: pointer; border-bottom: 1px solid var(--color-divider);
-  transition: background var(--transition-interactive);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.bracket-team:last-child { border-bottom: none; }
-.bracket-team:hover { background: var(--color-surface-offset); }
-.bracket-team.picked { background: var(--color-primary-highlight); color: var(--color-primary-active); font-weight: 700; }
-[data-theme="dark"] .bracket-team.picked { color: var(--color-primary); }
-.bracket-team.tbd { color: var(--color-text-faint); font-style: italic; }
-
-.bracket-vs {
   display: block;
-  text-align: center;
-  font-size: var(--text-xs);
-  color: var(--color-text-faint);
-  padding: var(--space-1) 0;
+  width: 100%;
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background var(--transition-interactive), color var(--transition-interactive);
+  line-height: 1.4;
+}
+.bracket-team:not(:disabled):hover {
+  background: var(--color-surface-offset);
+}
+.bracket-team:disabled {
+  cursor: default;
 }
 
-.bracket-champion { min-width: 160px; }
-.champion-card {
-  background: var(--color-surface); border: 2px solid var(--color-primary);
-  border-radius: var(--radius-lg); padding: var(--space-4);
-  text-align: center; font-size: var(--text-base); font-weight: 700;
-  box-shadow: var(--shadow-md);
-  display: flex; flex-direction: column; align-items: center; gap: var(--space-2);
+/* Selected pick */
+.bracket-team.picked {
+  background: var(--color-primary-highlight);
+  color: var(--color-primary-active);
+  font-weight: 700;
 }
-.trophy { font-size: 2rem; }
-.muted { color: var(--color-text-faint); font-weight: 400; }
+[data-theme="dark"] .bracket-team.picked {
+  background: var(--color-primary-highlight);
+  color: var(--color-primary);
+}
+
+/* TBD slot */
+.bracket-team.tbd {
+  color: var(--color-text-faint);
+  font-style: italic;
+  cursor: default;
+}
+
+/* Actual winner after result */
+.bracket-team.actual-winner {
+  background: var(--color-success-highlight);
+  color: var(--color-success);
+  font-weight: 700;
+}
+
+/* Wrong pick */
+.bracket-team.wrong-pick {
+  background: var(--color-error-highlight);
+  color: var(--color-error);
+  text-decoration: line-through;
+  font-weight: 400;
+}
 
 /* ============================================================
    FOOTER
@@ -1003,4 +1079,14 @@ a, button, [role="button"], input, select {
   background: var(--color-surface-offset); color: var(--color-text-faint);
   border: 1px solid var(--color-divider);
   vertical-align: middle;
+}
+
+/* Group card title (used in renderGroups / renderPredGroupStandings) */
+.group-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  letter-spacing: 0.06em;
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-accent);
+  color: var(--color-text-inverse);
 }
