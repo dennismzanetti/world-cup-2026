@@ -20,7 +20,7 @@
   --space-8:  2rem;    --space-10: 2.5rem;  --space-12: 3rem;
   --space-16: 4rem;
 
-  --header-h: 5.5rem;   /* total sticky height on mobile (3rem top + 2.5rem nav) */
+  --header-h: 5.5rem;
   --footer-h: 2rem;
   --score-col-w: 9rem;
 
@@ -183,8 +183,6 @@ a, button, [role="button"], input, select {
 
 /* ============================================================
    LAYOUT — HEADER
-   Desktop: single row  [brand] [nav] [actions]
-   Mobile:  two rows    [brand + actions] / [nav tabs full-width]
    ============================================================ */
 
 .site-header {
@@ -193,7 +191,6 @@ a, button, [role="button"], input, select {
   box-shadow: var(--shadow-md);
 }
 
-/* ── Top row (brand + actions) ── */
 .header-inner {
   max-width: var(--content-default);
   margin: 0 auto;
@@ -206,7 +203,6 @@ a, button, [role="button"], input, select {
   gap: var(--space-4);
 }
 
-/* Brand */
 .header-brand {
   display: flex; align-items: center; gap: var(--space-2);
   color: var(--color-text-inverse); text-decoration: none; flex-shrink: 0;
@@ -214,13 +210,11 @@ a, button, [role="button"], input, select {
 .brand-logo { color: var(--color-primary); width: 28px; height: 28px; }
 .brand-name { font-family: var(--font-display); font-size: 1.4rem; letter-spacing: 0.04em; color: var(--color-text-inverse); }
 
-/* ── Nav tabs (desktop: inside header-inner, flex:1) ── */
 .main-nav {
   display: flex; align-items: stretch;
   gap: 0;
   flex: 1;
   height: 3rem;
-  /* no overflow-x on desktop — tabs fit fine */
 }
 .nav-btn {
   flex-shrink: 0;
@@ -235,7 +229,6 @@ a, button, [role="button"], input, select {
 .nav-btn:hover { color: #fff; }
 .nav-btn.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
 
-/* Header right-side controls */
 .header-actions {
   display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0;
 }
@@ -249,44 +242,35 @@ a, button, [role="button"], input, select {
 #auth-btn:hover { background: var(--color-primary-hover); }
 #sign-out-btn { font-size: var(--text-xs); }
 
-/* ── Mobile: two-row header ── */
 @media (max-width: 600px) {
-  /* Pull nav out of the top row and stretch it below */
   .main-nav {
-    order: 3;                        /* rendered after header-inner children */
+    order: 3;
     flex: none;
     width: 100%;
     height: 2.5rem;
     border-top: 1px solid rgba(255,255,255,0.1);
-    overflow-x: auto;                /* scroll if tabs overflow — no clipping */
-    scrollbar-width: none;           /* hide scrollbar Firefox */
+    overflow-x: auto;
+    scrollbar-width: none;
   }
-  .main-nav::-webkit-scrollbar { display: none; } /* hide scrollbar Chrome/Safari */
-
-  /* Each tab takes equal share; min-width prevents excessive squishing */
+  .main-nav::-webkit-scrollbar { display: none; }
   .nav-btn {
     flex: 1;
-    min-width: 5.5rem;               /* ensures "Predictions" never wraps */
+    min-width: 5.5rem;
     justify-content: center;
     padding: 0 var(--space-2);
     font-size: 0.82rem;
     height: 2.5rem;
   }
-
-  /* Make site-header a flex column so the nav row wraps below */
   .site-header {
     display: flex;
     flex-wrap: wrap;
     align-items: stretch;
   }
-
-  /* Top row stays full-width */
   .header-inner {
     flex: 1 1 100%;
     padding: 0 var(--space-3);
     gap: var(--space-2);
   }
-
   .brand-name { display: none; }
   .main-content { padding-top: var(--space-4); }
   .container { padding: 0 var(--space-3); }
@@ -296,6 +280,10 @@ a, button, [role="button"], input, select {
   .bracket-round { min-width: 150px; }
   .bracket-header { flex-direction: column; align-items: flex-start; }
   #pred-group-standings-container { grid-template-columns: 1fr; }
+  .pred-accuracy-hero { flex-direction: column; }
+  .accuracy-ring-wrap { width: 140px; height: 140px; }
+  .accuracy-ring-wrap svg { width: 140px; height: 140px; }
+  .accuracy-pct { font-size: 2.4rem; }
 }
 
 /* ============================================================
@@ -317,9 +305,7 @@ a, button, [role="button"], input, select {
    PAGE HEADER
    ============================================================ */
 
-.page-header {
-  margin-bottom: var(--space-6);
-}
+.page-header { margin-bottom: var(--space-6); }
 .page-title {
   font-family: var(--font-display); font-size: var(--text-xl);
   letter-spacing: 0.04em; color: var(--color-text); line-height: 1.1;
@@ -369,7 +355,6 @@ a, button, [role="button"], input, select {
   display: flex; flex-direction: column; gap: var(--space-3);
 }
 
-/* ── Date grouping ── */
 .date-group-header {
   font-size: var(--text-xs);
   font-weight: 700;
@@ -407,8 +392,6 @@ a, button, [role="button"], input, select {
 .card-header-group { font-weight: 600; color: var(--color-accent); text-transform: uppercase; letter-spacing: 0.05em; }
 [data-theme="dark"] .card-header-group { color: var(--color-accent-hover); }
 
-/* 3-column grid: [home team] [score] [away team]
-   align-items: center puts all three on the same vertical midline */
 .card-teams {
   display: grid;
   grid-template-columns: 1fr var(--score-col-w) 1fr;
@@ -425,13 +408,11 @@ a, button, [role="button"], input, select {
   font-size: var(--text-base);
 }
 
-/* Home team: [flag] [name] — pushed to the RIGHT (toward score col) */
 .home-team {
   justify-content: flex-end;
   flex-direction: row-reverse;
 }
 
-/* Away team: [name] [flag] — pushed to the RIGHT edge of the card */
 .away-team {
   justify-content: flex-end;
   flex-direction: row;
@@ -496,15 +477,8 @@ a, button, [role="button"], input, select {
 .card-meta-item { display: flex; align-items: center; gap: var(--space-1); }
 .meta-icon { width: 12px; height: 12px; flex-shrink: 0; }
 
-/* ── Broadcaster chips ── */
-.card-meta-broadcast {
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-.card-meta-broadcast .card-meta-item {
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
+.card-meta-broadcast { gap: var(--space-2); flex-wrap: wrap; }
+.card-meta-broadcast .card-meta-item { gap: var(--space-2); flex-wrap: wrap; }
 
 .broadcaster-chip {
   display: inline-flex; align-items: center;
@@ -514,17 +488,6 @@ a, button, [role="button"], input, select {
   background: var(--color-tv-bg); color: var(--color-tv-text);
   white-space: nowrap;
 }
-
-/* Spanish-language broadcasters (Telemundo, TUDN, Univision) */
-.broadcaster-chip:is(
-  [data-net="Telemundo"],
-  [data-net="TUDN"],
-  [data-net="Univision"]
-) {
-  background: var(--color-esp-bg); color: var(--color-esp-text);
-}
-
-/* Streaming-specific chip */
 .broadcaster-chip--stream {
   background: var(--color-stream-bg); color: var(--color-stream-text);
 }
@@ -606,7 +569,7 @@ a, button, [role="button"], input, select {
   border-bottom: 1px solid var(--color-divider); color: var(--color-text);
 }
 .standings-table td:first-child { text-align: left; font-weight: 500; }
-.standings-table tr.qualify td:first-child {
+.standings-table tr.advancing td:first-child {
   border-left: 3px solid var(--color-success);
   padding-left: calc(var(--space-3) - 3px);
 }
@@ -621,11 +584,190 @@ a, button, [role="button"], input, select {
   padding-top: var(--space-2);
 }
 
-/* ---- PREDICTION STATS ---- */
-.pred-stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(180px,100%),1fr)); gap: var(--space-4); margin-bottom: var(--space-6); }
-.pred-stat-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-5) var(--space-4); text-align: center; box-shadow: var(--shadow-sm); }
-.pred-stat-value { font-family: var(--font-display); font-size: 2rem; color: var(--color-primary); line-height: 1.1; }
-.pred-stat-label { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: var(--space-1); text-transform: uppercase; letter-spacing: 0.04em; }
+/* ============================================================
+   PREDICTION ACCURACY TAB
+   ============================================================ */
+
+/* Outer wrapper */
+.pred-stats {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding-top: var(--space-2);
+}
+
+/* Hero section: ring + right-side summary */
+.pred-accuracy-hero {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-8) var(--space-10);
+}
+
+/* SVG ring container */
+.accuracy-ring-wrap {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  flex-shrink: 0;
+}
+.accuracy-ring-wrap svg {
+  width: 180px;
+  height: 180px;
+  transform: rotate(-90deg);
+}
+.accuracy-ring-track {
+  fill: none;
+  stroke: var(--color-surface-offset);
+  stroke-width: 12;
+}
+.accuracy-ring-fill {
+  fill: none;
+  stroke: var(--color-primary);
+  stroke-width: 12;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.accuracy-ring-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.accuracy-pct {
+  font-family: var(--font-display);
+  font-size: 3rem;
+  line-height: 1;
+  color: var(--color-primary);
+  letter-spacing: 0.02em;
+}
+.accuracy-pct-label {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: var(--space-1);
+}
+
+/* Right-side summary text */
+.accuracy-summary {
+  flex: 1;
+}
+.accuracy-title {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  letter-spacing: 0.04em;
+  color: var(--color-text);
+  line-height: 1.1;
+  margin-bottom: var(--space-2);
+}
+.accuracy-subtitle {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-6);
+}
+.accuracy-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.accuracy-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.accuracy-row-label {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  width: 130px;
+  flex-shrink: 0;
+}
+.accuracy-bar-track {
+  flex: 1;
+  height: 8px;
+  background: var(--color-surface-offset);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+.accuracy-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  transition: width 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.accuracy-bar-fill.bar-exact {
+  background: var(--color-success);
+}
+.accuracy-row-val {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  color: var(--color-text);
+  width: 2.5rem;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* Stat cards grid */
+.pred-stat-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr));
+  gap: var(--space-4);
+}
+.pred-stat-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition-interactive), transform var(--transition-interactive);
+}
+.pred-stat-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+.pred-stat-icon {
+  font-size: 1.4rem;
+  margin-bottom: var(--space-1);
+}
+.pred-stat-val {
+  font-family: var(--font-display);
+  font-size: 2.2rem;
+  letter-spacing: 0.04em;
+  color: var(--color-primary);
+  line-height: 1;
+}
+.pred-stat-lbl {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* No-data empty state for standings tab */
+.pred-stats-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--space-16) var(--space-8);
+  color: var(--color-text-muted);
+  gap: var(--space-3);
+}
+.pred-stats-empty-icon { font-size: 3rem; }
+.pred-stats-empty h3 { color: var(--color-text); font-family: var(--font-display); font-size: var(--text-lg); letter-spacing: 0.04em; }
+.pred-stats-empty p { max-width: 32ch; font-size: var(--text-sm); }
 
 /* ============================================================
    AUTH MODAL
@@ -675,9 +817,7 @@ a, button, [role="button"], input, select {
 .modal-sub { font-size: var(--text-sm); color: var(--color-text-muted); }
 .auth-error { font-size: var(--text-sm); color: var(--color-error); min-height: 1.2em; }
 
-#auth-form {
-  display: flex; flex-direction: column; gap: var(--space-3);
-}
+#auth-form { display: flex; flex-direction: column; gap: var(--space-3); }
 #auth-form label {
   font-size: var(--text-sm); font-weight: 600; color: var(--color-text);
   display: block; margin-bottom: var(--space-1);
@@ -780,8 +920,15 @@ a, button, [role="button"], input, select {
 .bracket-team:hover { background: var(--color-surface-offset); }
 .bracket-team.picked { background: var(--color-primary-highlight); color: var(--color-primary-active); font-weight: 700; }
 [data-theme="dark"] .bracket-team.picked { color: var(--color-primary); }
-/* TBD slots are visually muted */
 .bracket-team.tbd { color: var(--color-text-faint); font-style: italic; }
+
+.bracket-vs {
+  display: block;
+  text-align: center;
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+  padding: var(--space-1) 0;
+}
 
 .bracket-champion { min-width: 160px; }
 .champion-card {
@@ -833,7 +980,6 @@ a, button, [role="button"], input, select {
 .font-display { font-family: var(--font-display); }
 .tabular-nums { font-variant-numeric: tabular-nums; }
 
-/* ── Loading / skeleton ── */
 @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
 .skeleton {
   background: linear-gradient(90deg,var(--color-surface-offset) 25%,var(--color-surface-2) 50%,var(--color-surface-offset) 75%);
@@ -841,7 +987,6 @@ a, button, [role="button"], input, select {
   border-radius: var(--radius-sm);
 }
 
-/* ── Empty state ── */
 .empty-state {
   display: flex; flex-direction: column; align-items: center; text-align: center;
   padding: var(--space-16) var(--space-8); color: var(--color-text-muted);
@@ -850,7 +995,6 @@ a, button, [role="button"], input, select {
 .empty-state h3 { color: var(--color-text); margin-bottom: var(--space-2); }
 .empty-state p { max-width: 36ch; margin-bottom: var(--space-6); }
 
-/* ── Version badge ── */
 .version-badge {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 1px var(--space-2);
