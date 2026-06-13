@@ -484,6 +484,19 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     return parts.length ? `<div class="card-meta card-meta-broadcast">${parts.join('')}</div>` : '';
   }
 
+  // ─── Prediction outcome helpers ───────────────────────────────────────────────
+  function predOutcome(pred, match) {
+    // Returns 'exact', 'correct', 'wrong', or 'none' (no prediction made)
+    if (!pred || pred.home === undefined || pred.away === undefined) return 'none';
+    if (match.homeScore == null || match.awayScore == null) return 'none';
+    const ph = pred.home, pa = pred.away;
+    const ah = match.homeScore, aa = match.awayScore;
+    if (ph === ah && pa === aa) return 'exact';
+    const predResult = ph > pa ? 'H' : ph < pa ? 'A' : 'D';
+    const actualResult = ah > aa ? 'H' : ah < aa ? 'A' : 'D';
+    return predResult === actualResult ? 'correct' : 'wrong';
+  }
+
   function buildMatchCard(m, isPred) {
     const card     = document.createElement('div');
     const finished = isFinished(m);
@@ -509,18 +522,38 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       const pred = userPredictions[m.id] || {};
       const hVal = pred.home !== undefined ? pred.home : '';
       const aVal = pred.away !== undefined ? pred.away : '';
-      scoreColHtml = `
-        <div class="card-score-col">
-          <div class="score-inputs-wrap">
-            <input type="number" class="score-input" min="0" max="99" data-match="${m.id}" data-side="home" value="${hVal}" aria-label="${hn} predicted score"${isLocked ? ' disabled' : ''}>
-            <span class="score-sep">–</span>
-            <input type="number" class="score-input" min="0" max="99" data-match="${m.id}" data-side="away" value="${aVal}" aria-label="${an} predicted score"${isLocked ? ' disabled' : ''}>
-          </div>
-          ${!isLocked ? `<button class="btn-save pred-btn save-pred-btn" data-match="${m.id}">Save</button>` : ''}
-          <span class="pred-saving" hidden>Saving…</span>
-          <span class="pred-saved"  hidden>Saved ✓</span>
-          <span class="pred-error"  hidden></span>
-        </div>`;
+
+      if (finished && m.homeScore != null) {
+        // ── Finished: show final score + prediction result ──
+        const outcome = predOutcome(pred, m);
+        const hasPred = outcome !== 'none';
+        const outcomeClass = hasPred ? `pred-outcome--${outcome}` : 'pred-outcome--none';
+        const outcomeLabel = { exact: '🎯 Exact!', correct: '✅ Correct result', wrong: '❌ Wrong', none: 'No prediction' }[outcome];
+
+        scoreColHtml = `
+          <div class="card-score-col pred-score-col--finished">
+            <span class="score-final">${m.homeScore} – ${m.awayScore}</span>
+            <div class="pred-result-row ${outcomeClass}">
+              <span class="pred-result-label">Your pick:</span>
+              <span class="pred-result-score">${hasPred ? `${hVal} – ${aVal}` : '—'}</span>
+            </div>
+            <span class="pred-outcome-badge ${outcomeClass}">${outcomeLabel}</span>
+          </div>`;
+      } else {
+        // ── Not finished: show score inputs ──
+        scoreColHtml = `
+          <div class="card-score-col">
+            <div class="score-inputs-wrap">
+              <input type="number" class="score-input" min="0" max="99" data-match="${m.id}" data-side="home" value="${hVal}" aria-label="${hn} predicted score">
+              <span class="score-sep">–</span>
+              <input type="number" class="score-input" min="0" max="99" data-match="${m.id}" data-side="away" value="${aVal}" aria-label="${an} predicted score">
+            </div>
+            <button class="btn-save pred-btn save-pred-btn" data-match="${m.id}">Save</button>
+            <span class="pred-saving" hidden>Saving…</span>
+            <span class="pred-saved"  hidden>Saved ✓</span>
+            <span class="pred-error"  hidden></span>
+          </div>`;
+      }
     } else {
       const hs  = m.homeScore != null ? m.homeScore : '–';
       const as_ = m.awayScore != null ? m.awayScore : '–';
@@ -552,7 +585,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       </div>` : ''}
       ${buildBroadcastRow(m)}`;
 
-    if (isPred && currentUser) {
+    if (isPred && currentUser && !finished) {
       card.querySelector('.save-pred-btn')?.addEventListener('click', async () => {
         const savingEl = card.querySelector('.pred-saving');
         const savedEl  = card.querySelector('.pred-saved');
