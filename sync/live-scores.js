@@ -2,12 +2,19 @@
 // Fetches live World Cup 2026 scores from ESPN and updates Firestore match docs.
 // Primary lookup: espnId field (set at seed time) — direct, unambiguous.
 // Fallback: home+away field query (both orderings).
+// Last resort: full collection scan (logs what it finds so we can diagnose mismatches).
 // No API key needed.
 // Requires: FIREBASE_SERVICE_ACCOUNT_JSON (GitHub Secret)
+//
+// Usage:
+//   node live-scores.js           # normal sync
+//   node live-scores.js --debug   # dump first 20 match docs + today's ESPN events, then exit
 
 import fetch from 'node-fetch';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+
+const DEBUG = process.argv.includes('--debug');
 
 // ─── Firebase Admin Init ──────────────────────────────────────────────────────
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
@@ -105,10 +112,53 @@ function parseMinute(statusObj) {
   return isNaN(mins) || mins === 0 ? null : mins;
 }
 
+// ─── DEBUG: dump Firestore docs + today's ESPN events ────────────────────────
+async function runDebug() {
+  console.log('\n════════════════════════════════════════════════════');
+  console.log('DEBUG MODE — dumping Firestore match docs');
+  console.log('════════════════════════════════════════════════════\n');
+
+  // Dump all docs sorted by date (limit 30 so we see the first few match days)
+  const snap = await db.collection('matches').orderBy('date').limit(30).get();
+  console.log(`Total docs returned (limit 30): ${snap.size}\n`);
+
+  for (const d of snap.docs) {
+    const f = d.data();
+    console.log(`  docId  : ${d.id}`);
+    console.log(`  home   : "${f.home}"   away: "${f.away}"`);
+    console.log(`  date   : ${f.date}   status: ${f.status}`);
+    console.log(`  espnId : ${f.espnId ?? '(null)'}`);
+    console.log('  ───');
+  }
+
+  // Also show what ESPN returns for today so we can compare team name strings
+  console.log('\n════════════════════════════════════════════════════');
+  console.log("DEBUG MODE — today's ESPN scoreboard (raw team names)");
+  console.log('════════════════════════════════════════════════════\n');
+
+  const sbRes = await fetch(SCOREBOARD_URL, { headers: HEADERS });
+  if (!sbRes.ok) { console.error(`Scoreboard fetch failed: ${sbRes.status}`); return; }
+  const sbData = await sbRes.json();
+  const events = sbData.events ?? [];
+  console.log(`ESPN returned ${events.length} event(s):\n`);
+  for (const ev of events) {
+    const comp = ev.competitions?.[0];
+    const hc = comp?.competitors?.find(c => c.homeAway === 'home');
+    const ac = comp?.competitors?.find(c => c.homeAway === 'away');
+    console.log(`  espnId : ${ev.id}`);
+    console.log(`  ESPN home (raw)       : "${hc?.team?.displayName}"  → normalised: "${normalise(hc?.team?.displayName)}"`);
+    console.log(`  ESPN away (raw)       : "${ac?.team?.displayName}"  → normalised: "${normalise(ac?.team?.displayName)}"`);
+    console.log('  ───');
+  }
+
+  console.log('\nDebug complete. Compare docId/home/away above to espnId/normalised names to identify the mismatch.');
+}
+
 // ─── Find Firestore doc for an ESPN event ─────────────────────────────────────
-// Strategy 1 (preferred): look up by espnId field — set at seed time.
-// Strategy 2 (fallback):  field query home+away in both orderings.
-// Returns { docRef, docData, flipped } or null.
+// Strategy 1: espnId field lookup (set at seed time).
+// Strategy 2: home+away field query, both orderings.
+// Strategy 3: full collection scan — compares normalised home/away to every doc.
+//             Slow but self-healing; also patches espnId onto the doc it finds.
 async function findMatchDoc(espnEventId, home, away) {
   // Strategy 1: direct espnId lookup
   const byId = await db.collection('matches')
@@ -118,13 +168,10 @@ async function findMatchDoc(espnEventId, home, away) {
   if (!byId.empty) {
     const d = byId.docs[0];
     const data = d.data();
-    const flipped = data.home !== home; // ESPN home differs from stored home
-    return { docRef: d.ref, docData: data, flipped };
+    return { docRef: d.ref, docData: data, flipped: data.home !== home };
   }
 
-  console.log(`     (espnId ${espnEventId} not found — falling back to name query)`);
-
-  // Strategy 2: name-based query, both orderings
+  // Strategy 2: exact name query, both orderings
   for (const [h, a] of [[home, away], [away, home]]) {
     const snap = await db.collection('matches')
       .where('home', '==', h)
@@ -133,8 +180,37 @@ async function findMatchDoc(espnEventId, home, away) {
       .get();
     if (!snap.empty) {
       const d = snap.docs[0];
-      const flipped = h !== home;
-      return { docRef: d.ref, docData: d.data(), flipped };
+      return { docRef: d.ref, docData: d.data(), flipped: h !== home };
+    }
+  }
+
+  // Strategy 3: full scan — normalise stored home/away and compare
+  console.log(`     ⚙ Strategies 1+2 failed for "${home} vs ${away}" — running full collection scan…`);
+  const allSnap = await db.collection('matches').get();
+  for (const d of allSnap.docs) {
+    const f = d.data();
+    if (!f.home || !f.away) continue;
+    const normH = normalise(f.home);
+    const normA = normalise(f.away);
+    if (
+      (normH === home && normA === away) ||
+      (normH === away && normA === home)
+    ) {
+      const flipped = normH !== home;
+      console.log(`     ✓ Scan found: docId="${d.id}"  stored home="${f.home}" away="${f.away}" (flipped=${flipped})`);
+      // Patch espnId so future lookups use Strategy 1
+      await d.ref.update({ espnId: espnEventId });
+      console.log(`     ✓ Patched espnId=${espnEventId} onto ${d.id}`);
+      return { docRef: d.ref, docData: f, flipped };
+    }
+  }
+
+  // Still nothing — log every doc's home/away so we can see the mismatch
+  console.warn(`     ✗ Full scan also found nothing. Stored home/away values for group-stage docs:`);
+  for (const d of allSnap.docs) {
+    const f = d.data();
+    if (f.home && f.away) {
+      console.warn(`       docId="${d.id}"  home="${f.home}"  away="${f.away}"  espnId=${f.espnId ?? 'null'}`);
     }
   }
 
@@ -143,7 +219,7 @@ async function findMatchDoc(espnEventId, home, away) {
 
 // ─── Update a single Firestore match from an ESPN competition object ──────────
 async function updateMatchFromEvent(event) {
-  const comp    = event.competitions?.[0] ?? event; // summary uses comp directly
+  const comp    = event.competitions?.[0] ?? event;
   const eventId = event.id ?? comp.id;
 
   const homeComp = comp.competitors?.find(c => c.homeAway === 'home');
@@ -184,11 +260,9 @@ async function updateMatchFromEvent(event) {
     minute,
     updatedAt: FieldValue.serverTimestamp(),
   };
-  // Persist espnId if it wasn't already set (pre-reseed docs)
   if (!docData.espnId) update.espnId = eventId;
 
   await docRef.update(update);
-
   console.log(`  ✓ Updated: ${docData.home} ${finalHomeScore}–${finalAwayScore} ${docData.away}  [${status}${minute ? ` ${minute}'` : ''}]`);
   return true;
 }
@@ -229,7 +303,6 @@ async function backfillPastMatches() {
       const sumRes = await fetch(SUMMARY_URL(event.id), { headers: HEADERS });
       if (!sumRes.ok) { console.warn(`  Summary error ${sumRes.status} for event ${event.id}`); continue; }
       const sumData = await sumRes.json();
-      // Attach event.id to the competition object for lookup
       const comp = sumData.header?.competitions?.[0];
       if (!comp) continue;
       const syntheticEvent = { id: event.id, competitions: [comp] };
@@ -241,37 +314,41 @@ async function backfillPastMatches() {
   console.log(`  Backfill done — ${backfilled} document(s) updated.`);
 }
 
-// ─── Main sync ────────────────────────────────────────────────────────────────
-async function syncScores() {
-  console.log(`[${new Date().toISOString()}] Starting live-scores sync…`);
+// ─── Main ─────────────────────────────────────────────────────────────────────
+if (DEBUG) {
+  runDebug().catch(err => { console.error('Debug failed:', err); process.exit(1); });
+} else {
+  async function syncScores() {
+    console.log(`[${new Date().toISOString()}] Starting live-scores sync…`);
 
-  await backfillPastMatches();
+    await backfillPastMatches();
 
-  console.log("  Fetching today's scoreboard from ESPN…");
-  const sbRes = await fetch(SCOREBOARD_URL, { headers: HEADERS });
-  if (!sbRes.ok) { console.error(`Scoreboard fetch failed: ${sbRes.status}`); process.exit(1); }
+    console.log("  Fetching today's scoreboard from ESPN…");
+    const sbRes = await fetch(SCOREBOARD_URL, { headers: HEADERS });
+    if (!sbRes.ok) { console.error(`Scoreboard fetch failed: ${sbRes.status}`); process.exit(1); }
 
-  const sbData = await sbRes.json();
-  const events = sbData.events ?? [];
-  console.log(`  Scoreboard returned ${events.length} event(s).`);
+    const sbData = await sbRes.json();
+    const events = sbData.events ?? [];
+    console.log(`  Scoreboard returned ${events.length} event(s).`);
 
-  if (!events.length) { console.log('  No matches today.'); return; }
+    if (!events.length) { console.log('  No matches today.'); return; }
 
-  let updated = 0;
+    let updated = 0;
 
-  for (const event of events) {
-    console.log(`  Fetching summary for event ${event.id} (${event.name})…`);
-    const sumRes = await fetch(SUMMARY_URL(event.id), { headers: HEADERS });
-    if (!sumRes.ok) { console.warn(`  Summary error ${sumRes.status} for event ${event.id}`); continue; }
-    const sumData = await sumRes.json();
-    const comp    = sumData.header?.competitions?.[0];
-    if (!comp) { console.warn('  No competition found in summary.'); continue; }
-    const syntheticEvent = { id: event.id, competitions: [comp] };
-    const didUpdate = await updateMatchFromEvent(syntheticEvent);
-    if (didUpdate) updated++;
+    for (const event of events) {
+      console.log(`  Fetching summary for event ${event.id} (${event.name})…`);
+      const sumRes = await fetch(SUMMARY_URL(event.id), { headers: HEADERS });
+      if (!sumRes.ok) { console.warn(`  Summary error ${sumRes.status} for event ${event.id}`); continue; }
+      const sumData = await sumRes.json();
+      const comp    = sumData.header?.competitions?.[0];
+      if (!comp) { console.warn('  No competition found in summary.'); continue; }\
+      const syntheticEvent = { id: event.id, competitions: [comp] };
+      const didUpdate = await updateMatchFromEvent(syntheticEvent);
+      if (didUpdate) updated++;
+    }
+
+    console.log(`  Done — ${updated} document(s) updated.`);
   }
 
-  console.log(`  Done — ${updated} document(s) updated.`);
+  syncScores().catch(err => { console.error('Sync failed:', err); process.exit(1); });
 }
-
-syncScores().catch(err => { console.error('Sync failed:', err); process.exit(1); });
