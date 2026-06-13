@@ -249,17 +249,21 @@ a, button, [role="button"], input, select {
     width: 100%;
     height: 2.5rem;
     border-top: 1px solid rgba(255,255,255,0.1);
-    overflow-x: auto;
-    scrollbar-width: none;
+    /* No overflow: auto — let tabs fill and shrink to fit */
+    overflow: visible;
   }
-  .main-nav::-webkit-scrollbar { display: none; }
   .nav-btn {
+    /* Each tab takes equal share; shrink text to fit */
     flex: 1;
-    min-width: 5.5rem;
+    min-width: 0;
     justify-content: center;
-    padding: 0 var(--space-2);
-    font-size: 0.82rem;
+    padding: 0 var(--space-1);
+    font-size: 0.78rem;
+    letter-spacing: 0.03em;
     height: 2.5rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .site-header {
     display: flex;
@@ -276,7 +280,6 @@ a, button, [role="button"], input, select {
   .container { padding: 0 var(--space-3); }
   .card-teams { grid-template-columns: 1fr var(--score-col-w) 1fr; padding: var(--space-2) var(--space-3); align-items: center; }
   .standings-grid, .groups-grid { grid-template-columns: 1fr; }
-  .sub-tab { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); }
   .bracket-round { min-width: 150px; }
   .bracket-header { flex-direction: column; align-items: flex-start; }
   #pred-group-standings-container { grid-template-columns: 1fr; }
@@ -849,26 +852,41 @@ a, button, [role="button"], input, select {
    ============================================================ */
 
 .sub-tabs {
-  display: flex; gap: var(--space-1);
+  display: flex;
+  flex-wrap: wrap;           /* wrap to next line if needed instead of scrolling */
+  gap: 0;
   border-bottom: 2px solid var(--color-divider);
   margin-bottom: var(--space-4);
-  overflow-x: auto; scrollbar-width: none;
+  /* No overflow: auto — no horizontal scroll */
 }
-.sub-tabs::-webkit-scrollbar { display: none; }
 .sub-tab {
-  flex-shrink: 0;
+  /* Allow shrinking to fit all tabs on screen */
+  flex: 1 1 auto;
+  min-width: 0;
   background: none; border: none; cursor: pointer;
   font-size: var(--text-sm); font-weight: 600;
   color: var(--color-text-muted);
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-3);
   border-bottom: 2px solid transparent;
   margin-bottom: -2px;
   transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
 }
 .sub-tab:hover { color: var(--color-text); }
 .sub-tab.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
 .sub-tab-panel { display: none; }
 .sub-tab-panel.active { display: block; }
+
+/* On very narrow screens, sub-tabs that can't share a line each get their own row */
+@media (max-width: 480px) {
+  .sub-tab {
+    font-size: var(--text-xs);
+    padding: var(--space-2) var(--space-2);
+  }
+}
 
 .auth-prompt {
   text-align: center; padding: var(--space-12) var(--space-8);
