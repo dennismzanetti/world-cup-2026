@@ -39,6 +39,11 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
   // Matches tab shows group stage only
   function allTabMatches()  { return groupMatches(); }
 
+  // FIX 3: canonical "finished" check — Firestore sync writes 'finished'; legacy FT/final also accepted
+  function isFinished(m) {
+    return m.status === 'finished' || m.status === 'ft' || m.status === 'final';
+  }
+
   // WC_GROUPS is derived dynamically from liveMatches (Firestore)
   function buildGroups() {
     const map = {};
@@ -115,8 +120,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
   const ADMIN_UIDS = ['rvR3HclRnhXAOd3rgk7sO0s3F7v1'];
 
   // ─── Team helpers ──────────────────────────────────────────────────────────
-  // Firestore stores team names as plain strings; objects are accepted too for
-  // backwards-compat and knockout fixture stubs.
   function teamName(t)    { return (t && typeof t === 'object') ? t.name : (t || ''); }
   function teamFlag(t) {
     if (t && typeof t === 'object') return t.flag || TEAM_FLAGS[t.name] || '';
@@ -285,9 +288,10 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
 
   // ─── Live match data — sole source of truth from Firestore ───────────────────
   watchMatches(allMatches => {
-    // Replace liveMatches entirely from Firestore; doc.id IS the canonical match ID.
     liveMatches = allMatches;
+    // FIX 1 & 2: populate ALL filter dropdowns once when data arrives (not inside render)
     populateMatchFilters();
+    populatePredFilters();
     if (authResolved) renderAll();
   });
 
@@ -316,40 +320,53 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     return { R32:'Round of 32', R16:'Round of 16', QF:'Quarter-Finals', SF:'Semi-Finals', '3P':'Third Place', F:'Final' }[key] || key;
   };
 
+  // FIX 1: Matches tab stage filter built from allTabMatches() (group-stage only), not allPredMatches()
   function populateMatchFilters() {
     const dateEl  = document.getElementById('match-date-filter');
     const stageEl = document.getElementById('match-group-filter');
     const venueEl = document.getElementById('match-venue-filter');
-    const allMatches = allPredMatches();
+    const tabMatches = allTabMatches();
     if (dateEl) {
-      const dates = [...new Set(allTabMatches().map(m => m.date).filter(Boolean))].sort();
+      const savedDate = dateEl.value;
+      const dates = [...new Set(tabMatches.map(m => m.date).filter(Boolean))].sort();
       dateEl.innerHTML = '<option value="all">All Dates</option>' +
         dates.map(d => `<option value="${d}">${formatDateHeader(d)}</option>`).join('');
+      if (savedDate && savedDate !== 'all') dateEl.value = savedDate;
     }
     if (stageEl) {
-      const stages = [...new Set(allMatches.map(m => m.group || m.stage).filter(Boolean))];
+      const savedStage = stageEl.value;
+      // FIX 1: use tabMatches (group-only) so no phantom knockout options appear
+      const stages = [...new Set(tabMatches.map(m => m.group || m.stage).filter(Boolean))];
       stageEl.innerHTML = '<option value="all">All Matches</option>' +
         stages.map(s => `<option value="${s}">${stageKeyToLabel(s)}</option>`).join('');
+      if (savedStage && savedStage !== 'all') stageEl.value = savedStage;
     }
     if (venueEl) {
-      const venues = [...new Set(allTabMatches().map(m => m.venue).filter(Boolean))].sort();
+      const savedVenue = venueEl.value;
+      const venues = [...new Set(tabMatches.map(m => m.venue).filter(Boolean))].sort();
       venueEl.innerHTML = '<option value="all">All Venues</option>' +
         venues.map(v => `<option value="${v}">${v}</option>`).join('');
+      if (savedVenue && savedVenue !== 'all') venueEl.value = savedVenue;
     }
   }
 
+  // FIX 2: populatePredFilters preserves current selection so re-renders don't reset the filter
   function populatePredFilters() {
     const dateEl  = document.getElementById('pred-date-filter');
     const stageEl = document.getElementById('pred-group-filter');
     if (dateEl) {
+      const savedDate = dateEl.value;
       const dates = [...new Set(allPredMatches().map(m => m.date).filter(Boolean))].sort();
       dateEl.innerHTML = '<option value="all">All Dates</option>' +
         dates.map(d => `<option value="${d}">${formatDateHeader(d)}</option>`).join('');
+      if (savedDate && savedDate !== 'all') dateEl.value = savedDate;
     }
     if (stageEl) {
+      const savedStage = stageEl.value;
       const stages = [...new Set(allPredMatches().map(m => m.group || m.stage).filter(Boolean))];
       stageEl.innerHTML = '<option value="all">All Matches</option>' +
         stages.map(s => `<option value="${s}">${stageKeyToLabel(s)}</option>`).join('');
+      if (savedStage && savedStage !== 'all') stageEl.value = savedStage;
     }
   }
 
@@ -460,6 +477,8 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
 
   function buildMatchCard(m, isPred) {
     const card     = document.createElement('div');
+    // FIX 3: use isFinished() for lock + badge logic
+    const finished = isFinished(m);
     card.className = 'match-card' + (m.status === 'live' ? ' match-card-live' : '');
     const stageLabel = m.group ? `Group ${m.group}` : stageKeyToLabel(m.stage || '');
     const isKnockout = KNOCKOUT_IDS.has(m.id);
@@ -471,11 +490,11 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       : teamName(m.away);
     const hFlag = isKnockout ? '' : teamFlag(m.home);
     const aFlag = isKnockout ? '' : teamFlag(m.away);
-    const isLocked   = m.status === 'ft' || m.status === 'final';
+    const isLocked = finished;
     let statusBadge = '';
-    if      (m.status === 'live')                       statusBadge = '<span class="status-badge status-live"><span class="live-dot"></span>Live</span>';
-    else if (m.status === 'ht')                         statusBadge = '<span class="status-badge status-ht">HT</span>';
-    else if (m.status === 'ft' || m.status === 'final') statusBadge = '<span class="status-badge status-ft">FT</span>';
+    if      (m.status === 'live')  statusBadge = '<span class="status-badge status-live"><span class="live-dot"></span>Live</span>';
+    else if (m.status === 'ht')    statusBadge = '<span class="status-badge status-ht">HT</span>';
+    else if (finished)             statusBadge = '<span class="status-badge status-ft">FT</span>';
 
     let scoreColHtml = '';
     if (isPred && currentUser) {
@@ -553,6 +572,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     return card;
   }
 
+  // FIX 2: populatePredFilters is no longer called inside renderPredictions()
   function renderPredictions() {
     const container  = document.getElementById('predictions-list');
     const authPrompt = document.getElementById('predictions-auth-prompt');
@@ -572,7 +592,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     }
     authPrompt?.setAttribute('hidden', '');
     if (filtersBar) filtersBar.hidden = false;
-    populatePredFilters();
+    // Note: populatePredFilters() is now called only in watchMatches, so selections are preserved
     const dateVal  = document.getElementById('pred-date-filter')?.value  || 'all';
     const stageVal = document.getElementById('pred-group-filter')?.value || 'all';
     const teamVal  = (document.getElementById('pred-team-filter')?.value || '').toLowerCase().trim();
@@ -652,7 +672,8 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       return;
     }
     authPrompt?.setAttribute('hidden', '');
-    const finishedMatches = liveMatches.filter(m => (m.status === 'ft' || m.status === 'final') && m.homeScore != null && m.awayScore != null);
+    // FIX 3: use isFinished() so 'finished' (from sync) is recognised alongside legacy 'ft'/'final'
+    const finishedMatches = liveMatches.filter(m => isFinished(m) && m.homeScore != null && m.awayScore != null);
     if (!finishedMatches.length) {
       container.innerHTML = '<p class="empty-filter-msg">No finished matches yet.</p>';
       return;
@@ -713,7 +734,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       const grid = document.createElement('div');
       grid.className = 'bracket-matchups';
       round.ids.forEach(matchId => {
-        // Fixture comes directly from Firestore via liveMatches
         const fixture = getKnockoutFixture(matchId);
         if (!fixture) return;
         const hn = currentUser
