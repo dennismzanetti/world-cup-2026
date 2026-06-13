@@ -39,7 +39,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
   // Matches tab shows group stage only
   function allTabMatches()  { return groupMatches(); }
 
-  // FIX 3: canonical "finished" check — Firestore sync writes 'finished'; legacy FT/final also accepted
+  // Canonical "finished" check — Firestore sync writes 'finished'; legacy FT/final also accepted
   function isFinished(m) {
     return m.status === 'finished' || m.status === 'ft' || m.status === 'final';
   }
@@ -289,7 +289,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
   // ─── Live match data — sole source of truth from Firestore ───────────────────
   watchMatches(allMatches => {
     liveMatches = allMatches;
-    // FIX 1 & 2: populate ALL filter dropdowns once when data arrives (not inside render)
     populateMatchFilters();
     populatePredFilters();
     if (authResolved) renderAll();
@@ -320,7 +319,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     return { R32:'Round of 32', R16:'Round of 16', QF:'Quarter-Finals', SF:'Semi-Finals', '3P':'Third Place', F:'Final' }[key] || key;
   };
 
-  // FIX 1: Matches tab stage filter built from allTabMatches() (group-stage only), not allPredMatches()
   function populateMatchFilters() {
     const dateEl  = document.getElementById('match-date-filter');
     const stageEl = document.getElementById('match-group-filter');
@@ -335,8 +333,8 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     }
     if (stageEl) {
       const savedStage = stageEl.value;
-      // FIX 1: use tabMatches (group-only) so no phantom knockout options appear
-      const stages = [...new Set(tabMatches.map(m => m.group || m.stage).filter(Boolean))];
+      // Sort stages so single-letter group IDs (A–L) sort alphabetically
+      const stages = [...new Set(tabMatches.map(m => m.group || m.stage).filter(Boolean))].sort();
       stageEl.innerHTML = '<option value="all">All Matches</option>' +
         stages.map(s => `<option value="${s}">${stageKeyToLabel(s)}</option>`).join('');
       if (savedStage && savedStage !== 'all') stageEl.value = savedStage;
@@ -350,7 +348,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     }
   }
 
-  // FIX 2: populatePredFilters preserves current selection so re-renders don't reset the filter
   function populatePredFilters() {
     const dateEl  = document.getElementById('pred-date-filter');
     const stageEl = document.getElementById('pred-group-filter');
@@ -363,7 +360,8 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     }
     if (stageEl) {
       const savedStage = stageEl.value;
-      const stages = [...new Set(allPredMatches().map(m => m.group || m.stage).filter(Boolean))];
+      // Sort stages so single-letter group IDs (A–L) sort alphabetically
+      const stages = [...new Set(allPredMatches().map(m => m.group || m.stage).filter(Boolean))].sort();
       stageEl.innerHTML = '<option value="all">All Matches</option>' +
         stages.map(s => `<option value="${s}">${stageKeyToLabel(s)}</option>`).join('');
       if (savedStage && savedStage !== 'all') stageEl.value = savedStage;
@@ -477,7 +475,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
 
   function buildMatchCard(m, isPred) {
     const card     = document.createElement('div');
-    // FIX 3: use isFinished() for lock + badge logic
     const finished = isFinished(m);
     card.className = 'match-card' + (m.status === 'live' ? ' match-card-live' : '');
     const stageLabel = m.group ? `Group ${m.group}` : stageKeyToLabel(m.stage || '');
@@ -572,7 +569,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     return card;
   }
 
-  // FIX 2: populatePredFilters is no longer called inside renderPredictions()
   function renderPredictions() {
     const container  = document.getElementById('predictions-list');
     const authPrompt = document.getElementById('predictions-auth-prompt');
@@ -592,7 +588,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     }
     authPrompt?.setAttribute('hidden', '');
     if (filtersBar) filtersBar.hidden = false;
-    // Note: populatePredFilters() is now called only in watchMatches, so selections are preserved
     const dateVal  = document.getElementById('pred-date-filter')?.value  || 'all';
     const stageVal = document.getElementById('pred-group-filter')?.value || 'all';
     const teamVal  = (document.getElementById('pred-team-filter')?.value || '').toLowerCase().trim();
@@ -672,7 +667,6 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       return;
     }
     authPrompt?.setAttribute('hidden', '');
-    // FIX 3: use isFinished() so 'finished' (from sync) is recognised alongside legacy 'ft'/'final'
     const finishedMatches = liveMatches.filter(m => isFinished(m) && m.homeScore != null && m.awayScore != null);
     if (!finishedMatches.length) {
       container.innerHTML = '<p class="empty-filter-msg">No finished matches yet.</p>';
