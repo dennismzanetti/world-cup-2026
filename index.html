@@ -125,11 +125,19 @@
     <section class="view" id="view-predictions">
       <div class="container">
 
-        <!-- Top bar: page title (left) + backup toolbar (right) -->
-        <div class="pred-page-header">
-          <div class="page-header">
-            <h1 class="page-title">Predictions</h1>
-            <p class="page-subtitle">Predict match scores before kickoff &mdash; sign in to save</p>
+        <!-- Page title -->
+        <div class="page-header">
+          <h1 class="page-title">Predictions</h1>
+          <p class="page-subtitle">Predict match scores before kickoff &mdash; sign in to save</p>
+        </div>
+
+        <!-- Sub-tab bar + backup toolbar row -->
+        <div class="pred-subtab-row">
+          <div class="sub-tabs" role="tablist" aria-label="Predictions sub-tabs">
+            <button class="sub-tab active" data-subtab="my-picks" role="tab" aria-selected="true" aria-controls="subtab-my-picks">My Predictions</button>
+            <button class="sub-tab" data-subtab="pred-group-standings" role="tab" aria-selected="false" aria-controls="subtab-pred-group-standings">Group Standings</button>
+            <button class="sub-tab" data-subtab="pred-standings" role="tab" aria-selected="false" aria-controls="subtab-pred-standings">Prediction Accuracy</button>
+            <button class="sub-tab" data-subtab="pred-bracket" role="tab" aria-selected="false" aria-controls="subtab-pred-bracket">Knockout Bracket</button>
           </div>
 
           <!-- Export / Import toolbar (only visible when signed in) -->
@@ -146,14 +154,6 @@
             <input id="import-file-input" type="file" accept=".json" class="sr-only" />
             <span id="data-toolbar-status" class="data-toolbar-status" aria-live="polite"></span>
           </div>
-        </div>
-
-        <!-- Sub-tab bar -->
-        <div class="sub-tabs" role="tablist" aria-label="Predictions sub-tabs">
-          <button class="sub-tab active" data-subtab="my-picks" role="tab" aria-selected="true" aria-controls="subtab-my-picks">My Predictions</button>
-          <button class="sub-tab" data-subtab="pred-group-standings" role="tab" aria-selected="false" aria-controls="subtab-pred-group-standings">Group Standings</button>
-          <button class="sub-tab" data-subtab="pred-standings" role="tab" aria-selected="false" aria-controls="subtab-pred-standings">Prediction Accuracy</button>
-          <button class="sub-tab" data-subtab="pred-bracket" role="tab" aria-selected="false" aria-controls="subtab-pred-bracket">Knockout Bracket</button>
         </div>
 
         <!-- My Predictions panel -->

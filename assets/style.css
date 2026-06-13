@@ -361,7 +361,7 @@ a, button, [role="button"], input, select {
    PAGE HEADER
    ============================================================ */
 
-.page-header { margin-bottom: var(--space-6); }
+.page-header { margin-bottom: var(--space-4); }
 .page-title {
   font-family: var(--font-display); font-size: var(--text-xl);
   letter-spacing: 0.04em; color: var(--color-text); line-height: 1.1;
@@ -757,37 +757,43 @@ a, button, [role="button"], input, select {
 #auth-switch { background: none; border: none; cursor: pointer; color: var(--color-primary); text-decoration: underline; font-size: var(--text-sm); }
 
 /* ============================================================
-   PREDICTIONS PAGE HEADER — title left, backup toolbar right
+   PREDICTIONS SUB-TAB ROW
+   Sub-tabs on the left, backup toolbar pinned to the right
    ============================================================ */
 
-.pred-page-header {
+.pred-subtab-row {
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;      /* align to bottom so tabs sit on the divider line */
   justify-content: space-between;
   gap: var(--space-4);
-  margin-bottom: var(--space-2);
+  border-bottom: 2px solid var(--color-divider);
+  margin-bottom: var(--space-4);
 }
 
-/* Remove bottom margin from page-header when inside pred-page-header */
-.pred-page-header .page-header {
+/* Sub-tabs — remove their own bottom border since the row provides it */
+.pred-subtab-row .sub-tabs {
+  border-bottom: none;
   margin-bottom: 0;
+  margin-top: 0;
   flex: 1;
   min-width: 0;
+  display: flex;
+  gap: var(--space-1);
+  align-items: flex-end;
 }
 
-/* Backup toolbar — compact, floated to the top-right */
+/* Backup toolbar — sits inline on the right, vertically centred */
 .data-toolbar {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   flex-shrink: 0;
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-1) var(--space-3);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
-  /* Align to top of flex row */
-  align-self: center;
+  margin-bottom: var(--space-2);  /* slight lift above the divider line */
 }
 
 .data-toolbar-label {
@@ -820,17 +826,24 @@ a, button, [role="button"], input, select {
   min-width: 0;
 }
 
-/* On mobile: stack toolbar below page title */
+/* Mobile: toolbar drops below tabs as a full-width strip */
 @media (max-width: 600px) {
-  .pred-page-header {
+  .pred-subtab-row {
     flex-direction: column;
     align-items: stretch;
-    gap: var(--space-2);
+    border-bottom: none;
+    gap: 0;
   }
+
+  /* Sub-tabs restore their own border on mobile */
+  .pred-subtab-row .sub-tabs {
+    border-bottom: none;  /* overridden by 2×2 grid rule below */
+  }
+
   .data-toolbar {
-    align-self: flex-start;
-    width: 100%;
-    justify-content: flex-start;
+    align-self: flex-end;
+    margin-bottom: var(--space-3);
+    margin-top: var(--space-2);
   }
 }
 
