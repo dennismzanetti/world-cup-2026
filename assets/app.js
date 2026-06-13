@@ -793,12 +793,16 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     return 'TBD';
   }
 
+  // Recursively resolve a team name for the bracket prediction view.
+  // Handles group-based slots, and winner-of-match slots by following bracketPicks.
   function resolveKnockoutTeamForPreds(source) {
     if (!source || typeof source === 'string') return null;
+
+    // ── Group finisher (1st / 2nd place from a group) ────────────────────────
     if (source.type === 'group') {
-      const gm = groupMatches().filter(m => m.group === source.group);
+      const gm     = groupMatches().filter(m => m.group === source.group);
       const groups = buildGroups();
-      const group = groups.find(g => g.id === source.group);
+      const group  = groups.find(g => g.id === source.group);
       if (!group) return null;
       const standings = calcPoints(group.teams, gm.map(m => {
         const pred = userPredictions[m.id];
@@ -807,6 +811,33 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       const team = standings[source.pos - 1]?.team;
       return team ? teamDisplay(team) : null;
     }
+
+    // ── Winner of a previous knockout match ──────────────────────────────────
+    if (source.type === 'winner') {
+      const srcMatchId = source.matchId || source.match;
+      if (!srcMatchId) return null;
+
+      const fixture = getKnockoutFixture(srcMatchId);
+      if (!fixture) return null;
+
+      // If the actual match is finished, use the real result
+      if (isFinished(fixture) && fixture.homeScore != null && fixture.awayScore != null) {
+        if (fixture.homeScore > fixture.awayScore) return resolveKnockoutTeamForPreds(fixture.homeSource) || teamDisplay(fixture.home);
+        if (fixture.awayScore > fixture.homeScore) return resolveKnockoutTeamForPreds(fixture.awaySource) || teamDisplay(fixture.away);
+        return null; // draw (extra time TBD)
+      }
+
+      // Otherwise follow the user's bracket pick for that match
+      const pick = bracketPicks[srcMatchId];
+      if (!pick) return null; // not yet picked — slot stays TBD
+
+      const pickedSource = pick === 'home' ? fixture.homeSource : fixture.awaySource;
+      // Recursively resolve the picked team (may itself be a winner/group source)
+      return resolveKnockoutTeamForPreds(pickedSource)
+        || (pick === 'home' ? teamDisplay(fixture.home) : teamDisplay(fixture.away))
+        || null;
+    }
+
     return null;
   }
 
@@ -856,7 +887,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
       round.ids.forEach(matchId => {
         const fixture = getKnockoutFixture(matchId);
 
-        // Build display names
+        // Build display names — resolved from picks chain
         const homeDisplay = fixture
           ? (resolveKnockoutTeamForPreds(fixture.homeSource) || slotLabel(fixture.homeSource))
           : 'TBD';
@@ -884,7 +915,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
         homeBtn.setAttribute('aria-pressed', String(pick === 'home'));
         homeBtn.setAttribute('title', homeDisplay);
         if (!finished) {
-          homeBtn.addEventListener('click', () => togglePick(matchId, 'home', card));
+          homeBtn.addEventListener('click', () => togglePick(matchId, 'home'));
         } else {
           homeBtn.disabled = true;
         }
@@ -905,7 +936,7 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
         awayBtn.setAttribute('aria-pressed', String(pick === 'away'));
         awayBtn.setAttribute('title', awayDisplay);
         if (!finished) {
-          awayBtn.addEventListener('click', () => togglePick(matchId, 'away', card));
+          awayBtn.addEventListener('click', () => togglePick(matchId, 'away'));
         } else {
           awayBtn.disabled = true;
         }
@@ -922,14 +953,12 @@ import { watchMatches, savePrediction, watchUserPredictions, updateMatchResult, 
     container.appendChild(rail);
   }
 
-  function togglePick(matchId, side, card) {
+  // Re-render the full bracket on every pick so downstream slots update immediately
+  function togglePick(matchId, side) {
     if (!currentUser) { openModal(); return; }
     bracketPicks[matchId] = side;
     persistBracketPicks();
-    card.querySelectorAll('.bracket-team').forEach(b => {
-      b.classList.toggle('picked', b === (side === 'home' ? card.children[0] : card.children[2]));
-      b.setAttribute('aria-pressed', String(b.classList.contains('picked')));
-    });
+    renderKnockoutBracket();
   }
 
   window._wc = { getAllMatches() { return [...liveMatches]; } };
