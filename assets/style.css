@@ -757,6 +757,84 @@ a, button, [role="button"], input, select {
 #auth-switch { background: none; border: none; cursor: pointer; color: var(--color-primary); text-decoration: underline; font-size: var(--text-sm); }
 
 /* ============================================================
+   PREDICTIONS PAGE HEADER — title left, backup toolbar right
+   ============================================================ */
+
+.pred-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-2);
+}
+
+/* Remove bottom margin from page-header when inside pred-page-header */
+.pred-page-header .page-header {
+  margin-bottom: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Backup toolbar — compact, floated to the top-right */
+.data-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  /* Align to top of flex row */
+  align-self: center;
+}
+
+.data-toolbar-label {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-faint);
+  padding-right: var(--space-1);
+  border-right: 1px solid var(--color-divider);
+  margin-right: var(--space-1);
+  white-space: nowrap;
+}
+
+.data-toolbar .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+
+.data-toolbar .import-label {
+  cursor: pointer;
+}
+
+.data-toolbar-status {
+  font-size: var(--text-xs);
+  color: var(--color-success);
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* On mobile: stack toolbar below page title */
+@media (max-width: 600px) {
+  .pred-page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+  .data-toolbar {
+    align-self: flex-start;
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+/* ============================================================
    PREDICTIONS SUB-TABS
    ============================================================ */
 
@@ -764,6 +842,7 @@ a, button, [role="button"], input, select {
   display: flex; gap: var(--space-1);
   border-bottom: 2px solid var(--color-divider);
   margin-bottom: var(--space-4);
+  margin-top: var(--space-4);
 }
 .sub-tab {
   flex-shrink: 0; background: none; border: none; cursor: pointer;
