@@ -1,11 +1,11 @@
 import { teamName } from './teamData.js';
 
-// ─── Knockout stage order (for sorting) ───────────────────────────────────────
+// Knockout stage order (for sorting)
 export const KNOCKOUT_STAGE_ORDER = [
   'Round of 32', 'Round of 16', 'Quarterfinals', 'Semifinals', 'Final'
 ];
 
-// ─── Today's date as YYYY-MM-DD (local) ───────────────────────────────────────
+// Today's date as YYYY-MM-DD (local)
 export function getTodayStr() {
   const d = new Date();
   const y = d.getFullYear();
@@ -14,7 +14,7 @@ export function getTodayStr() {
   return `${y}-${m}-${day}`;
 }
 
-// ─── Date formatting ──────────────────────────────────────────────────────────
+// Date formatting
 export function formatDateHeader(isoDate) {
   if (!isoDate) return 'Date TBD';
   const [year, month, day] = isoDate.split('-').map(Number);
@@ -22,7 +22,7 @@ export function formatDateHeader(isoDate) {
   return d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-// ─── Parse time string to sortable minutes since midnight ─────────────────────
+// Parse time string to sortable minutes since midnight
 export function parseTimeMins(timeStr) {
   if (!timeStr) return Infinity;
   const ampm = /(\d{1,2}):(\d{2})\s*(am|pm)/i.exec(timeStr);
@@ -39,7 +39,7 @@ export function parseTimeMins(timeStr) {
   return Infinity;
 }
 
-// ─── Sort group keys then knockout stages ─────────────────────────────────────
+// Sort group keys then knockout stages
 export function sortStages(stages) {
   return stages.sort((a, b) => {
     const aIsGroup = /^[A-Z]$/.test(a);
@@ -56,43 +56,51 @@ export function sortStages(stages) {
   });
 }
 
-// ─── Match status helper ───────────────────────────────────────────────────────
+// Match status helper
 export function isFinished(m) {
   return m.status === 'finished' || m.status === 'ft' || m.status === 'final';
 }
 
-// ─── Stage key → human label ───────────────────────────────────────────────────
+// Stage key to human label
 export const stageKeyToLabel = key => {
   if (/^[A-Z]$/.test(key)) return `Group ${key}`;
   return { R32:'Round of 32', R16:'Round of 16', QF:'Quarter-Finals', SF:'Semi-Finals', '3P':'Third Place', F:'Final' }[key] || key;
 };
 
-// ─── Populate the Matches tab filter dropdowns ────────────────────────────────
-export function populateMatchFilters(allTabMatches, getTodayStr, formatDateHeader, sortStages) {
-  const dateEl  = document.getElementById('match-date-filter');
-  const stageEl = document.getElementById('match-group-filter');
-  const venueEl = document.getElementById('match-venue-filter');
-  const tabMatches = allTabMatches();
+// Shared helper: populate a date <select> and a stage <select> from a match list.
+// dateId  - element id of the date dropdown
+// stageId - element id of the stage/group dropdown
+// matches - already-resolved array of match objects
+function populateDateStageFilters(dateId, stageId, matches) {
+  const dateEl  = document.getElementById(dateId);
+  const stageEl = document.getElementById(stageId);
   if (dateEl) {
     const savedDate = dateEl.value;
     const today = getTodayStr();
-    const todayExists = tabMatches.some(m => m.date === today);
-    const dates = [...new Set(tabMatches.map(m => m.date).filter(Boolean))].sort();
+    const todayExists = matches.some(m => m.date === today);
+    const dates = [...new Set(matches.map(m => m.date).filter(Boolean))].sort();
     dateEl.innerHTML =
       '<option value="all">All Dates</option>' +
-      `<option value="today">📅 Today${todayExists ? '' : ' (no matches)'}</option>` +
+      `<option value="today">Today${todayExists ? '' : ' (no matches)'}</option>` +
       dates.map(d => `<option value="${d}">${formatDateHeader(d)}</option>`).join('');
     if (savedDate && savedDate !== 'all') dateEl.value = savedDate;
   }
   if (stageEl) {
     const savedStage = stageEl.value;
-    const stages = [...new Set(tabMatches.map(m => m.group || m.stage).filter(Boolean))];
+    const stages = [...new Set(matches.map(m => m.group || m.stage).filter(Boolean))];
     sortStages(stages);
     stageEl.innerHTML =
       '<option value="all">All Matches</option>' +
       stages.map(s => `<option value="${s}">${/^[A-Z]$/.test(s) ? `Group ${s}` : s}</option>`).join('');
     if (savedStage && savedStage !== 'all') stageEl.value = savedStage;
   }
+}
+
+// Populate the Matches tab filter dropdowns
+export function populateMatchFilters(allTabMatches, getTodayStr, formatDateHeader, sortStages) {
+  const tabMatches = allTabMatches();
+  populateDateStageFilters('match-date-filter', 'match-group-filter', tabMatches);
+  const venueEl = document.getElementById('match-venue-filter');
   if (venueEl) {
     const savedVenue = venueEl.value;
     const venues = [...new Set(tabMatches.map(m => m.venue).filter(Boolean))].sort();
@@ -103,29 +111,7 @@ export function populateMatchFilters(allTabMatches, getTodayStr, formatDateHeade
   }
 }
 
-// ─── Populate the Predictions tab filter dropdowns ────────────────────────────
+// Populate the Predictions tab filter dropdowns
 export function populatePredFilters(allPredMatches, getTodayStr, formatDateHeader, sortStages) {
-  const dateEl  = document.getElementById('pred-date-filter');
-  const stageEl = document.getElementById('pred-group-filter');
-  const predMatches = allPredMatches();
-  if (dateEl) {
-    const savedDate = dateEl.value;
-    const today = getTodayStr();
-    const todayExists = predMatches.some(m => m.date === today);
-    const dates = [...new Set(predMatches.map(m => m.date).filter(Boolean))].sort();
-    dateEl.innerHTML =
-      '<option value="all">All Dates</option>' +
-      `<option value="today">📅 Today${todayExists ? '' : ' (no matches)'}</option>` +
-      dates.map(d => `<option value="${d}">${formatDateHeader(d)}</option>`).join('');
-    if (savedDate && savedDate !== 'all') dateEl.value = savedDate;
-  }
-  if (stageEl) {
-    const savedStage = stageEl.value;
-    const stages = [...new Set(predMatches.map(m => m.group || m.stage).filter(Boolean))];
-    sortStages(stages);
-    stageEl.innerHTML =
-      '<option value="all">All Matches</option>' +
-      stages.map(s => `<option value="${s}">${/^[A-Z]$/.test(s) ? `Group ${s}` : s}</option>`).join('');
-    if (savedStage && savedStage !== 'all') stageEl.value = savedStage;
-  }
+  populateDateStageFilters('pred-date-filter', 'pred-group-filter', allPredMatches());
 }
