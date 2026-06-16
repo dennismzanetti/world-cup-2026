@@ -68,19 +68,18 @@ export const stageKeyToLabel = key => {
 };
 
 // Shared helper: populate a date <select> and a stage <select> from a match list.
-// Bakes the selected attribute into the option HTML so the value is set
-// before the browser parses the element, avoiding .value timing issues.
+// Uses data-initialized attribute to distinguish first load (default to Today)
+// from subsequent Firestore re-renders (restore the user's saved selection).
 function populateDateStageFilters(dateId, stageId, matches) {
   const dateEl  = document.getElementById(dateId);
   const stageEl = document.getElementById(stageId);
   if (dateEl) {
-    const savedDate = dateEl.value;  // empty string on first render
+    const isFirstLoad = !dateEl.hasAttribute('data-initialized');
+    const savedDate   = isFirstLoad ? null : dateEl.value;
     const today = getTodayStr();
     const todayExists = matches.some(m => m.date === today);
     const dates = [...new Set(matches.map(m => m.date).filter(Boolean))].sort();
-    // Decide which value should be selected:
-    // - keep an explicit user choice (including 'all')
-    // - otherwise default to 'today'
+    // On first load default to 'today'; afterwards restore whatever the user picked.
     const activeDate = savedDate || 'today';
     dateEl.innerHTML =
       `<option value="all"${activeDate === 'all' ? ' selected' : ''}>All Dates</option>` +
@@ -88,6 +87,7 @@ function populateDateStageFilters(dateId, stageId, matches) {
       dates.map(d =>
         `<option value="${d}"${activeDate === d ? ' selected' : ''}>${formatDateHeader(d)}</option>`
       ).join('');
+    dateEl.setAttribute('data-initialized', '1');
   }
   if (stageEl) {
     const savedStage = stageEl.value;
