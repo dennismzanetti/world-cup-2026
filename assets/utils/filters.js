@@ -83,7 +83,12 @@ function populateDateStageFilters(dateId, stageId, matches) {
       '<option value="all">All Dates</option>' +
       `<option value="today">Today${todayExists ? '' : ' (no matches)'}</option>` +
       dates.map(d => `<option value="${d}">${formatDateHeader(d)}</option>`).join('');
-    if (savedDate && savedDate !== 'all') dateEl.value = savedDate;
+    // Restore saved selection, or default to "today" on first load
+    if (savedDate && savedDate !== 'all') {
+      dateEl.value = savedDate;
+    } else if (!savedDate) {
+      dateEl.value = 'today';
+    }
   }
   if (stageEl) {
     const savedStage = stageEl.value;
