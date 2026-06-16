@@ -68,36 +68,36 @@ export const stageKeyToLabel = key => {
 };
 
 // Shared helper: populate a date <select> and a stage <select> from a match list.
-// dateId  - element id of the date dropdown
-// stageId - element id of the stage/group dropdown
-// matches - already-resolved array of match objects
+// Bakes the selected attribute into the option HTML so the value is set
+// before the browser parses the element, avoiding .value timing issues.
 function populateDateStageFilters(dateId, stageId, matches) {
   const dateEl  = document.getElementById(dateId);
   const stageEl = document.getElementById(stageId);
   if (dateEl) {
-    const savedDate = dateEl.value;
+    const savedDate = dateEl.value;  // empty string on first render
     const today = getTodayStr();
     const todayExists = matches.some(m => m.date === today);
     const dates = [...new Set(matches.map(m => m.date).filter(Boolean))].sort();
+    // Decide which value should be selected:
+    // - keep an explicit user choice (including 'all')
+    // - otherwise default to 'today'
+    const activeDate = savedDate || 'today';
     dateEl.innerHTML =
-      '<option value="all">All Dates</option>' +
-      `<option value="today">Today${todayExists ? '' : ' (no matches)'}</option>` +
-      dates.map(d => `<option value="${d}">${formatDateHeader(d)}</option>`).join('');
-    // Restore saved selection, or default to "today" on first load
-    if (savedDate && savedDate !== 'all') {
-      dateEl.value = savedDate;
-    } else if (!savedDate) {
-      dateEl.value = 'today';
-    }
+      `<option value="all"${activeDate === 'all' ? ' selected' : ''}>All Dates</option>` +
+      `<option value="today"${activeDate === 'today' ? ' selected' : ''}>Today${todayExists ? '' : ' (no matches)'}</option>` +
+      dates.map(d =>
+        `<option value="${d}"${activeDate === d ? ' selected' : ''}>${formatDateHeader(d)}</option>`
+      ).join('');
   }
   if (stageEl) {
     const savedStage = stageEl.value;
     const stages = [...new Set(matches.map(m => m.group || m.stage).filter(Boolean))];
     sortStages(stages);
     stageEl.innerHTML =
-      '<option value="all">All Matches</option>' +
-      stages.map(s => `<option value="${s}">${/^[A-Z]$/.test(s) ? `Group ${s}` : s}</option>`).join('');
-    if (savedStage && savedStage !== 'all') stageEl.value = savedStage;
+      `<option value="all"${!savedStage || savedStage === 'all' ? ' selected' : ''}>All Matches</option>` +
+      stages.map(s =>
+        `<option value="${s}"${savedStage === s ? ' selected' : ''}>${/^[A-Z]$/.test(s) ? `Group ${s}` : s}</option>`
+      ).join('');
   }
 }
 
@@ -110,9 +110,10 @@ export function populateMatchFilters(allTabMatches, getTodayStr, formatDateHeade
     const savedVenue = venueEl.value;
     const venues = [...new Set(tabMatches.map(m => m.venue).filter(Boolean))].sort();
     venueEl.innerHTML =
-      '<option value="all">All Venues</option>' +
-      venues.map(v => `<option value="${v}">${v}</option>`).join('');
-    if (savedVenue && savedVenue !== 'all') venueEl.value = savedVenue;
+      `<option value="all"${!savedVenue || savedVenue === 'all' ? ' selected' : ''}>All Venues</option>` +
+      venues.map(v =>
+        `<option value="${v}"${savedVenue === v ? ' selected' : ''}>${v}</option>`
+      ).join('');
   }
 }
 
