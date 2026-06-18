@@ -4,7 +4,7 @@ import { calcPoints } from '../utils/stats.js';
 import { resolveBest3rd } from '../utils/stats.js';
 import { savePrediction } from '../db.js';
 
-// ─── Slot / resolve helpers ───────────────────────────────────────────────────
+// ─── Slot / resolve helpers ─────────────────────────────────────────────────
 export function slotLabel(source) {
   if (!source) return 'TBD';
   if (typeof source === 'string') return source;
@@ -59,7 +59,7 @@ export function resolveKnockoutTeamForPreds(source, {
     const fixture = getKnockoutFixture(srcMatchId);
     if (!fixture) return null;
 
-    // ── Finished match: use actual result (regulation + PK) ──────────────────
+    // ── Finished match: use actual result (regulation + PK) ────────────────────
     if (isFinished(fixture) && fixture.homeScore != null && fixture.awayScore != null) {
       const winnerSide = resolveFinishedWinnerSide(fixture);
       if (!winnerSide) return null; // tie result with no PK scores yet
@@ -69,7 +69,7 @@ export function resolveKnockoutTeamForPreds(source, {
         || (winnerSide === 'home' ? teamDisplay(fixture.home) : teamDisplay(fixture.away));
     }
 
-    // ── Unfinished match: use user's prediction ───────────────────────────────
+    // ── Unfinished match: use user's prediction ────────────────────────────
     const pred = userPredictions[srcMatchId];
     if (!pred || pred.home === undefined || pred.away === undefined) return null;
 
@@ -98,20 +98,23 @@ export function resolveKnockoutTeamForPreds(source, {
   return null;
 }
 
-// ─── Inline prediction form for a bracket card ───────────────────────────────
+// ─── Inline prediction form for a bracket card ─────────────────────────────────
 function buildBracketPredForm({
   matchId, fixture, homeDisplay, awayDisplay,
   currentUser, userPredictions,
   onSaved,
 }) {
-  const pred    = userPredictions[matchId] || {};
-  const hVal    = pred.home !== undefined ? pred.home : '';
-  const aVal    = pred.away !== undefined ? pred.away : '';
-  const pkVal   = pred.pk   || '';
-  const isTied  = hVal !== '' && aVal !== '' && Number(hVal) === Number(aVal);
+  const pred   = userPredictions[matchId] || {};
+  const hVal   = pred.home !== undefined ? pred.home : '';
+  const aVal   = pred.away !== undefined ? pred.away : '';
+  const isTied = hVal !== '' && aVal !== '' && Number(hVal) === Number(aVal);
 
-  const hFlag   = fixture ? teamFlag(fixture.home) || '' : '';
-  const aFlag   = fixture ? teamFlag(fixture.away) || '' : '';
+  // Existing PK score predictions (from the new score-based inputs)
+  const hPkVal = pred.homePkScore !== undefined ? pred.homePkScore : '';
+  const aPkVal = pred.awayPkScore !== undefined ? pred.awayPkScore : '';
+
+  const hFlag  = fixture ? teamFlag(fixture.home) || '' : '';
+  const aFlag  = fixture ? teamFlag(fixture.away) || '' : '';
 
   const form = document.createElement('div');
   form.className = 'bracket-pred-form';
@@ -125,11 +128,21 @@ function buildBracketPredForm({
              data-side="away" value="${aVal}" aria-label="${awayDisplay} predicted score">
       <span class="bracket-form-team-name">${awayDisplay}</span>
     </div>
-    <div class="pk-row bracket-pk-row" style="display:${isTied ? '' : 'none'}">
-      <span class="pk-label">PK winner:</span>
-      <button class="pk-btn pk-btn-home${pkVal === 'home' ? ' pk-selected' : ''}" data-pk="home">${hFlag} ${homeDisplay}</button>
-      <button class="pk-btn pk-btn-away${pkVal === 'away' ? ' pk-selected' : ''}" data-pk="away">${awayDisplay} ${aFlag}</button>
+
+    <div class="pk-score-row bracket-pk-row" style="display:${isTied ? '' : 'none'}">
+      <span class="pk-label">🥅 PK Score:</span>
+      <span class="pk-team-name pk-team-home">${hFlag} ${homeDisplay}</span>
+      <input type="number" class="score-input bracket-pk-input" min="0" max="20"
+             data-pk-side="home" value="${hPkVal}"
+             aria-label="${homeDisplay} PK goals">
+      <span class="score-sep">–</span>
+      <input type="number" class="score-input bracket-pk-input" min="0" max="20"
+             data-pk-side="away" value="${aPkVal}"
+             aria-label="${awayDisplay} PK goals">
+      <span class="pk-team-name pk-team-away">${awayDisplay} ${aFlag}</span>
+      <div class="pk-derived-winner" aria-live="polite"></div>
     </div>
+
     <div class="bracket-form-footer">
       <button class="btn-save pred-btn save-pred-btn">Save</button>
       <span class="pred-saving" hidden>Saving…</span>
@@ -137,40 +150,55 @@ function buildBracketPredForm({
       <span class="pred-error"  hidden></span>
     </div>`;
 
-  const homeInput = form.querySelector('[data-side="home"]');
-  const awayInput = form.querySelector('[data-side="away"]');
-  const pkRow     = form.querySelector('.bracket-pk-row');
+  const homeInput   = form.querySelector('[data-side="home"]');
+  const awayInput   = form.querySelector('[data-side="away"]');
+  const homePkInput = form.querySelector('[data-pk-side="home"]');
+  const awayPkInput = form.querySelector('[data-pk-side="away"]');
+  const pkRow       = form.querySelector('.bracket-pk-row');
+  const pkWinnerEl  = form.querySelector('.pk-derived-winner');
 
-  function updatePkVisibility() {
+  // Update the derived-winner hint so users see who would advance as they type
+  function updatePkWinnerHint() {
+    const hpk = parseInt(homePkInput.value);
+    const apk = parseInt(awayPkInput.value);
+    if (isNaN(hpk) || isNaN(apk)) { pkWinnerEl.textContent = ''; return; }
+    if (hpk === apk)               { pkWinnerEl.textContent = '⚠️ PK scores must differ'; return; }
+    const winner = hpk > apk ? homeDisplay : awayDisplay;
+    pkWinnerEl.innerHTML = `→ <strong>${winner}</strong> advances`;
+  }
+
+  // Show/hide PK row and reset PK inputs when regulation tie status changes
+  function updatePkRowVisibility() {
     const hv = parseInt(homeInput.value);
     const av = parseInt(awayInput.value);
     const tied = !isNaN(hv) && !isNaN(av) && hv === av;
     pkRow.style.display = tied ? '' : 'none';
     if (!tied) {
-      form.querySelectorAll('.pk-btn').forEach(b => b.classList.remove('pk-selected'));
-      if (userPredictions[matchId]) delete userPredictions[matchId].pk;
+      homePkInput.value = '';
+      awayPkInput.value = '';
+      pkWinnerEl.textContent = '';
+      if (userPredictions[matchId]) {
+        delete userPredictions[matchId].homePkScore;
+        delete userPredictions[matchId].awayPkScore;
+        delete userPredictions[matchId].pk; // clear legacy toggle too
+      }
     }
   }
 
-  homeInput.addEventListener('input', updatePkVisibility);
-  awayInput.addEventListener('input', updatePkVisibility);
+  homeInput.addEventListener('input', updatePkRowVisibility);
+  awayInput.addEventListener('input', updatePkRowVisibility);
+  homePkInput.addEventListener('input', updatePkWinnerHint);
+  awayPkInput.addEventListener('input', updatePkWinnerHint);
 
-  form.querySelectorAll('.pk-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const pk = btn.dataset.pk;
-      const current = userPredictions[matchId]?.pk;
-      const newPk = current === pk ? undefined : pk;
-      userPredictions[matchId] = { ...(userPredictions[matchId] || {}), pk: newPk };
-      form.querySelectorAll('.pk-btn').forEach(b => b.classList.remove('pk-selected'));
-      if (newPk) btn.classList.add('pk-selected');
-    });
-  });
+  // Show hint on load if PK scores are already set
+  if (isTied && hPkVal !== '' && aPkVal !== '') updatePkWinnerHint();
 
   form.querySelector('.save-pred-btn').addEventListener('click', async () => {
     const savingEl = form.querySelector('.pred-saving');
     const savedEl  = form.querySelector('.pred-saved');
     const errEl    = form.querySelector('.pred-error');
     const btn      = form.querySelector('.save-pred-btn');
+
     const hv = parseInt(homeInput.value);
     const av = parseInt(awayInput.value);
     if (isNaN(hv) || isNaN(av)) {
@@ -178,14 +206,50 @@ function buildBracketPredForm({
       errEl.hidden = false;
       return;
     }
-    const pkPick = userPredictions[matchId]?.pk
-      || form.querySelector('.pk-btn.pk-selected')?.dataset.pk;
+
+    const isTie = hv === av;
+    const hpk = isTie ? parseInt(homePkInput.value) : NaN;
+    const apk = isTie ? parseInt(awayPkInput.value) : NaN;
+
+    // Require valid, differing PK scores on a predicted tie
+    if (isTie) {
+      if (isNaN(hpk) || isNaN(apk)) {
+        errEl.textContent = 'Enter PK scores for a tied result.';
+        errEl.hidden = false;
+        return;
+      }
+      if (hpk === apk) {
+        errEl.textContent = 'PK scores must differ — there must be a winner.';
+        errEl.hidden = false;
+        return;
+      }
+    }
+
+    // Derive pk field from PK scores so legacy resolver still works
+    const pkFromScores = isTie && !isNaN(hpk) && !isNaN(apk)
+      ? (hpk > apk ? 'home' : 'away')
+      : undefined;
+
     errEl.hidden    = true;
     savingEl.hidden = false;
     btn.disabled    = true;
-    userPredictions[matchId] = { home: hv, away: av, ...(pkPick ? { pk: pkPick } : {}) };
+
+    const predPayload = {
+      home: hv,
+      away: av,
+      ...(isTie && !isNaN(hpk) ? { homePkScore: hpk } : {}),
+      ...(isTie && !isNaN(apk) ? { awayPkScore: apk } : {}),
+      ...(pkFromScores          ? { pk: pkFromScores } : {}),
+    };
+    userPredictions[matchId] = predPayload;
+
     try {
-      await savePrediction(currentUser.uid, matchId, hv, av, pkPick);
+      // savePrediction takes (uid, matchId, home, away, pk, extra?)
+      // Pass homePkScore/awayPkScore as extra fields
+      await savePrediction(
+        currentUser.uid, matchId, hv, av, pkFromScores,
+        isTie && !isNaN(hpk) ? { homePkScore: hpk, awayPkScore: apk } : undefined,
+      );
       savingEl.hidden = true;
       savedEl.hidden  = false;
       setTimeout(() => { savedEl.hidden = true; }, 2000);
@@ -276,7 +340,11 @@ export function renderKnockoutBracket({
       if (predScore && predScore.home !== undefined && predScore.away !== undefined) {
         if (predScore.home > predScore.away) predWinner = 'home';
         else if (predScore.away > predScore.home) predWinner = 'away';
-        else if (predScore.pk) {
+        else if (predScore.homePkScore != null && predScore.awayPkScore != null) {
+          // Derive winner from PK scores
+          predWinner = predScore.homePkScore > predScore.awayPkScore ? 'home' : 'away';
+          predPkLabel = `${predScore.homePkScore}–${predScore.awayPkScore}`;
+        } else if (predScore.pk) {
           predWinner = predScore.pk;
           predPkLabel = 'PK';
         }
@@ -303,8 +371,9 @@ export function renderKnockoutBracket({
       const divider = document.createElement('div');
       divider.className = 'bracket-divider';
       divider.setAttribute('aria-hidden', 'true');
-      if (predScoreLabel && !finished) {
-        divider.innerHTML = predPkLabel ? `<span class="bracket-pk-badge">PK</span>` : '';
+      if (predScoreLabel && !finished && predPkLabel) {
+        // Show actual PK score (e.g. "5–4") or legacy "PK" badge
+        divider.innerHTML = `<span class="bracket-pk-badge" title="PK: ${predPkLabel}">${predPkLabel}</span>`;
       }
 
       const awayEl = document.createElement('div');
@@ -316,7 +385,7 @@ export function renderKnockoutBracket({
       awayEl.innerHTML = `<span class="bracket-team-name">${awayDisplay}</span>` +
         (predScoreLabel && !finished ? `<span class="bracket-pred-score">${predScore.away}</span>` : '');
 
-      // ── Expandable prediction form ─────────────────────────────────────────
+      // ── Expandable prediction form ──────────────────────────────────────────
       const formWrap = document.createElement('div');
       formWrap.className = 'bracket-form-wrap';
       formWrap.hidden = true;
@@ -333,17 +402,14 @@ export function renderKnockoutBracket({
           matchId, fixture, homeDisplay, awayDisplay,
           currentUser, userPredictions,
           onSaved: () => {
-            // Collapse form and re-render bracket
             formWrap.hidden = true;
             card.classList.remove('bracket-match--open');
-            // Trigger a re-render via a custom event the app listens to
             document.dispatchEvent(new CustomEvent('bracket:predSaved'));
           },
         });
         formWrap.appendChild(form);
 
         card.addEventListener('click', e => {
-          // Don't toggle when clicking inside the form itself
           if (e.target.closest('.bracket-form-wrap')) return;
           const isOpen = !formWrap.hidden;
           formWrap.hidden = isOpen;
