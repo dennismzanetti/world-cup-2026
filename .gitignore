@@ -1,0 +1,17 @@
+# Node.js
+node_modules/
+
+# Environment variables (keep secrets out of GitHub)
+.env
+.env.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Firebase local cache
+.firebase/
+
+# OS files
+.DS_Store
+Thumbs.db
