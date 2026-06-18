@@ -133,7 +133,7 @@ html {
   -webkit-font-smoothing: antialiased;
   scroll-behavior: smooth;
   scroll-padding-top: calc(var(--header-h) + 0.5rem);
-  overflow-x: hidden;
+  /* overflow-x: hidden removed — clips bracket scroll on last column */
 }
 body {
   min-height: 100dvh;
@@ -146,7 +146,7 @@ body {
   background-color: var(--color-bg);
   padding-bottom: var(--footer-h);
   max-width: 100vw;
-  overflow-x: hidden;
+  /* overflow-x: hidden removed — clips bracket scroll on last column */
 }
 img, svg { display: block; max-width: 100%; }
 button { cursor: pointer; background: none; border: none; font: inherit; color: inherit; }
