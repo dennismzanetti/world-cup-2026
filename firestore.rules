@@ -2,20 +2,71 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Matches (admin-controlled) ─────────────────────────────────────────
-    match /matches/{matchId} {
-      allow read: if true;
-      allow write: if request.auth != null
-        && request.auth.uid == 'rvR3HclRnhXAOd3rgk7sO0s3F7v1';
+    // ── Helpers ────────────────────────────────────────────────────────────────
+
+    // True when the incoming data contains PK scores for both sides.
+    function hasPkScores(data) {
+      return data.keys().hasAll(['homePkScore', 'awayPkScore'])
+        && data.homePkScore != null
+        && data.awayPkScore != null;
     }
 
-    // ── User subcollections (predictions, bracket) ─────────────────────
+    // True when the incoming match/prediction scores are a tie.
+    function isTie(data) {
+      return data.keys().hasAll(['homeScore', 'awayScore'])
+        && data.homeScore == data.awayScore;
+    }
+
+    // True when the incoming prediction scores are a tie (uses 'home'/'away' keys).
+    function isPredTie(data) {
+      return data.keys().hasAll(['home', 'away'])
+        && data.home == data.away;
+    }
+
+    // PK scores, when present, must differ (no scoreless or equal-score shootout).
+    function pkScoresValid(data) {
+      return !hasPkScores(data)
+        || (data.homePkScore is int
+            && data.awayPkScore is int
+            && data.homePkScore >= 0
+            && data.awayPkScore >= 0
+            && data.homePkScore != data.awayPkScore);
+    }
+
+    // ── Matches (admin-controlled) ─────────────────────────────────────────────
+    match /matches/{matchId} {
+      allow read: if true;
+
+      allow write: if request.auth != null
+        && request.auth.uid == 'rvR3HclRnhXAOd3rgk7sO0s3F7v1'
+        // PK scores only allowed when the match result itself is a tie
+        && (!hasPkScores(request.resource.data) || isTie(request.resource.data))
+        // PK scores must be valid integers that differ (no draw in PK)
+        && pkScoresValid(request.resource.data);
+    }
+
+    // ── User subcollections (predictions, bracket) ─────────────────────────────
     match /users/{userId}/{document=**} {
       allow read, write: if request.auth != null
         && request.auth.uid == userId;
     }
 
-    // ── Top-level predictions (for leaderboard/standings reads) ───────────
+    // Tighter rule scoped to predictions only — layered on top of the
+    // wildcard above. Rejects writes where PK scores are present but
+    // the predicted scoreline is not actually a tie.
+    match /users/{userId}/predictions/{predictionId} {
+      allow read: if request.auth != null
+        && request.auth.uid == userId;
+
+      allow write: if request.auth != null
+        && request.auth.uid == userId
+        // PK scores only allowed when the predicted result is a tie
+        && (!hasPkScores(request.resource.data) || isPredTie(request.resource.data))
+        // PK scores must be valid integers that differ
+        && pkScoresValid(request.resource.data);
+    }
+
+    // ── Top-level predictions (for leaderboard/standings reads) ───────────────
     match /predictions/{predictionId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null
