@@ -15,6 +15,22 @@ export function slotLabel(source) {
   return 'TBD';
 }
 
+/**
+ * Derive the winning side from a finished knockout fixture.
+ * Checks regulation score first, then falls back to PK shootout scores.
+ * Returns 'home', 'away', or null if still undetermined.
+ */
+function resolveFinishedWinnerSide(fixture) {
+  if (fixture.homeScore > fixture.awayScore) return 'home';
+  if (fixture.awayScore > fixture.homeScore) return 'away';
+  // Tied after 90/120 min — use PK scores if available
+  if (fixture.homePkScore != null && fixture.awayPkScore != null) {
+    if (fixture.homePkScore > fixture.awayPkScore) return 'home';
+    if (fixture.awayPkScore > fixture.homePkScore) return 'away';
+  }
+  return null; // PK scores not yet entered
+}
+
 export function resolveKnockoutTeamForPreds(source, {
   groupMatches, buildGroups, userPredictions, getKnockoutFixture,
 }) {
@@ -43,13 +59,17 @@ export function resolveKnockoutTeamForPreds(source, {
     const fixture = getKnockoutFixture(srcMatchId);
     if (!fixture) return null;
 
+    // ── Finished match: use actual result (regulation + PK) ──────────────────
     if (isFinished(fixture) && fixture.homeScore != null && fixture.awayScore != null) {
+      const winnerSide = resolveFinishedWinnerSide(fixture);
+      if (!winnerSide) return null; // tie result with no PK scores yet
       const ctx = { groupMatches, buildGroups, userPredictions, getKnockoutFixture };
-      if (fixture.homeScore > fixture.awayScore) return resolveKnockoutTeamForPreds(fixture.homeSource, ctx) || teamDisplay(fixture.home);
-      if (fixture.awayScore > fixture.homeScore) return resolveKnockoutTeamForPreds(fixture.awaySource, ctx) || teamDisplay(fixture.away);
-      return null;
+      const winnerSource = winnerSide === 'home' ? fixture.homeSource : fixture.awaySource;
+      return resolveKnockoutTeamForPreds(winnerSource, ctx)
+        || (winnerSide === 'home' ? teamDisplay(fixture.home) : teamDisplay(fixture.away));
     }
 
+    // ── Unfinished match: use user's prediction ───────────────────────────────
     const pred = userPredictions[srcMatchId];
     if (!pred || pred.home === undefined || pred.away === undefined) return null;
 
@@ -57,8 +77,15 @@ export function resolveKnockoutTeamForPreds(source, {
     if (pred.home > pred.away) winnerSide = 'home';
     else if (pred.away > pred.home) winnerSide = 'away';
     else {
-      if (!pred.pk) return null;
-      winnerSide = pred.pk;
+      // Tied prediction: prefer derived PK score winner, fall back to pk toggle
+      if (pred.homePkScore != null && pred.awayPkScore != null) {
+        if (pred.homePkScore > pred.awayPkScore) winnerSide = 'home';
+        else if (pred.awayPkScore > pred.homePkScore) winnerSide = 'away';
+      }
+      if (!winnerSide) {
+        if (!pred.pk) return null;
+        winnerSide = pred.pk;
+      }
     }
 
     const pickedSource = winnerSide === 'home' ? fixture.homeSource : fixture.awaySource;
@@ -239,9 +266,8 @@ export function renderKnockoutBracket({
         : 'TBD';
 
       const finished = fixture ? isFinished(fixture) : false;
-      const actualWinner = finished && fixture
-        ? (fixture.homeScore > fixture.awayScore ? 'home' : fixture.awayScore > fixture.homeScore ? 'away' : null)
-        : null;
+      // Use shared helper so PK shootout scores are respected for finished ties
+      const actualWinner = finished && fixture ? resolveFinishedWinnerSide(fixture) : null;
 
       const predScore = userPredictions[matchId];
       let predWinner = null;
