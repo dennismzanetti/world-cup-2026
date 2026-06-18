@@ -20,14 +20,36 @@ export function watchMatches(cb) {
   });
 }
 
-export async function updateMatchResult(matchId, { homeScore, awayScore }) {
+/**
+ * Save a match result. For knockout ties, also accepts PK scores.
+ * @param {string} matchId
+ * @param {object} result
+ * @param {number} result.homeScore
+ * @param {number} result.awayScore
+ * @param {number|null} [result.homePkScore]  - Goals scored in PK shootout (home). Only for knockout ties.
+ * @param {number|null} [result.awayPkScore]  - Goals scored in PK shootout (away). Only for knockout ties.
+ */
+export async function updateMatchResult(matchId, { homeScore, awayScore, homePkScore, awayPkScore }) {
   const ref = doc(db, 'matches', String(matchId));
-  await setDoc(ref, {
+  const data = {
     homeScore,
     awayScore,
     status: 'final',
     updatedAt: serverTimestamp(),
-  }, { merge: true });
+  };
+
+  // Only persist PK scores when it's a tied result and both values are provided
+  const isTie = Number(homeScore) === Number(awayScore);
+  if (isTie && homePkScore != null && awayPkScore != null) {
+    data.homePkScore = Number(homePkScore);
+    data.awayPkScore = Number(awayPkScore);
+  } else {
+    // Explicitly clear stale PK scores if the result is no longer a tie
+    data.homePkScore = null;
+    data.awayPkScore = null;
+  }
+
+  await setDoc(ref, data, { merge: true });
 }
 
 export async function seedKnockoutMatches(fixtures, merge = true) {
@@ -55,21 +77,42 @@ export async function seedKnockoutMatches(fixtures, merge = true) {
 // ============================================================
 
 /**
- * Save a score prediction (and optional PK winner) for a match.
+ * Save a score prediction (and optional PK scores) for a knockout match.
  * @param {string} uid
  * @param {string} matchId
  * @param {number} home
  * @param {number} away
- * @param {string|undefined} pk  - 'home', 'away', or undefined
+ * @param {string|undefined} pk          - 'home', 'away', or undefined (legacy PK winner toggle)
+ * @param {number|undefined} homePkScore - Predicted PK goals (home). Only for knockout ties.
+ * @param {number|undefined} awayPkScore - Predicted PK goals (away). Only for knockout ties.
  */
-export async function savePrediction(uid, matchId, home, away, pk) {
+export async function savePrediction(uid, matchId, home, away, pk, homePkScore, awayPkScore) {
   const ref = doc(db, 'users', uid, 'predictions', String(matchId));
   const data = {
     home: Number(home),
     away: Number(away),
     savedAt: serverTimestamp(),
   };
+
+  const isTie = Number(home) === Number(away);
+
+  // PK winner side (legacy toggle — kept for backward compat)
   if (pk === 'home' || pk === 'away') data.pk = pk;
+
+  // PK shootout scores — only saved on ties
+  if (isTie && homePkScore != null && awayPkScore != null) {
+    data.homePkScore = Number(homePkScore);
+    data.awayPkScore = Number(awayPkScore);
+    // Derive pk winner from scores if not explicitly set
+    if (!data.pk) {
+      if (Number(homePkScore) > Number(awayPkScore)) data.pk = 'home';
+      else if (Number(awayPkScore) > Number(homePkScore)) data.pk = 'away';
+    }
+  } else {
+    data.homePkScore = null;
+    data.awayPkScore = null;
+  }
+
   await setDoc(ref, data, { merge: true });
 }
 
@@ -108,7 +151,7 @@ export async function getBracketPicks(uid) {
 
 /**
  * Restore a user's predictions and bracket picks from a backup object.
- * predictions: { matchId: { home, away, pk? } }
+ * predictions: { matchId: { home, away, pk?, homePkScore?, awayPkScore? } }
  * bracketPicks: { matchId: 'home'|'away' }
  * Uses batched writes (max 500 ops per batch).
  */
@@ -123,8 +166,13 @@ export async function importUserData(uid, { predictions = {}, bracketPicks = {} 
   for (const [matchId, val] of Object.entries(predictions)) {
     if (val.home === undefined || val.away === undefined) continue;
     const ref = doc(db, 'users', uid, 'predictions', String(matchId));
+    const isTie = Number(val.home) === Number(val.away);
     const data = { home: Number(val.home), away: Number(val.away), savedAt: serverTimestamp() };
     if (val.pk === 'home' || val.pk === 'away') data.pk = val.pk;
+    if (isTie && val.homePkScore != null && val.awayPkScore != null) {
+      data.homePkScore = Number(val.homePkScore);
+      data.awayPkScore = Number(val.awayPkScore);
+    }
     batch.set(ref, data, { merge: true });
     if (++ops >= BATCH_LIMIT) await flush();
   }
