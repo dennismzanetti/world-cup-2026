@@ -62,16 +62,30 @@ export function renderPredStandings(liveMatches, userPredictions, currentUser) {
       </div>`;
     return;
   }
-  let exact = 0, correct = 0, predicted = 0;
+
+  let exact = 0, exactPk = 0, correct = 0, correctPk = 0, predicted = 0;
   const total = finishedMatches.length;
+
   finishedMatches.forEach(m => {
-    const pred = userPredictions[m.id];
+    const pred    = userPredictions[m.id];
     const outcome = predOutcome(pred, m);
-    if (outcome === 'exact')   exact++;
-    if (outcome === 'correct') correct++;
-    if (outcome !== 'none')    predicted++;
+    if (outcome === 'exact')      exact++;
+    if (outcome === 'exact-pk')   exactPk++;
+    if (outcome === 'correct')    correct++;
+    if (outcome === 'correct-pk') correctPk++;
+    if (outcome !== 'none')       predicted++;
   });
-  const pct = predicted > 0 ? Math.round(((exact + correct) / predicted) * 100) : 0;
+
+  const totalExact   = exact + exactPk;
+  const totalCorrect = correct + correctPk;
+  const pct = predicted > 0
+    ? Math.round(((totalExact + totalCorrect) / predicted) * 100)
+    : 0;
+
+  // Build PK sub-label only when there are PK outcomes to show
+  const pkExactNote   = exactPk   > 0 ? `<span class="pred-stat-pk-note">(incl. ${exactPk} PK 🥅)</span>` : '';
+  const pkCorrectNote = correctPk > 0 ? `<span class="pred-stat-pk-note">(incl. ${correctPk} PK 🥅)</span>` : '';
+
   container.innerHTML = `
     <div class="pred-stats-header">
       <div class="pred-stats-summary">
@@ -79,10 +93,26 @@ export function renderPredStandings(liveMatches, userPredictions, currentUser) {
         <span class="pred-stats-label">Prediction Accuracy</span>
       </div>
       <div class="pred-stat-cards">
-        <div class="pred-stat-card"><span class="pred-stat-icon">🎯</span><span class="pred-stat-val">${exact}</span><span class="pred-stat-lbl">Exact Scores</span></div>
-        <div class="pred-stat-card"><span class="pred-stat-icon">✅</span><span class="pred-stat-val">${correct}</span><span class="pred-stat-lbl">Correct Results</span></div>
-        <div class="pred-stat-card"><span class="pred-stat-icon">📋</span><span class="pred-stat-val">${predicted}</span><span class="pred-stat-lbl">Matches Predicted</span></div>
-        <div class="pred-stat-card"><span class="pred-stat-icon">⚽</span><span class="pred-stat-val">${total}</span><span class="pred-stat-lbl">Matches Played</span></div>
+        <div class="pred-stat-card">
+          <span class="pred-stat-icon">🎯</span>
+          <span class="pred-stat-val">${totalExact}</span>
+          <span class="pred-stat-lbl">Exact Scores ${pkExactNote}</span>
+        </div>
+        <div class="pred-stat-card">
+          <span class="pred-stat-icon">✅</span>
+          <span class="pred-stat-val">${totalCorrect}</span>
+          <span class="pred-stat-lbl">Correct Results ${pkCorrectNote}</span>
+        </div>
+        <div class="pred-stat-card">
+          <span class="pred-stat-icon">📋</span>
+          <span class="pred-stat-val">${predicted}</span>
+          <span class="pred-stat-lbl">Matches Predicted</span>
+        </div>
+        <div class="pred-stat-card">
+          <span class="pred-stat-icon">⚽</span>
+          <span class="pred-stat-val">${total}</span>
+          <span class="pred-stat-lbl">Matches Played</span>
+        </div>
       </div>
     </div>`;
 }
