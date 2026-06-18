@@ -1,1 +1,4 @@
-$(cat /tmp/style_new.css)
+$(python3 -c "
+with open('/tmp/style_new.css') as f:
+    print(f.read(), end='')
+")
