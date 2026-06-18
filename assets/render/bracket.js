@@ -244,8 +244,6 @@ function buildBracketPredForm({
     userPredictions[matchId] = predPayload;
 
     try {
-      // savePrediction takes (uid, matchId, home, away, pk, extra?)
-      // Pass homePkScore/awayPkScore as extra fields
       await savePrediction(
         currentUser.uid, matchId, hv, av, pkFromScores,
         isTie && !isNaN(hpk) ? { homePkScore: hpk, awayPkScore: apk } : undefined,
@@ -330,26 +328,29 @@ export function renderKnockoutBracket({
         : 'TBD';
 
       const finished = fixture ? isFinished(fixture) : false;
-      // Use shared helper so PK shootout scores are respected for finished ties
       const actualWinner = finished && fixture ? resolveFinishedWinnerSide(fixture) : null;
 
       const predScore = userPredictions[matchId];
       let predWinner = null;
-      let predScoreLabel = '';
+      let predHomeScore = '';
+      let predAwayScore = '';
       let predPkLabel = '';
+
       if (predScore && predScore.home !== undefined && predScore.away !== undefined) {
+        predHomeScore = predScore.home;
+        predAwayScore = predScore.away;
         if (predScore.home > predScore.away) predWinner = 'home';
         else if (predScore.away > predScore.home) predWinner = 'away';
         else if (predScore.homePkScore != null && predScore.awayPkScore != null) {
-          // Derive winner from PK scores
           predWinner = predScore.homePkScore > predScore.awayPkScore ? 'home' : 'away';
           predPkLabel = `${predScore.homePkScore}–${predScore.awayPkScore}`;
         } else if (predScore.pk) {
           predWinner = predScore.pk;
           predPkLabel = 'PK';
         }
-        predScoreLabel = `${predScore.home}–${predScore.away}`;
       }
+
+      const hasPred = predHomeScore !== '';
 
       const card = document.createElement('div');
       card.className = 'bracket-match';
@@ -359,31 +360,35 @@ export function renderKnockoutBracket({
       const homeTbd = homeDisplay === 'TBD' || homeDisplay.startsWith('Best 3rd') || homeDisplay.startsWith('W:');
       const awayTbd = awayDisplay === 'TBD' || awayDisplay.startsWith('Best 3rd') || awayDisplay.startsWith('W:');
 
+      // ── Home team row ──
       const homeEl = document.createElement('div');
       homeEl.className = 'bracket-team' +
         (predWinner === 'home' ? ' picked' : '') +
         (homeTbd ? ' tbd' : '') +
         (actualWinner === 'home' ? ' actual-winner' : '');
       homeEl.setAttribute('title', homeDisplay);
-      homeEl.innerHTML = `<span class="bracket-team-name">${homeDisplay}</span>` +
-        (predScoreLabel && !finished ? `<span class="bracket-pred-score">${predScore.home}</span>` : '');
+      homeEl.innerHTML =
+        `<span class="bracket-team-name">${homeDisplay}</span>` +
+        (hasPred && !finished ? `<span class="bracket-team-score">${predHomeScore}</span>` : '');
 
+      // ── Divider row (shows PK badge if applicable) ──
       const divider = document.createElement('div');
       divider.className = 'bracket-divider';
       divider.setAttribute('aria-hidden', 'true');
-      if (predScoreLabel && !finished && predPkLabel) {
-        // Show actual PK score (e.g. "5–4") or legacy "PK" badge
-        divider.innerHTML = `<span class="bracket-pk-badge" title="PK: ${predPkLabel}">${predPkLabel}</span>`;
+      if (hasPred && !finished && predPkLabel) {
+        divider.innerHTML = `<span class="bracket-pk-badge">${predPkLabel}</span>`;
       }
 
+      // ── Away team row ──
       const awayEl = document.createElement('div');
       awayEl.className = 'bracket-team' +
         (predWinner === 'away' ? ' picked' : '') +
         (awayTbd ? ' tbd' : '') +
         (actualWinner === 'away' ? ' actual-winner' : '');
       awayEl.setAttribute('title', awayDisplay);
-      awayEl.innerHTML = `<span class="bracket-team-name">${awayDisplay}</span>` +
-        (predScoreLabel && !finished ? `<span class="bracket-pred-score">${predScore.away}</span>` : '');
+      awayEl.innerHTML =
+        `<span class="bracket-team-name">${awayDisplay}</span>` +
+        (hasPred && !finished ? `<span class="bracket-team-score">${predAwayScore}</span>` : '');
 
       // ── Expandable prediction form ──────────────────────────────────────────
       const formWrap = document.createElement('div');
@@ -391,13 +396,6 @@ export function renderKnockoutBracket({
       formWrap.hidden = true;
 
       if (!finished) {
-        // Edit hint
-        const hint = document.createElement('span');
-        hint.className = 'bracket-edit-hint';
-        hint.textContent = predScoreLabel ? '✏️' : '+';
-        hint.setAttribute('aria-hidden', 'true');
-        card.appendChild(hint);
-
         const form = buildBracketPredForm({
           matchId, fixture, homeDisplay, awayDisplay,
           currentUser, userPredictions,
