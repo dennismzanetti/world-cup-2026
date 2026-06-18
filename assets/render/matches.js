@@ -177,7 +177,14 @@ export function buildMatchCard(m, isPred, {
       const outcome = predOutcome(pred, m);
       const hasPred = outcome !== 'none';
       const outcomeClass = hasPred ? `pred-outcome--${outcome}` : 'pred-outcome--none';
-      const outcomeLabel = { exact: '🎯 Exact!', correct: '✅ Correct result', wrong: '❌ Wrong', none: 'No prediction' }[outcome];
+      const outcomeLabel = {
+        'exact':      '🎯 Exact!',
+        'exact-pk':   '🎯🥅 Exact + PK!',
+        'correct':    '✅ Correct result',
+        'correct-pk': '✅🥅 Correct result + PK',
+        'wrong':      '❌ Wrong',
+        'none':       'No prediction',
+      }[outcome] ?? 'No prediction';
       scoreColHtml = `
         <div class="card-score-col pred-score-col--finished">
           <span class="score-final">${m.homeScore} – ${m.awayScore}</span>
