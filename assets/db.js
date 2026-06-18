@@ -54,13 +54,23 @@ export async function seedKnockoutMatches(fixtures, merge = true) {
 // USER PREDICTIONS
 // ============================================================
 
-export async function savePrediction(uid, matchId, home, away) {
+/**
+ * Save a score prediction (and optional PK winner) for a match.
+ * @param {string} uid
+ * @param {string} matchId
+ * @param {number} home
+ * @param {number} away
+ * @param {string|undefined} pk  - 'home', 'away', or undefined
+ */
+export async function savePrediction(uid, matchId, home, away, pk) {
   const ref = doc(db, 'users', uid, 'predictions', String(matchId));
-  await setDoc(ref, {
+  const data = {
     home: Number(home),
     away: Number(away),
     savedAt: serverTimestamp(),
-  }, { merge: true });
+  };
+  if (pk === 'home' || pk === 'away') data.pk = pk;
+  await setDoc(ref, data, { merge: true });
 }
 
 export function watchUserPredictions(uid, cb) {
@@ -98,7 +108,7 @@ export async function getBracketPicks(uid) {
 
 /**
  * Restore a user's predictions and bracket picks from a backup object.
- * predictions: { matchId: { home, away } }
+ * predictions: { matchId: { home, away, pk? } }
  * bracketPicks: { matchId: 'home'|'away' }
  * Uses batched writes (max 500 ops per batch).
  */
@@ -113,7 +123,9 @@ export async function importUserData(uid, { predictions = {}, bracketPicks = {} 
   for (const [matchId, val] of Object.entries(predictions)) {
     if (val.home === undefined || val.away === undefined) continue;
     const ref = doc(db, 'users', uid, 'predictions', String(matchId));
-    batch.set(ref, { home: Number(val.home), away: Number(val.away), savedAt: serverTimestamp() }, { merge: true });
+    const data = { home: Number(val.home), away: Number(val.away), savedAt: serverTimestamp() };
+    if (val.pk === 'home' || val.pk === 'away') data.pk = val.pk;
+    batch.set(ref, data, { merge: true });
     if (++ops >= BATCH_LIMIT) await flush();
   }
 
