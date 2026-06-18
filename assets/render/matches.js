@@ -21,6 +21,122 @@ export function buildBroadcastRow(m) {
   return parts.length ? `<div class="card-meta card-meta-broadcast">${parts.join('')}</div>` : '';
 }
 
+// ─── Admin result-entry form (Matches view, signed-in users only) ────────────────
+function buildResultForm(m, { currentUser, updateMatchResult, isKnockout, hn, an }) {
+  const wrap = document.createElement('div');
+  wrap.className = 'result-form-wrap';
+
+  const existingHome = m.homeScore != null ? m.homeScore : '';
+  const existingAway = m.awayScore != null ? m.awayScore : '';
+  const existingHomePk = m.homePkScore != null ? m.homePkScore : '';
+  const existingAwayPk = m.awayPkScore != null ? m.awayPkScore : '';
+  const isTied = existingHome !== '' && existingAway !== '' &&
+                 Number(existingHome) === Number(existingAway);
+
+  wrap.innerHTML = `
+    <div class="result-form">
+      <div class="result-form-scores">
+        <span class="result-form-label">${hn}</span>
+        <input type="number" class="score-input result-score-input" min="0" max="99"
+               data-result-side="home" value="${existingHome}"
+               aria-label="${hn} final score">
+        <span class="score-sep">–</span>
+        <input type="number" class="score-input result-score-input" min="0" max="99"
+               data-result-side="away" value="${existingAway}"
+               aria-label="${an} final score">
+        <span class="result-form-label">${an}</span>
+      </div>
+      <div class="pk-score-row result-pk-row" style="display:${isKnockout && isTied ? '' : 'none'}">
+        <span class="pk-label">🥅 PK Score:</span>
+        <input type="number" class="score-input result-pk-input" min="0" max="20"
+               data-result-side="homePk" value="${existingHomePk}"
+               aria-label="${hn} PK goals">
+        <span class="score-sep">–</span>
+        <input type="number" class="score-input result-pk-input" min="0" max="20"
+               data-result-side="awayPk" value="${existingAwayPk}"
+               aria-label="${an} PK goals">
+      </div>
+      <div class="result-form-footer">
+        <button class="btn-save pred-btn save-result-btn">Save Result</button>
+        <span class="result-saving" hidden>Saving…</span>
+        <span class="result-saved"  hidden>Saved ✓</span>
+        <span class="result-error"  hidden></span>
+      </div>
+    </div>`;
+
+  const homeInput  = wrap.querySelector('[data-result-side="home"]');
+  const awayInput  = wrap.querySelector('[data-result-side="away"]');
+  const homePkInput = wrap.querySelector('[data-result-side="homePk"]');
+  const awayPkInput = wrap.querySelector('[data-result-side="awayPk"]');
+  const pkRow      = wrap.querySelector('.result-pk-row');
+
+  // Show / hide PK row based on whether it's a knockout tie
+  function updatePkRowVisibility() {
+    if (!isKnockout) return;
+    const hv = parseInt(homeInput.value);
+    const av = parseInt(awayInput.value);
+    const tied = !isNaN(hv) && !isNaN(av) && hv === av;
+    pkRow.style.display = tied ? '' : 'none';
+    if (!tied) {
+      homePkInput.value = '';
+      awayPkInput.value = '';
+    }
+  }
+
+  homeInput.addEventListener('input', updatePkRowVisibility);
+  awayInput.addEventListener('input', updatePkRowVisibility);
+
+  wrap.querySelector('.save-result-btn').addEventListener('click', async () => {
+    const savingEl = wrap.querySelector('.result-saving');
+    const savedEl  = wrap.querySelector('.result-saved');
+    const errEl    = wrap.querySelector('.result-error');
+    const btn      = wrap.querySelector('.save-result-btn');
+
+    const hv = parseInt(homeInput.value);
+    const av = parseInt(awayInput.value);
+    if (isNaN(hv) || isNaN(av)) {
+      errEl.textContent = 'Enter both scores.';
+      errEl.hidden = false;
+      return;
+    }
+
+    const isTie = hv === av;
+    const homePk = isKnockout && isTie ? parseInt(homePkInput.value) : NaN;
+    const awayPk = isKnockout && isTie ? parseInt(awayPkInput.value) : NaN;
+
+    // Require PK scores on knockout ties before saving
+    if (isKnockout && isTie && (isNaN(homePk) || isNaN(awayPk))) {
+      errEl.textContent = 'Enter PK shootout scores for a tied result.';
+      errEl.hidden = false;
+      return;
+    }
+
+    errEl.hidden    = true;
+    savingEl.hidden = false;
+    btn.disabled    = true;
+
+    try {
+      await updateMatchResult(m.id, {
+        homeScore: hv,
+        awayScore: av,
+        homePkScore: isKnockout && isTie && !isNaN(homePk) ? homePk : null,
+        awayPkScore: isKnockout && isTie && !isNaN(awayPk) ? awayPk : null,
+      });
+      savingEl.hidden = true;
+      savedEl.hidden  = false;
+      setTimeout(() => { savedEl.hidden = true; }, 2000);
+    } catch (err) {
+      savingEl.hidden = true;
+      errEl.textContent = 'Save failed.';
+      errEl.hidden = false;
+      console.warn('[matches] updateMatchResult error', err);
+    }
+    btn.disabled = false;
+  });
+
+  return wrap;
+}
+
 export function buildMatchCard(m, isPred, {
   KNOCKOUT_IDS,
   currentUser,
@@ -31,6 +147,7 @@ export function buildMatchCard(m, isPred, {
   renderPredictions,
   renderKnockoutBracket,
   activePredSubtab,
+  updateMatchResult,   // ← new: passed in from app.js for admin result entry
 }) {
   const card     = document.createElement('div');
   const finished = isFinished(m);
@@ -60,7 +177,14 @@ export function buildMatchCard(m, isPred, {
       const outcome = predOutcome(pred, m);
       const hasPred = outcome !== 'none';
       const outcomeClass = hasPred ? `pred-outcome--${outcome}` : 'pred-outcome--none';
-      const outcomeLabel = { exact: '🎯 Exact!', correct: '✅ Correct result', wrong: '❌ Wrong', none: 'No prediction' }[outcome];
+      const outcomeLabel = {
+        'exact':      '🎯 Exact!',
+        'exact-pk':   '🎯🥅 Exact + PK!',
+        'correct':    '✅ Correct result',
+        'correct-pk': '✅🥅 Correct result + PK',
+        'wrong':      '❌ Wrong',
+        'none':       'No prediction',
+      }[outcome] ?? 'No prediction';
       scoreColHtml = `
         <div class="card-score-col pred-score-col--finished">
           <span class="score-final">${m.homeScore} – ${m.awayScore}</span>
@@ -96,10 +220,15 @@ export function buildMatchCard(m, isPred, {
         </div>`;
     }
   } else {
+    // ── Matches view: read-only score display ─────────────────────────────────
     const hs  = m.homeScore != null ? m.homeScore : '–';
     const as_ = m.awayScore != null ? m.awayScore : '–';
     const cls = m.status === 'live' ? 'score-final score-live' : m.homeScore != null ? 'score-final' : 'score-final score-pending';
-    scoreColHtml = `<div class="card-score-col"><span class="${cls}">${hs} – ${as_}</span></div>`;
+    // Show PK score if it was a shootout
+    const pkBadge = (m.homePkScore != null && m.awayPkScore != null)
+      ? `<span class="score-pk-label">(PK ${m.homePkScore}–${m.awayPkScore})</span>`
+      : '';
+    scoreColHtml = `<div class="card-score-col"><span class="${cls}">${hs} – ${as_}</span>${pkBadge}</div>`;
   }
 
   const dtStr = [m.timeLocal, m.tz].filter(Boolean).join(' ');
@@ -125,6 +254,30 @@ export function buildMatchCard(m, isPred, {
       ${dtStr  ? `<span class="card-meta-item"><svg class="meta-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M5 1.5v3M11 1.5v3M2 7h12"/></svg>${dtStr}</span>` : ''}
     </div>` : ''}
     ${buildBroadcastRow(m)}`;
+
+  // ── Admin result-entry form (Matches view only, signed-in users) ──────────────
+  if (!isPred && currentUser && updateMatchResult) {
+    const resultForm = buildResultForm(m, { currentUser, updateMatchResult, isKnockout, hn, an });
+
+    // Collapsible toggle button
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = 'btn-result-toggle';
+    toggleBtn.setAttribute('aria-expanded', 'false');
+    toggleBtn.setAttribute('aria-label', finished ? 'Edit result' : 'Enter result');
+    toggleBtn.innerHTML = finished
+      ? `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M11.5 2.5l2 2L5 13H3v-2L11.5 2.5z"/></svg> Edit`
+      : `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg> Result`;
+
+    resultForm.hidden = true;
+    toggleBtn.addEventListener('click', () => {
+      const isOpen = !resultForm.hidden;
+      resultForm.hidden = isOpen;
+      toggleBtn.setAttribute('aria-expanded', String(!isOpen));
+    });
+
+    card.appendChild(toggleBtn);
+    card.appendChild(resultForm);
+  }
 
   if (isPred && currentUser && !finished) {
     card.querySelectorAll('.pk-btn').forEach(pkBtn => {

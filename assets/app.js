@@ -83,6 +83,8 @@ import { renderKnockoutBracket, slotLabel, resolveKnockoutTeamForPreds } from '.
       renderPredictions: _renderPredictions,
       renderKnockoutBracket: _renderKnockoutBracket,
       activePredSubtab: () => activePredSubtab,
+      // Admin result entry — allows signed-in users to save match scores + PK
+      updateMatchResult,
     };
   }
 

@@ -1,6 +1,7 @@
 import { teamName, teamDisplay } from './teamData.js';
 
 // ─── Points calculator ────────────────────────────────────────────────────────
+// Used for GROUP STAGE standings only. Never receives PK data — no changes needed.
 export function calcPoints(teams, matches) {
   const stats = {};
   teams.forEach(t => { const n = teamName(t); stats[n] = { team: t, played:0, won:0, drawn:0, lost:0, gf:0, ga:0, gd:0, pts:0 }; });
@@ -21,14 +22,68 @@ export function calcPoints(teams, matches) {
 }
 
 // ─── Prediction outcome helper ────────────────────────────────────────────────
+/**
+ * Evaluate how accurate a prediction was against the actual match result.
+ *
+ * Return values:
+ *   'none'       — no prediction was made
+ *   'exact'      — correct scoreline (outright win/loss, no PK involved)
+ *   'exact-pk'   — correct tied scoreline AND correct PK winner (knockout only)
+ *   'correct'    — correct result direction (H/A/D) but not the exact score
+ *   'correct-pk' — predicted a tie, actual was a tie, and predicted the correct
+ *                  PK winner — but the tied scoreline itself was wrong
+ *   'wrong'      — wrong result direction, OR tied + wrong/missing PK winner
+ *
+ * Group-stage draws (no PK):
+ *   A predicted draw that matches an actual draw still returns 'exact' or
+ *   'correct' as before — the pk/PK-score fields are simply absent/null so
+ *   the new PK branches are never entered. Fully backward-compatible.
+ */
 export function predOutcome(pred, match) {
   if (!pred || pred.home === undefined || pred.away === undefined) return 'none';
   if (match.homeScore == null || match.awayScore == null) return 'none';
-  const ph = pred.home, pa = pred.away;
-  const ah = match.homeScore, aa = match.awayScore;
-  if (ph === ah && pa === aa) return 'exact';
-  const predResult   = ph > pa ? 'H' : ph < pa ? 'A' : 'D';
+
+  const ph = Number(pred.home),  pa = Number(pred.away);
+  const ah = Number(match.homeScore), aa = Number(match.awayScore);
+
+  // ── Determine the actual result direction ──────────────────────────────────
   const actualResult = ah > aa ? 'H' : ah < aa ? 'A' : 'D';
+  const predResult   = ph > pa ? 'H' : ph < pa ? 'A' : 'D';
+
+  // ── Knockout tie: actual match ended in a draw (went to PK) ───────────────
+  //    Only applies when the match document has PK scores saved.
+  const isKnockoutTie = actualResult === 'D' &&
+    match.homePkScore != null && match.awayPkScore != null;
+
+  if (isKnockoutTie) {
+    // Determine actual PK winner ('home' or 'away')
+    const actualPkWinner = match.homePkScore > match.awayPkScore ? 'home' : 'away';
+
+    // Determine predicted PK winner — prefer score-derived, fall back to toggle
+    let predPkWinner = null;
+    if (pred.homePkScore != null && pred.awayPkScore != null) {
+      predPkWinner = pred.homePkScore > pred.awayPkScore ? 'home' : 'away';
+    } else if (pred.pk === 'home' || pred.pk === 'away') {
+      predPkWinner = pred.pk;
+    }
+
+    if (predResult !== 'D') {
+      // Predicted an outright winner but the match went to PK — wrong
+      return 'wrong';
+    }
+
+    // Predicted a draw — check scoreline then PK winner
+    const exactScore = ph === ah && pa === aa;
+
+    if (predPkWinner === actualPkWinner) {
+      return exactScore ? 'exact-pk' : 'correct-pk';
+    }
+    // Predicted draw but wrong/missing PK winner
+    return 'wrong';
+  }
+
+  // ── Standard (non-PK-tie) path — unchanged from original ─────────────────
+  if (ph === ah && pa === aa) return 'exact';
   return predResult === actualResult ? 'correct' : 'wrong';
 }
 
