@@ -195,12 +195,13 @@ export function buildMatchCard(m, isPred, {
           <span class="pred-outcome-badge ${outcomeClass}">${outcomeLabel}</span>
         </div>`;
     } else {
+      // Always pre-render the pk-row (hidden); show/hide it dynamically via JS
       const isTied    = hVal !== '' && aVal !== '' && Number(hVal) === Number(aVal);
       const pkVal     = pred.pk || '';
       const pkHomeCls = pkVal === 'home' ? ' pk-selected' : '';
       const pkAwayCls = pkVal === 'away' ? ' pk-selected' : '';
-      const pkRowHtml = isKnockout && isTied ? `
-        <div class="pk-row" data-match="${m.id}">
+      const pkRowHtml = isKnockout ? `
+        <div class="pk-row" data-match="${m.id}" style="display:${isTied ? '' : 'none'}">
           <span class="pk-label">PK winner:</span>
           <button class="pk-btn pk-btn-home${pkHomeCls}" data-match="${m.id}" data-pk="home">${hFlag} ${hn}</button>
           <button class="pk-btn pk-btn-away${pkAwayCls}" data-match="${m.id}" data-pk="away">${an} ${aFlag}</button>
@@ -212,7 +213,7 @@ export function buildMatchCard(m, isPred, {
             <span class="score-sep">–</span>
             <input type="number" class="score-input" min="0" max="99" data-match="${m.id}" data-side="away" value="${aVal}" aria-label="${an} predicted score">
           </div>
-          ${isKnockout ? pkRowHtml : ''}
+          ${pkRowHtml}
           <button class="btn-save pred-btn save-pred-btn" data-match="${m.id}">Save</button>
           <span class="pred-saving" hidden>Saving…</span>
           <span class="pred-saved"  hidden>Saved ✓</span>
@@ -280,6 +281,7 @@ export function buildMatchCard(m, isPred, {
   }
 
   if (isPred && currentUser && !finished) {
+    // PK winner button clicks
     card.querySelectorAll('.pk-btn').forEach(pkBtn => {
       pkBtn.addEventListener('click', () => {
         const pk = pkBtn.dataset.pk;
@@ -304,15 +306,14 @@ export function buildMatchCard(m, isPred, {
         const hv = parseInt(homeInput?.value);
         const av = parseInt(awayInput?.value);
         const pkRow = card.querySelector('.pk-row');
-        if (!pkRow) {
-          if (!isNaN(hv) && !isNaN(av) && hv === av) {
-            userPredictions[m.id] = { ...(userPredictions[m.id] || {}), home: hv, away: av };
-            renderPredictions();
-          }
-          return;
-        }
+        if (!pkRow) return;
         const isTied = !isNaN(hv) && !isNaN(av) && hv === av;
         pkRow.style.display = isTied ? '' : 'none';
+        // Clear stale PK selection when scores are no longer tied
+        if (!isTied) {
+          card.querySelectorAll('.pk-btn').forEach(b => b.classList.remove('pk-selected'));
+          if (userPredictions[m.id]) userPredictions[m.id].pk = undefined;
+        }
       };
       homeInput?.addEventListener('input', updatePkRow);
       awayInput?.addEventListener('input', updatePkRow);
