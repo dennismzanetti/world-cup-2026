@@ -354,7 +354,7 @@ a, button, [role="button"], input, select {
   margin: 0 auto;
   padding: 0 var(--space-4);
   min-width: 0;
-  overflow-x: hidden;
+  /* overflow-x: hidden removed — was clipping the bracket's last column */
 }
 
 /* ============================================================
@@ -1017,6 +1017,7 @@ a, button, [role="button"], input, select {
 .bracket-scroll {
   display: flex; gap: var(--space-5);
   overflow-x: auto; padding-bottom: var(--space-4);
+  padding-right: var(--space-4); /* breathing room so the Final column isn't flush against the edge */
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin; scrollbar-color: var(--color-border) transparent;
   align-items: flex-start;
@@ -1031,6 +1032,11 @@ a, button, [role="button"], input, select {
   text-transform: uppercase; color: var(--color-text-muted);
   padding-bottom: var(--space-2); border-bottom: 2px solid var(--color-divider);
   margin-bottom: var(--space-1); white-space: nowrap;
+}
+
+/* Suppress connector stub on the Final column so no pseudo-element bleeds past the scroll boundary */
+.bracket-round:last-child .bracket-match::after {
+  display: none;
 }
 
 /* ── Bracket match card ─────────────────────────────────────────────────── */
