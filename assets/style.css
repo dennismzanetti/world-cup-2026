@@ -275,9 +275,18 @@ a, button, [role="button"], input, select {
   font-size: 1.1rem;
   transition: color var(--transition-interactive), background var(--transition-interactive);
   flex-shrink: 0;
+  position: relative;
 }
 .refresh-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
 .refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Default: show SVG arrow, hide soccer ball */
+.refresh-icon-default  { display: block; }
+.refresh-icon-spinning { display: none; font-style: normal; }
+
+/* Spinning state: hide SVG arrow, show soccer ball + spin the whole button */
+.refresh-btn.is-spinning .refresh-icon-default  { display: none; }
+.refresh-btn.is-spinning .refresh-icon-spinning { display: block; }
 .refresh-btn.is-spinning { animation: spin-ball 0.8s linear infinite; }
 
 @keyframes spin-ball {
@@ -290,7 +299,7 @@ a, button, [role="button"], input, select {
   position: fixed;
   bottom: calc(var(--footer-h) + var(--space-4));
   left: 50%;
-  transform: translateX(-50%) translateY(0);
+  transform: translateX(-50%) translateY(8px);
   z-index: 300;
   display: flex; align-items: center; gap: var(--space-2);
   padding: var(--space-2) var(--space-5);

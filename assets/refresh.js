@@ -33,13 +33,16 @@ function showToast(message, isError = false) {
   const toast = document.getElementById('refresh-toast');
   if (!toast) return;
   toast.textContent = message;
-  toast.className = 'refresh-toast' + (isError ? ' refresh-toast-error' : ' refresh-toast-success');
+  // Use BEM modifier names that match style.css
+  toast.className = 'refresh-toast show' + (isError ? ' refresh-toast--error' : ' refresh-toast--success');
   toast.removeAttribute('hidden');
-  // Clear any existing hide timer
   clearTimeout(toast._hideTimer);
   toast._hideTimer = setTimeout(() => {
-    toast.setAttribute('hidden', '');
-    toast.className = 'refresh-toast';
+    toast.classList.remove('show');
+    setTimeout(() => {
+      toast.setAttribute('hidden', '');
+      toast.className = 'refresh-toast';
+    }, 260); // match CSS transition duration
   }, 5000);
 }
 
