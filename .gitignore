@@ -15,3 +15,6 @@ npm-debug.log*
 # OS files
 .DS_Store
 Thumbs.db
+
+# GitHub token for manual score refresh (never commit this)
+assets/config.js
