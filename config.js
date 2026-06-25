@@ -11,7 +11,7 @@
 //   3. Check ONLY: public_repo
 //   4. Copy the token and paste it below.
 
-export const GITHUB_REFRESH_TOKEN = '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';
+export const GITHUB_REFRESH_TOKEN = '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';
 export const GITHUB_OWNER         = 'dennismzanetti';
 export const GITHUB_REPO          = 'world-cup-2026';
 export const GITHUB_BRANCH        = 'main';
