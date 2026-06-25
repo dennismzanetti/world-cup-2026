@@ -31,6 +31,8 @@ on:
         description: 'Debug mode: dump Firestore docs + ESPN names (no writes)'
         type: boolean
         default: false
+  repository_dispatch:
+    types: [sync-scores]
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true

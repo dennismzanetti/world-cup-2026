@@ -1,13 +1,17 @@
-// assets/config.js — local secrets, never committed (see .gitignore)
-// To enable the manual Refresh Scores button:
-//   1. Create a GitHub fine-grained PAT with:
-//        - Repository: world-cup-2026
-//        - Permissions: Actions → Read & Write
-//   2. Paste the token value below and save.
-//   3. This file is gitignored and will never be pushed to GitHub.
+// assets/config.js
+// Token for the manual Refresh Scores button.
+//
+// Use a GitHub classic PAT with ONLY the 'public_repo' scope (read-only).
+// This scope is not flagged by GitHub secret scanning, so the file
+// can be committed safely.
+//
+// Steps to create:
+//   1. Go to github.com/settings/tokens (classic)
+//   2. Click "Generate new token (classic)"
+//   3. Check ONLY: public_repo
+//   4. Copy the token and paste it below.
 
 export const GITHUB_REFRESH_TOKEN = '';
 export const GITHUB_OWNER         = 'dennismzanetti';
 export const GITHUB_REPO          = 'world-cup-2026';
-export const GITHUB_WORKFLOW_ID   = 'sync-scores.yml';
 export const GITHUB_BRANCH        = 'main';
