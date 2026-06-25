@@ -8,11 +8,10 @@ import { renderGroups, renderPredGroupStandings } from './render/groups.js';
 import { renderMatches } from './render/matches.js';
 import { renderPredictions, renderPredStandings } from './render/predictions.js';
 import { renderKnockoutBracket, slotLabel, resolveKnockoutTeamForPreds } from './render/bracket.js';
-import { initRefreshButton } from './refresh.js';
 
 (function () {
 
-  // ─── State ──────────────────────────────────────────────────────────────────────────
+  // ─── State ────────────────────────────────────────────────────────────────────────────────────
   let currentUser      = null;
   let authResolved     = false;
   let activeTab        = 'groups';
@@ -23,7 +22,7 @@ import { initRefreshButton } from './refresh.js';
   let bracketPicks     = {};  // matchId (string) → 'home'|'away' (legacy, kept for backup compat)
   let bracketSaveTimer = null;
 
-  // ─── Knockout stage round definitions ──────────────────────────────────────────
+  // ─── Knockout stage round definitions ──────────────────────────────────────────────
   const BRACKET_ROUNDS = [
     { label: 'Round of 32',    stage: 'Round of 32',    ids: ['r32-1','r32-2','r32-3','r32-4','r32-5','r32-6','r32-7','r32-8','r32-9','r32-10','r32-11','r32-12','r32-13','r32-14','r32-15','r32-16'] },
     { label: 'Round of 16',    stage: 'Round of 16',    ids: ['r16-1','r16-2','r16-3','r16-4','r16-5','r16-6','r16-7','r16-8'] },
@@ -34,7 +33,7 @@ import { initRefreshButton } from './refresh.js';
 
   const KNOCKOUT_IDS = new Set(BRACKET_ROUNDS.flatMap(r => r.ids));
 
-  // ─── Data accessors ────────────────────────────────────────────────────────────
+  // ─── Data accessors ──────────────────────────────────────────────────────────────
   function groupMatches()   { return liveMatches.filter(m => m.group && !KNOCKOUT_IDS.has(m.id)); }
   function allPredMatches() { return liveMatches.slice(); }
   function allTabMatches()  { return liveMatches.slice(); }
@@ -60,7 +59,7 @@ import { initRefreshButton } from './refresh.js';
     return liveMatches.find(m => m.id === id) || null;
   }
 
-  // ─── Shared context object for render modules that need app state ─────────────
+  // ─── Shared context object for render modules that need app state ─────────────────
   function getBracketCtx() {
     return {
       BRACKET_ROUNDS,
@@ -84,7 +83,6 @@ import { initRefreshButton } from './refresh.js';
       renderPredictions: _renderPredictions,
       renderKnockoutBracket: _renderKnockoutBracket,
       activePredSubtab: () => activePredSubtab,
-      // Admin result entry — allows signed-in users to save match scores + PK
       updateMatchResult,
     };
   }
@@ -114,11 +112,11 @@ import { initRefreshButton } from './refresh.js';
     renderKnockoutBracket(getBracketCtx());
   }
 
-  // ─── Modal helpers ────────────────────────────────────────────────────────────
+  // ─── Modal helpers ─────────────────────────────────────────────────────────────
   function openModal()  { document.getElementById('auth-modal')?.removeAttribute('hidden'); document.getElementById('auth-backdrop')?.removeAttribute('hidden'); }
   function closeModal() { document.getElementById('auth-modal')?.setAttribute('hidden', ''); document.getElementById('auth-backdrop')?.setAttribute('hidden', ''); }
 
-  // ─── Sub-tab switching ────────────────────────────────────────────────────────
+  // ─── Sub-tab switching ────────────────────────────────────────────────────────────
   function switchPredSubtab(id) {
     activePredSubtab = id;
     document.querySelectorAll('.sub-tab').forEach(btn => {
@@ -147,7 +145,7 @@ import { initRefreshButton } from './refresh.js';
     toolbar.hidden = !(currentUser && activePredSubtab === 'my-picks');
   }
 
-  // ─── Main tab switching ───────────────────────────────────────────────────────
+  // ─── Main tab switching ───────────────────────────────────────────────────────────
   function switchTab(id) {
     activeTab = id;
     document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -172,7 +170,7 @@ import { initRefreshButton } from './refresh.js';
     }
   }
 
-  // ─── Auth ─────────────────────────────────────────────────────────────────────
+  // ─── Auth ─────────────────────────────────────────────────────────────────────────────
   watchAuth(async user => {
     if (unsubPredictions) { unsubPredictions(); unsubPredictions = null; }
     currentUser  = user;
@@ -205,7 +203,7 @@ import { initRefreshButton } from './refresh.js';
     }
   });
 
-  // ─── Bracket picks persistence ────────────────────────────────────────────────
+  // ─── Bracket picks persistence ────────────────────────────────────────────────────
   function persistBracketPicks() {
     if (!currentUser) return;
     clearTimeout(bracketSaveTimer);
@@ -215,7 +213,7 @@ import { initRefreshButton } from './refresh.js';
     }, 600);
   }
 
-  // ─── Export / Import (Backup & Restore) ──────────────────────────────────────
+  // ─── Export / Import (Backup & Restore) ──────────────────────────────────────────
   function setToolbarStatus(msg, isError) {
     const el = document.getElementById('data-toolbar-status');
     if (!el) return;
@@ -265,7 +263,7 @@ import { initRefreshButton } from './refresh.js';
     }
   }
 
-  // ─── Event Listeners ─────────────────────────────────────────────────────────
+  // ─── Event Listeners ───────────────────────────────────────────────────────────────
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', () => switchTab(btn.dataset.view));
   });
@@ -335,16 +333,13 @@ import { initRefreshButton } from './refresh.js';
   document.getElementById('pred-group-filter')?.addEventListener('change', _renderPredictions);
   document.getElementById('pred-team-filter')?.addEventListener('input', _renderPredictions);
 
-  // ─── Live match data from Firestore ───────────────────────────────────────────
+  // ─── Live match data from Firestore ───────────────────────────────────────────────
   watchMatches(allMatches => {
     liveMatches = allMatches;
     populateMatchFilters(allTabMatches, getTodayStr, formatDateHeader, sortStages);
     populatePredFilters(allPredMatches, getTodayStr, formatDateHeader, sortStages);
     if (authResolved) renderAll();
   });
-
-  // ─── Refresh button ───────────────────────────────────────────────────────────
-  initRefreshButton();
 
   window._wc = { getAllMatches() { return [...liveMatches]; } };
 
