@@ -5,7 +5,8 @@
 // Requires assets/config.js (gitignored) with a GitHub PAT that has
 // Actions: Read & Write permission on this repo.
 //
-// If config.js is absent or the token is blank the button is hidden.
+// If config.js is absent or the token is blank the button is shown but
+// clicking it shows a friendly error toast instead of hiding the button.
 
 let _config = null;
 
@@ -33,7 +34,7 @@ function showToast(message, isError = false) {
   const toast = document.getElementById('refresh-toast');
   if (!toast) return;
   toast.textContent = message;
-  // Use BEM modifier names that match style.css
+  // BEM modifier names matching style.css
   toast.className = 'refresh-toast show' + (isError ? ' refresh-toast--error' : ' refresh-toast--success');
   toast.removeAttribute('hidden');
   clearTimeout(toast._hideTimer);
@@ -42,7 +43,7 @@ function showToast(message, isError = false) {
     setTimeout(() => {
       toast.setAttribute('hidden', '');
       toast.className = 'refresh-toast';
-    }, 260); // match CSS transition duration
+    }, 260);
   }, 5000);
 }
 
@@ -66,11 +67,9 @@ async function triggerWorkflow(token, owner, repo, workflowId, branch) {
     const text = await res.text().catch(() => '');
     throw new Error(`GitHub API ${res.status}: ${text}`);
   }
-  // 204 No Content on success
 }
 
 async function pollForRun(token, owner, repo, workflowId, triggeredAt) {
-  // Polls up to ~90 seconds for a new run created after triggeredAt.
   const headers = {
     Authorization: `Bearer ${token}`,
     Accept: 'application/vnd.github+json',
@@ -79,7 +78,6 @@ async function pollForRun(token, owner, repo, workflowId, triggeredAt) {
   const deadline = Date.now() + 90_000;
   let runId = null;
 
-  // Step 1: wait for a new run to appear
   while (Date.now() < deadline) {
     await sleep(2000);
     const res = await fetch(
@@ -90,14 +88,13 @@ async function pollForRun(token, owner, repo, workflowId, triggeredAt) {
     const data = await res.json();
     const newRun = data.workflow_runs?.find(r => {
       const created = new Date(r.created_at).getTime();
-      return created >= triggeredAt - 2000; // 2s grace for clock skew
+      return created >= triggeredAt - 2000;
     });
     if (newRun) { runId = newRun.id; break; }
   }
 
   if (!runId) throw new Error('Timed out waiting for workflow run to start.');
 
-  // Step 2: wait for the run to complete
   while (Date.now() < deadline) {
     await sleep(3000);
     const res = await fetch(
@@ -112,7 +109,6 @@ async function pollForRun(token, owner, repo, workflowId, triggeredAt) {
     }
   }
 
-  // Run is still in progress after 90s — treat it as success (it'll finish)
   return 'running';
 }
 
@@ -123,14 +119,17 @@ function sleep(ms) {
 // ─── Main entry point ─────────────────────────────────────────────────────────
 
 export async function initRefreshButton() {
-  const cfg = await loadConfig();
+  const cfg   = await loadConfig();
   const token = cfg.GITHUB_REFRESH_TOKEN || '';
   const btn   = document.getElementById('refresh-btn');
   if (!btn) return;
 
+  // Always keep the button visible — never hide it.
+  // If no token is configured, clicking shows a friendly message.
   if (!token) {
-    // No token configured — hide the button gracefully
-    btn.setAttribute('hidden', '');
+    btn.addEventListener('click', () => {
+      showToast('⚙️ Refresh not configured — add a token to config.js', true);
+    });
     return;
   }
 
