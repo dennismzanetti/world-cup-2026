@@ -1,7 +1,7 @@
 import { teamDisplay, teamFlag } from '../utils/teamData.js';
 import { isFinished } from '../utils/filters.js';
 import { calcPoints } from '../utils/stats.js';
-import { resolveBest3rd } from '../utils/stats.js';
+import { resolveBest3rd, calcBest3rdTeams } from '../utils/stats.js';
 import { savePrediction } from '../db.js';
 
 // ─── Slot / resolve helpers ─────────────────────────────────────────────────
@@ -99,23 +99,35 @@ export function resolveKnockoutTeamForPreds(source, {
 }
 
 // ─── Resolve actual (real) team name for a knockout slot ───────────────────
+// Returns null (→ TBD) unless the team's placement is fully confirmed:
+//   • group source  → all group matches must be finished
+//   • best3rd       → ALL groups must be fully complete
+//   • winner source → the source knockout match must be finished
 function resolveActualTeam(source, { groupMatches, buildGroups, getKnockoutFixture }) {
   if (!source) return null;
   if (typeof source === 'string') return source;
 
   if (source.type === 'group') {
     const gm     = groupMatches().filter(m => m.group === source.group);
+    // Require every group match to be finished before locking in standings
+    if (!gm.length || !gm.every(m => isFinished(m))) return null;
     const groups = buildGroups();
     const group  = groups.find(g => g.id === source.group);
     if (!group) return null;
-    // Only use actual finished results — no predictions
-    const standings = calcPoints(group.teams, gm.filter(m => isFinished(m)));
+    const standings = calcPoints(group.teams, gm);
     const team = standings[source.pos - 1]?.team;
     return team ? teamDisplay(team) : null;
   }
 
   if (source.type === 'best3rd') {
-    // Use actual results only
+    // All groups must be complete before best-3rd order is determined
+    const allGroups = buildGroups();
+    const allComplete = allGroups.every(g => {
+      const gm = groupMatches().filter(m => m.group === g.id);
+      return gm.length > 0 && gm.every(m => isFinished(m));
+    });
+    if (!allComplete) return null;
+    // Use actual results only (empty predictions object)
     return resolveBest3rd(source.rank, buildGroups, groupMatches, {});
   }
 
@@ -185,7 +197,7 @@ export function renderActualBracket({
       const fixture = getKnockoutFixture(matchId);
       const finished = fixture ? isFinished(fixture) : false;
 
-      // Resolve display names
+      // Resolve display names — null means not yet confirmed → show slot label
       const homeDisplay = fixture
         ? (resolveActualTeam(fixture.homeSource, ctx) || slotLabel(fixture.homeSource))
         : 'TBD';
