@@ -98,6 +98,160 @@ export function resolveKnockoutTeamForPreds(source, {
   return null;
 }
 
+// ─── Resolve actual (real) team name for a knockout slot ───────────────────
+function resolveActualTeam(source, { groupMatches, buildGroups, getKnockoutFixture }) {
+  if (!source) return null;
+  if (typeof source === 'string') return source;
+
+  if (source.type === 'group') {
+    const gm     = groupMatches().filter(m => m.group === source.group);
+    const groups = buildGroups();
+    const group  = groups.find(g => g.id === source.group);
+    if (!group) return null;
+    // Only use actual finished results — no predictions
+    const standings = calcPoints(group.teams, gm.filter(m => isFinished(m)));
+    const team = standings[source.pos - 1]?.team;
+    return team ? teamDisplay(team) : null;
+  }
+
+  if (source.type === 'best3rd') {
+    // Use actual results only
+    return resolveBest3rd(source.rank, buildGroups, groupMatches, {});
+  }
+
+  if (source.type === 'winner') {
+    const srcMatchId = source.matchId || source.match;
+    if (!srcMatchId) return null;
+    const fixture = getKnockoutFixture(srcMatchId);
+    if (!fixture) return null;
+    if (!isFinished(fixture) || fixture.homeScore == null) return null;
+    const winnerSide = resolveFinishedWinnerSide(fixture);
+    if (!winnerSide) return null;
+    const ctx = { groupMatches, buildGroups, getKnockoutFixture };
+    const winnerSource = winnerSide === 'home' ? fixture.homeSource : fixture.awaySource;
+    return resolveActualTeam(winnerSource, ctx)
+      || (winnerSide === 'home' ? teamDisplay(fixture.home) : teamDisplay(fixture.away));
+  }
+
+  return null;
+}
+
+// ─── Actual Bracket renderer (results-only, no predictions) ────────────────
+export function renderActualBracket({
+  BRACKET_ROUNDS,
+  getKnockoutFixture,
+  groupMatches,
+  buildGroups,
+  userPredictions,
+}) {
+  const container = document.getElementById('actual-bracket-container');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const ctx = { groupMatches, buildGroups, getKnockoutFixture };
+
+  // Count played knockout matches for the legend
+  const allIds    = BRACKET_ROUNDS.flatMap(r => r.ids);
+  const played    = allIds.filter(id => { const f = getKnockoutFixture(id); return f && isFinished(f); }).length;
+  const remaining = allIds.length - played;
+
+  // Legend bar
+  const legend = document.createElement('div');
+  legend.className = 'bracket-actual-legend';
+  legend.innerHTML = `
+    <span class="bracket-legend-item">
+      <span class="bracket-legend-dot bracket-legend-dot--winner"></span> Winner / Advances
+    </span>
+    <span class="bracket-legend-item">
+      <span class="bracket-legend-dot bracket-legend-dot--tbd"></span> Not yet played (${remaining} remaining)
+    </span>
+    ${played > 0 ? `<span class="bracket-legend-played">${played} match${played !== 1 ? 'es' : ''} played</span>` : ''}
+  `;
+  container.appendChild(legend);
+
+  const rail = document.createElement('div');
+  rail.className = 'bracket-scroll';
+
+  BRACKET_ROUNDS.forEach(round => {
+    const col = document.createElement('div');
+    col.className = 'bracket-round';
+
+    const label = document.createElement('div');
+    label.className = 'bracket-round-label';
+    label.textContent = round.label;
+    col.appendChild(label);
+
+    round.ids.forEach(matchId => {
+      const fixture = getKnockoutFixture(matchId);
+      const finished = fixture ? isFinished(fixture) : false;
+
+      // Resolve display names
+      const homeDisplay = fixture
+        ? (resolveActualTeam(fixture.homeSource, ctx) || slotLabel(fixture.homeSource))
+        : 'TBD';
+      const awayDisplay = fixture
+        ? (resolveActualTeam(fixture.awaySource, ctx) || slotLabel(fixture.awaySource))
+        : 'TBD';
+
+      const winnerSide = finished && fixture ? resolveFinishedWinnerSide(fixture) : null;
+
+      // Build score display
+      let homeScoreStr = '';
+      let awayScoreStr = '';
+      let pkLabel = '';
+
+      if (finished && fixture && fixture.homeScore != null) {
+        homeScoreStr = String(fixture.homeScore);
+        awayScoreStr = String(fixture.awayScore);
+        if (fixture.homeScore === fixture.awayScore && fixture.homePkScore != null) {
+          pkLabel = `(${fixture.homePkScore}–${fixture.awayPkScore} pens)`;
+        }
+      }
+
+      const card = document.createElement('div');
+      card.className = 'bracket-match bracket-match--actual';
+      if (finished) card.classList.add('bracket-match--finished');
+
+      // Home team row
+      const homeEl = document.createElement('div');
+      homeEl.className = 'bracket-team' +
+        (winnerSide === 'home' ? ' actual-winner' : '') +
+        (homeDisplay === 'TBD' || homeDisplay.startsWith('1st') || homeDisplay.startsWith('2nd') || homeDisplay.startsWith('3rd') || homeDisplay.startsWith('W:') || homeDisplay.startsWith('Best') ? ' tbd' : '');
+      homeEl.setAttribute('title', homeDisplay);
+      homeEl.innerHTML =
+        `<span class="bracket-team-name">${homeDisplay}</span>` +
+        (homeScoreStr !== '' ? `<span class="bracket-team-score actual-score${winnerSide === 'home' ? ' winner-score' : ''}">${homeScoreStr}</span>` : '');
+
+      // Divider
+      const divider = document.createElement('div');
+      divider.className = 'bracket-divider';
+      divider.setAttribute('aria-hidden', 'true');
+      if (pkLabel) {
+        divider.innerHTML = `<span class="bracket-pk-badge bracket-pk-badge--actual">${pkLabel}</span>`;
+      }
+
+      // Away team row
+      const awayEl = document.createElement('div');
+      awayEl.className = 'bracket-team' +
+        (winnerSide === 'away' ? ' actual-winner' : '') +
+        (awayDisplay === 'TBD' || awayDisplay.startsWith('1st') || awayDisplay.startsWith('2nd') || awayDisplay.startsWith('3rd') || awayDisplay.startsWith('W:') || awayDisplay.startsWith('Best') ? ' tbd' : '');
+      awayEl.setAttribute('title', awayDisplay);
+      awayEl.innerHTML =
+        `<span class="bracket-team-name">${awayDisplay}</span>` +
+        (awayScoreStr !== '' ? `<span class="bracket-team-score actual-score${winnerSide === 'away' ? ' winner-score' : ''}">${awayScoreStr}</span>` : '');
+
+      card.appendChild(homeEl);
+      card.appendChild(divider);
+      card.appendChild(awayEl);
+      col.appendChild(card);
+    });
+
+    rail.appendChild(col);
+  });
+
+  container.appendChild(rail);
+}
+
 // ─── Inline prediction form for a bracket card ─────────────────────────────────
 function buildBracketPredForm({
   matchId, fixture, homeDisplay, awayDisplay,

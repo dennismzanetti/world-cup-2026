@@ -7,7 +7,7 @@ import { calcPoints } from './utils/stats.js';
 import { renderGroups, renderPredGroupStandings } from './render/groups.js';
 import { renderMatches } from './render/matches.js';
 import { renderPredictions, renderPredStandings } from './render/predictions.js';
-import { renderKnockoutBracket, slotLabel, resolveKnockoutTeamForPreds } from './render/bracket.js';
+import { renderKnockoutBracket, renderActualBracket, slotLabel, resolveKnockoutTeamForPreds } from './render/bracket.js';
 
 (function () {
 
@@ -112,6 +112,16 @@ import { renderKnockoutBracket, slotLabel, resolveKnockoutTeamForPreds } from '.
     renderKnockoutBracket(getBracketCtx());
   }
 
+  function _renderActualBracket() {
+    renderActualBracket({
+      BRACKET_ROUNDS,
+      getKnockoutFixture,
+      groupMatches,
+      buildGroups,
+      userPredictions,
+    });
+  }
+
   // ─── Modal helpers ─────────────────────────────────────────────────────────────
   function openModal()  { document.getElementById('auth-modal')?.removeAttribute('hidden'); document.getElementById('auth-backdrop')?.removeAttribute('hidden'); }
   function closeModal() { document.getElementById('auth-modal')?.setAttribute('hidden', ''); document.getElementById('auth-backdrop')?.setAttribute('hidden', ''); }
@@ -158,12 +168,14 @@ import { renderKnockoutBracket, slotLabel, resolveKnockoutTeamForPreds } from '.
     });
     if (id === 'groups')      _renderGroups();
     if (id === 'matches')     _renderMatches();
+    if (id === 'bracket')     _renderActualBracket();
     if (id === 'predictions') switchPredSubtab(activePredSubtab);
   }
 
   function renderAll() {
     if (activeTab === 'groups')      _renderGroups();
     if (activeTab === 'matches')     _renderMatches();
+    if (activeTab === 'bracket')     _renderActualBracket();
     if (activeTab === 'predictions') switchPredSubtab(activePredSubtab);
     if (activeTab === 'predictions' && activePredSubtab !== 'pred-bracket') {
       _renderKnockoutBracket();

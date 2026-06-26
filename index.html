@@ -62,6 +62,7 @@
       <nav class="main-nav" role="tablist" aria-label="Main navigation">
         <button class="nav-btn active" data-view="groups">Groups</button>
         <button class="nav-btn" data-view="matches">Matches</button>
+        <button class="nav-btn" data-view="bracket">Bracket</button>
         <button class="nav-btn" data-view="predictions">Predictions</button>
       </nav>
 
@@ -119,6 +120,17 @@
           <input id="match-team-filter" type="search" placeholder="Search team&hellip;" autocomplete="off" class="filter-search-input">
         </div>
         <div id="matches-list"></div>
+      </div>
+    </section>
+
+    <!-- BRACKET VIEW -->
+    <section class="view" id="view-bracket">
+      <div class="container">
+        <div class="page-header">
+          <h1 class="page-title">Knockout Bracket</h1>
+          <p class="page-subtitle">Live results from the knockout rounds &mdash; updated as games are played</p>
+        </div>
+        <div id="actual-bracket-container"></div>
       </div>
     </section>
 
