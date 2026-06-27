@@ -23,12 +23,13 @@ import { renderKnockoutBracket, renderActualBracket, slotLabel, resolveKnockoutT
   let bracketSaveTimer = null;
 
   // ─── Knockout stage round definitions ──────────────────────────────────────────────
+  // IDs must match the Firestore document IDs seeded from data/matches.json
   const BRACKET_ROUNDS = [
-    { label: 'Round of 32',    stage: 'Round of 32',    ids: ['r32-1','r32-2','r32-3','r32-4','r32-5','r32-6','r32-7','r32-8','r32-9','r32-10','r32-11','r32-12','r32-13','r32-14','r32-15','r32-16'] },
-    { label: 'Round of 16',    stage: 'Round of 16',    ids: ['r16-1','r16-2','r16-3','r16-4','r16-5','r16-6','r16-7','r16-8'] },
-    { label: 'Quarter-Finals', stage: 'Quarterfinals',  ids: ['qf-1','qf-2','qf-3','qf-4'] },
-    { label: 'Semi-Finals',    stage: 'Semifinals',     ids: ['sf-1','sf-2'] },
-    { label: 'Final',          stage: 'Final',          ids: ['final'] },
+    { label: 'Round of 32',    stage: 'Round of 32',    ids: ['m073-r32-1','m074-r32-2','m075-r32-3','m076-r32-4','m077-r32-5','m078-r32-6','m079-r32-7','m080-r32-8','m081-r32-9','m082-r32-10','m083-r32-11','m084-r32-12','m085-r32-13','m086-r32-14','m087-r32-15','m088-r32-16'] },
+    { label: 'Round of 16',    stage: 'Round of 16',    ids: ['m089-r16-1','m090-r16-2','m091-r16-3','m092-r16-4','m093-r16-5','m094-r16-6','m095-r16-7','m096-r16-8'] },
+    { label: 'Quarter-Finals', stage: 'Quarterfinals',  ids: ['m097-qf-1','m098-qf-2','m099-qf-3','m100-qf-4'] },
+    { label: 'Semi-Finals',    stage: 'Semifinals',     ids: ['m101-sf-1','m102-sf-2'] },
+    { label: 'Final',          stage: 'Final',          ids: ['m104-final'] },
   ];
 
   const KNOCKOUT_IDS = new Set(BRACKET_ROUNDS.flatMap(r => r.ids));
