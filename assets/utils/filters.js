@@ -56,9 +56,14 @@ export function sortStages(stages) {
   });
 }
 
-// Match status helper
+// Match status helper — a match is considered finished if:
+//   1. status is explicitly 'finished', 'ft', or 'final', OR
+//   2. scores are present (homeScore and awayScore are non-null numbers),
+//      which handles cases where Firestore has results but status wasn't updated.
 export function isFinished(m) {
-  return m.status === 'finished' || m.status === 'ft' || m.status === 'final';
+  if (m.status === 'finished' || m.status === 'ft' || m.status === 'final') return true;
+  return m.homeScore != null && m.awayScore != null &&
+         typeof m.homeScore === 'number' && typeof m.awayScore === 'number';
 }
 
 // Stage key to human label
