@@ -1,13 +1,17 @@
 import { teamName, teamDisplay } from './teamData.js';
 
 // ─── Points calculator ────────────────────────────────────────────────────────
-// Used for GROUP STAGE standings only. Never receives PK data — no changes needed.
+// Used for GROUP STAGE standings only.
+// Matches from Firestore use homeTeam/awayTeam field names.
 export function calcPoints(teams, matches) {
   const stats = {};
   teams.forEach(t => { const n = teamName(t); stats[n] = { team: t, played:0, won:0, drawn:0, lost:0, gf:0, ga:0, gd:0, pts:0 }; });
   matches.forEach(m => {
     if (m.homeScore == null || m.awayScore == null) return;
-    const hn = teamName(m.home), an = teamName(m.away);
+    // Support both 'home'/'away' (legacy) and 'homeTeam'/'awayTeam' (Firestore)
+    const homeKey = m.homeTeam ?? m.home;
+    const awayKey = m.awayTeam ?? m.away;
+    const hn = teamName(homeKey), an = teamName(awayKey);
     if (!stats[hn] || !stats[an]) return;
     const h = m.homeScore, a = m.awayScore;
     stats[hn].played++; stats[an].played++;
