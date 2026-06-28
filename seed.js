@@ -9,6 +9,41 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 /**
+ * Map a raw fixture from matches.json to the field schema the app expects.
+ * matches.json uses:  homeTeam, awayTeam, stage ("Group"/"Round of 32"/etc), group ("A")
+ * App code expects:   home, away, stage, group
+ * Knockout fixtures also need: homeSource, awaySource (from the matchup string — kept as-is from JSON)
+ */
+function toAppSchema(raw) {
+  const doc = {
+    id:          raw.id,
+    matchNumber: raw.matchNumber,
+    stage:       raw.stage,
+    group:       raw.group ?? null,
+    date:        raw.date,
+    timeUTC:     raw.timeUTC,
+    venue:       raw.venue,
+    city:        raw.city,
+    country:     raw.country,
+    home:        raw.homeTeam,
+    away:        raw.awayTeam,
+    matchup:     raw.matchup ?? null,
+    tvEnglish:   raw.tvEnglish ?? [],
+    tvSpanish:   raw.tvSpanish ?? [],
+    streaming:   raw.streaming ?? [],
+    status:      'scheduled',
+    homeScore:   null,
+    awayScore:   null,
+    homePkScore: null,
+    awayPkScore: null,
+  };
+  // Preserve homeSource / awaySource if present (knockout bracket wiring)
+  if (raw.homeSource !== undefined) doc.homeSource = raw.homeSource;
+  if (raw.awaySource !== undefined) doc.awaySource = raw.awaySource;
+  return doc;
+}
+
+/**
  * Delete all docs in the matches collection, then re-seed from data/matches.json.
  * @param {function} log  - callback(msg: string) for progress updates
  */
@@ -17,7 +52,8 @@ export async function reseedAllMatches(log = console.log) {
   log('📦 Loading fixture data…');
   const res = await fetch('./data/matches.json');
   if (!res.ok) throw new Error(`Failed to load matches.json: ${res.status}`);
-  const fixtures = await res.json();
+  const rawFixtures = await res.json();
+  const fixtures = rawFixtures.map(toAppSchema);
   log(`📋 Loaded ${fixtures.length} fixtures`);
 
   // 2. Delete all existing match documents
@@ -25,7 +61,6 @@ export async function reseedAllMatches(log = console.log) {
   const matchesCol = collection(db, 'matches');
   const existing = await getDocs(matchesCol);
   let deleted = 0;
-  // Delete in batches of 499
   let batch = writeBatch(db);
   let batchCount = 0;
   for (const snap of existing.docs) {
@@ -51,19 +86,10 @@ export async function reseedAllMatches(log = console.log) {
   for (const fixture of fixtures) {
     const { id, ...data } = fixture;
     if (!id) { errCount++; continue; }
-
-    // Strip any score fields — seed clean
-    delete data.homeScore;
-    delete data.awayScore;
-    delete data.homePkScore;
-    delete data.awayPkScore;
-    delete data.status;
-
     const ref = doc(db, 'matches', String(id));
     batch.set(ref, { ...data, seededAt: serverTimestamp() });
     batchCount++;
     written++;
-
     if (batchCount >= 499) {
       await batch.commit();
       batch = writeBatch(db);
