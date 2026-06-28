@@ -1,9 +1,5 @@
 /* ============================================================
    GROUPS TAB
-   Group cards grid shown on the Groups view.
-   app.js renderGroups() emits: .group-card, .group-header,
-   .group-table, and shares .team-flag / .qualified / .pts
-   with standings.css.
    ============================================================ */
 
 .groups-grid {
@@ -20,7 +16,16 @@
   overflow: hidden;
 }
 
-/* Header bar — matches .standings-header style */
+/* Scrollable wrapper so the full table is always reachable on narrow screens */
+.group-card .standings-table-wrap,
+.group-card > table {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  display: block;
+  width: 100%;
+}
+
+/* Header bar */
 .group-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: var(--space-3) var(--space-4);
@@ -29,25 +34,93 @@
   font-size: var(--text-lg); letter-spacing: 0.05em;
 }
 
-/* Table — reuses same rules as .standings-table */
-.group-table { width: 100%; border-collapse: collapse; }
+.group-title {
+  padding: var(--space-3) var(--space-4);
+  margin: 0;
+  background: var(--color-accent);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  letter-spacing: 0.05em;
+}
 
+/* ---- Standings table (emitted by groups.js as .standings-table) ---- */
+.standings-table {
+  width: 100%;
+  min-width: 420px;   /* ensures all columns fit; card scrolls if needed */
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.standings-table th,
+.standings-table td {
+  padding: var(--space-2) var(--space-2);
+  font-size: var(--text-sm);
+  border-bottom: 1px solid var(--color-divider);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.standings-table th {
+  background: var(--color-surface-2);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Team column — takes up remaining space */
+.standings-table .col-team {
+  text-align: left;
+  width: auto;
+  min-width: 100px;
+}
+
+/* Numeric columns — fixed narrow width, centered */
+.standings-table .col-num {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  width: 32px;
+  min-width: 28px;
+}
+
+.standings-table .col-num.pts {
+  font-weight: 700;
+  color: var(--color-primary);
+  width: 36px;
+}
+
+/* Advancing / qualified rows */
+.standings-table tr.advancing td { color: var(--color-text); }
+.standings-table tr.advancing td.col-team::before {
+  content: '';
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--color-success);
+  margin-right: var(--space-1);
+  vertical-align: middle;
+}
+
+.standings-table tr:last-child td { border-bottom: none; }
+
+/* ---- Legacy .group-table rules (kept for any old markup) ---- */
+.group-table { width: 100%; border-collapse: collapse; }
 .group-table th,
 .group-table td {
   padding: var(--space-2) var(--space-3);
   font-size: var(--text-sm); text-align: left;
   border-bottom: 1px solid var(--color-divider);
 }
-
 .group-table th {
   background: var(--color-surface-2);
   font-weight: 600; color: var(--color-text-muted);
   font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.06em;
 }
-
 .group-table td:not(:first-child):not(:nth-child(2)) { text-align: center; font-variant-numeric: tabular-nums; }
 .group-table th:not(:first-child):not(:nth-child(2)) { text-align: center; }
-
 .group-table tr.qualified td { color: var(--color-text); }
 .group-table tr.qualified td:first-child::before {
   content: '';
@@ -58,8 +131,64 @@
 .group-table td.pts { font-weight: 700; color: var(--color-primary); }
 .group-table tr:last-child td { border-bottom: none; }
 
+/* ---- Best 3rd section ---- */
+.best-3rd-header {
+  margin-bottom: var(--space-3);
+}
+.best-3rd-title {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  margin: 0 0 var(--space-1);
+}
+.best-3rd-subtitle {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+.best-3rd-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.best-3rd-table {
+  width: 100%;
+  min-width: 480px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.best-3rd-table th,
+.best-3rd-table td {
+  padding: var(--space-2) var(--space-2);
+  font-size: var(--text-sm);
+  border-bottom: 1px solid var(--color-divider);
+  white-space: nowrap;
+}
+.best-3rd-table th {
+  background: var(--color-surface-2);
+  font-weight: 600; color: var(--color-text-muted);
+  font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.06em;
+}
+.best-3rd-table .col-rank  { width: 28px; text-align: center; }
+.best-3rd-table .col-team  { text-align: left; min-width: 110px; width: auto; }
+.best-3rd-table .col-group-badge { width: 64px; text-align: center; }
+.best-3rd-table .col-num   { width: 32px; text-align: center; font-variant-numeric: tabular-nums; }
+.best-3rd-table .col-num.pts { font-weight: 700; color: var(--color-primary); }
+.best-3rd-table tr:last-child td { border-bottom: none; }
+
+.group-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
 /* ---- Responsive ---- */
 @media (max-width: 600px) {
+  .standings-table th,
+  .standings-table td { padding: var(--space-1) var(--space-1); font-size: var(--text-xs); }
+  .standings-table .col-num { width: 26px; min-width: 22px; }
   .group-table th,
   .group-table td { padding: var(--space-1) var(--space-2); }
 }
