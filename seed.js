@@ -10,12 +10,12 @@ import {
 
 /**
  * Map a raw fixture from matches.json to the field schema the app expects.
- * matches.json uses:  homeTeam, awayTeam, stage ("Group"/"Round of 32"/etc), group ("A")
- * App code expects:   home, away, stage, group
- * Knockout fixtures also need: homeSource, awaySource (from the matchup string — kept as-is from JSON)
+ * Group matches use:    homeTeam / awayTeam
+ * Knockout matches use: home / away  (already the display-ready slot label or TBD)
+ * Both styles also carry homeSource / awaySource for bracket wiring.
  */
 function toAppSchema(raw) {
-  const doc = {
+  const appDoc = {
     id:          raw.id,
     matchNumber: raw.matchNumber,
     stage:       raw.stage,
@@ -25,8 +25,11 @@ function toAppSchema(raw) {
     venue:       raw.venue,
     city:        raw.city,
     country:     raw.country,
-    home:        raw.homeTeam,
-    away:        raw.awayTeam,
+    // Support both naming conventions:
+    // - group matches use homeTeam / awayTeam
+    // - knockout matches use home / away
+    home:        raw.homeTeam ?? raw.home ?? 'TBD',
+    away:        raw.awayTeam ?? raw.away ?? 'TBD',
     matchup:     raw.matchup ?? null,
     tvEnglish:   raw.tvEnglish ?? [],
     tvSpanish:   raw.tvSpanish ?? [],
@@ -38,9 +41,9 @@ function toAppSchema(raw) {
     awayPkScore: null,
   };
   // Preserve homeSource / awaySource if present (knockout bracket wiring)
-  if (raw.homeSource !== undefined) doc.homeSource = raw.homeSource;
-  if (raw.awaySource !== undefined) doc.awaySource = raw.awaySource;
-  return doc;
+  if (raw.homeSource !== undefined) appDoc.homeSource = raw.homeSource;
+  if (raw.awaySource !== undefined) appDoc.awaySource = raw.awaySource;
+  return appDoc;
 }
 
 /**
