@@ -127,8 +127,8 @@ function resolveActualTeam(source, { groupMatches, buildGroups, getKnockoutFixtu
       return gm.length > 0 && gm.every(m => isFinished(m));
     });
     if (!allComplete) return null;
-    // Use actual results only (empty predictions object)
-    return resolveBest3rd(source.rank, buildGroups, groupMatches, {});
+    // Pass null explicitly: use actual scores only, no prediction overlay
+    return resolveBest3rd(source.rank, buildGroups, groupMatches, null);
   }
 
   if (source.type === 'winner') {
@@ -523,14 +523,21 @@ export function renderKnockoutBracket({
       if (predWinner) card.classList.add('bracket-match--predicted');
       if (!finished) card.classList.add('bracket-match--clickable');
 
-      const homeTbd = homeDisplay === 'TBD' || homeDisplay.startsWith('Best 3rd') || homeDisplay.startsWith('W:');
-      const awayTbd = awayDisplay === 'TBD' || awayDisplay.startsWith('Best 3rd') || awayDisplay.startsWith('W:');
+      // Detect unresolved slot labels for tbd styling
+      const isTbdLabel = s =>
+        s === 'TBD' ||
+        s.startsWith('1st Grp') ||
+        s.startsWith('2nd Grp') ||
+        s.startsWith('3rd Grp') ||
+        s.startsWith('Best 3rd') ||
+        s.startsWith('W:') ||
+        s.startsWith('L:');
 
       // ── Home team row ──
       const homeEl = document.createElement('div');
       homeEl.className = 'bracket-team' +
         (predWinner === 'home' ? ' picked' : '') +
-        (homeTbd ? ' tbd' : '') +
+        (isTbdLabel(homeDisplay) ? ' tbd' : '') +
         (actualWinner === 'home' ? ' actual-winner' : '');
       homeEl.setAttribute('title', homeDisplay);
       homeEl.innerHTML =
@@ -549,7 +556,7 @@ export function renderKnockoutBracket({
       const awayEl = document.createElement('div');
       awayEl.className = 'bracket-team' +
         (predWinner === 'away' ? ' picked' : '') +
-        (awayTbd ? ' tbd' : '') +
+        (isTbdLabel(awayDisplay) ? ' tbd' : '') +
         (actualWinner === 'away' ? ' actual-winner' : '');
       awayEl.setAttribute('title', awayDisplay);
       awayEl.innerHTML =

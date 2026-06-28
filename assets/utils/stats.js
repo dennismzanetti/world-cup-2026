@@ -92,14 +92,16 @@ export function predOutcome(pred, match) {
 }
 
 // ─── Best 3rd-place team calculation ──────────────────────────────────────────
+// userPredictions may be null (use actual scores only) or an object (overlay predictions).
 export function calcBest3rdTeams(buildGroups, groupMatches, userPredictions) {
+  const preds = userPredictions ?? {}; // null → treat as no predictions (actual scores only)
   const allGroups = buildGroups();
   const thirdPlaceTeams = [];
 
   allGroups.forEach(group => {
     const gm = groupMatches().filter(m => m.group === group.id);
     const predMatches = gm.map(m => {
-      const pred = userPredictions[m.id];
+      const pred = preds[m.id];
       return pred ? { ...m, homeScore: pred.home, awayScore: pred.away } : m;
     });
     const standings = calcPoints(group.teams, predMatches);
