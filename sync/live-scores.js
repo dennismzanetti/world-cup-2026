@@ -7,14 +7,17 @@
 // Requires: FIREBASE_SERVICE_ACCOUNT_JSON (GitHub Secret)
 //
 // Usage:
-//   node live-scores.js           # normal sync
-//   node live-scores.js --debug   # dump Firestore docs + today's ESPN events, then exit
+//   node live-scores.js             # normal sync
+//   node live-scores.js --debug     # dump Firestore docs + today's ESPN events, then exit
+//   node live-scores.js --repair-pk # re-check all finished tied knockout matches
+//                                   # and write missing homePkScore/awayPkScore values
 
 import fetch from 'node-fetch';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
-const DEBUG = process.argv.includes('--debug');
+const DEBUG     = process.argv.includes('--debug');
+const REPAIR_PK = process.argv.includes('--repair-pk');
 
 // ─── Firebase Admin Init ──────────────────────────────────────────────────────
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
@@ -113,12 +116,8 @@ function parseMinute(statusObj) {
 }
 
 // ─── Extract PK (penalty shootout) scores from ESPN summary data ─────────────
-// ESPN exposes shootout results in competition.situation.shootout or
-// competition.details[].type.text === 'Penalty' tallied by team.
-// We look for the most reliable source: the shootout object first, then
-// fall back to counting Penalty detail events per team.
 function parsePkScores(comp, homeTeamId, awayTeamId) {
-  // Strategy 1: competition.situation.shootout (present on some ESPN events)
+  // Strategy 1: competition.situation.shootout
   const shootout = comp.situation?.shootout;
   if (shootout) {
     const homeShoot = shootout.find(s => s.team?.id === homeTeamId);
@@ -177,6 +176,141 @@ function parsePkScores(comp, homeTeamId, awayTeamId) {
   return null;
 }
 
+// ─── REPAIR-PK: backfill missing PK scores on all finished tied matches ────────
+// Finds every Firestore match doc where:
+//   status is 'finished' / 'final' / 'ft'
+//   homeScore === awayScore
+//   homePkScore is null or missing
+// Then fetches the ESPN summary by espnId (or falls back to a scoreboard date
+// search) and attempts to write PK scores.
+async function repairPkScores() {
+  console.log('\n════════════════════════════════════════════════════');
+  console.log('REPAIR-PK MODE — finding finished tied matches without PK scores');
+  console.log('════════════════════════════════════════════════════\n');
+
+  // Fetch all match docs (Firestore doesn't support != null queries well across types)
+  const allSnap = await db.collection('matches').get();
+
+  const candidates = allSnap.docs.filter(d => {
+    const f = d.data();
+    const finishedStatuses = ['finished', 'final', 'ft'];
+    if (!finishedStatuses.includes(f.status)) return false;
+    if (typeof f.homeScore !== 'number' || typeof f.awayScore !== 'number') return false;
+    if (f.homeScore !== f.awayScore) return false;  // not a tie
+    if (f.homePkScore != null && f.awayPkScore != null) return false;  // already has PK scores
+    return true;
+  });
+
+  if (!candidates.length) {
+    console.log('  ✓ No finished tied matches are missing PK scores. Nothing to repair.');
+    return;
+  }
+
+  console.log(`  Found ${candidates.length} match(es) needing PK repair:\n`);
+  for (const d of candidates) {
+    const f = d.data();
+    console.log(`  ─ docId: ${d.id}  |  ${f.home} ${f.homeScore}–${f.awayScore} ${f.away}  |  espnId: ${f.espnId ?? '(missing)'}`);
+  }
+  console.log('');
+
+  let repaired = 0;
+  let failed   = 0;
+
+  for (const d of candidates) {
+    const f      = d.data();
+    const docRef = d.ref;
+
+    console.log(`  Processing: ${f.home} vs ${f.away} (docId=${d.id})…`);
+
+    // ─ Try ESPN summary by espnId first ────────────────────────────────────
+    let comp = null;
+    let espnHomeTeamId = null;
+    let espnAwayTeamId = null;
+    let usedEspnId = f.espnId;
+
+    if (f.espnId) {
+      const sumRes = await fetch(SUMMARY_URL(f.espnId), { headers: HEADERS });
+      if (sumRes.ok) {
+        const sumData = await sumRes.json();
+        comp = sumData.header?.competitions?.[0] ?? null;
+        if (comp) {
+          const hc = comp.competitors?.find(c => c.homeAway === 'home');
+          const ac = comp.competitors?.find(c => c.homeAway === 'away');
+          // Detect if ESPN orientation is flipped vs Firestore
+          const espnHome = normalise(hc?.team?.displayName ?? '');
+          const flipped  = espnHome !== f.home;
+          espnHomeTeamId = flipped ? ac?.team?.id : hc?.team?.id;
+          espnAwayTeamId = flipped ? hc?.team?.id : ac?.team?.id;
+        }
+      }
+    }
+
+    // ─ Fallback: search ESPN scoreboard for the match date ─────────────────
+    if (!comp && f.date) {
+      console.log(`     No espnId or summary fetch failed — searching scoreboard for date ${f.date}…`);
+      const dateStr = f.date.replace(/-/g, '');
+      const events  = await fetchEventsByDate(dateStr);
+      for (const ev of events) {
+        const evComp = ev.competitions?.[0];
+        if (!evComp) continue;
+        const hc = evComp.competitors?.find(c => c.homeAway === 'home');
+        const ac = evComp.competitors?.find(c => c.homeAway === 'away');
+        const evHome = normalise(hc?.team?.displayName ?? '');
+        const evAway = normalise(ac?.team?.displayName ?? '');
+        if (
+          (evHome === f.home && evAway === f.away) ||
+          (evHome === f.away && evAway === f.home)
+        ) {
+          // Fetch full summary for this event to get details/scoringPlays
+          const sumRes2 = await fetch(SUMMARY_URL(ev.id), { headers: HEADERS });
+          if (sumRes2.ok) {
+            const sumData2 = await sumRes2.json();
+            comp = sumData2.header?.competitions?.[0] ?? null;
+            if (comp) {
+              const flipped  = evHome !== f.home;
+              espnHomeTeamId = flipped ? ac?.team?.id : hc?.team?.id;
+              espnAwayTeamId = flipped ? hc?.team?.id : ac?.team?.id;
+              usedEspnId     = ev.id;
+              // Patch espnId onto the doc while we're here
+              if (!f.espnId) {
+                await docRef.update({ espnId: ev.id });
+                console.log(`     Patched espnId=${ev.id} onto ${d.id}`);
+              }
+            }
+          }
+          break;
+        }
+      }
+    }
+
+    if (!comp) {
+      console.warn(`     ✗ Could not fetch ESPN summary for ${f.home} vs ${f.away} (espnId=${usedEspnId ?? 'none'}) — skipping.`);
+      failed++;
+      continue;
+    }
+
+    const pkScores = parsePkScores(comp, espnHomeTeamId, espnAwayTeamId);
+    if (!pkScores) {
+      console.warn(`     ❗ ESPN returned no PK scores for ${f.home} vs ${f.away} — they may not be in the API yet.`);
+      failed++;
+      continue;
+    }
+
+    await docRef.update({
+      homePkScore: pkScores.homePkScore,
+      awayPkScore: pkScores.awayPkScore,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    console.log(`     ✓ Repaired: ${f.home} ${pkScores.homePkScore}–${pkScores.awayPkScore} ${f.away} (pens)`);
+    repaired++;
+  }
+
+  console.log(`\n  Repair complete — ${repaired} fixed, ${failed} could not be resolved.`);
+  if (failed > 0) {
+    console.log('  Re-run with --repair-pk once ESPN has published the shootout data.');
+  }
+}
+
 // ─── DEBUG: dump Firestore docs + today's ESPN events ────────────────────────
 async function runDebug() {
   console.log('\n════════════════════════════════════════════════════');
@@ -219,7 +353,6 @@ async function runDebug() {
 
 // ─── Find Firestore doc for an ESPN event ─────────────────────────────────────
 async function findMatchDoc(espnEventId, home, away) {
-  // Strategy 1: direct espnId lookup
   const byId = await db.collection('matches')
     .where('espnId', '==', espnEventId)
     .limit(1)
@@ -230,7 +363,6 @@ async function findMatchDoc(espnEventId, home, away) {
     return { docRef: d.ref, docData: data, flipped: data.home !== home };
   }
 
-  // Strategy 2: exact name query, both orderings
   for (const [h, a] of [[home, away], [away, home]]) {
     const snap = await db.collection('matches')
       .where('home', '==', h)
@@ -243,7 +375,6 @@ async function findMatchDoc(espnEventId, home, away) {
     }
   }
 
-  // Strategy 3: full scan — normalise stored home/away and compare
   console.log(`     ⚙ Strategies 1+2 failed for "${home} vs ${away}" — running full collection scan…`);
   const allSnap = await db.collection('matches').get();
   for (const d of allSnap.docs) {
@@ -263,8 +394,7 @@ async function findMatchDoc(espnEventId, home, away) {
     }
   }
 
-  // Still nothing — dump all docs so we can see the mismatch
-  console.warn(`     ✗ Full scan also found nothing. All group-stage docs:`);
+  console.warn(`     ✗ Full scan also found nothing. All docs:`);
   for (const d of allSnap.docs) {
     const f = d.data();
     if (f.home && f.away) {
@@ -301,7 +431,6 @@ async function updateMatchFromEvent(event) {
   const awayScore = parseInt(awayComp.score ?? '0', 10);
 
   const result = await findMatchDoc(eventId, home, away);
-
   if (!result) {
     console.warn(`  ⚠ No Firestore doc found for: ${home} vs ${away} (espnId=${eventId})`);
     return false;
@@ -320,22 +449,18 @@ async function updateMatchFromEvent(event) {
   };
   if (!docData.espnId) update.espnId = eventId;
 
-  // ── PK scores: only relevant for finished knockout ties ────────────────────
   if (status === 'finished' && finalHomeScore === finalAwayScore) {
     const homeTeamId = homeComp.team?.id;
     const awayTeamId = awayComp.team?.id;
     const pkScores = parsePkScores(comp, homeTeamId, awayTeamId);
     if (pkScores) {
-      // Respect the "flipped" flag so home/away always match the Firestore doc orientation
       update.homePkScore = flipped ? pkScores.awayPkScore : pkScores.homePkScore;
       update.awayPkScore = flipped ? pkScores.homePkScore : pkScores.awayPkScore;
       console.log(`     ✓ PK shootout: ${docData.home} ${update.homePkScore}–${update.awayPkScore} ${docData.away}`);
     } else {
       console.log(`     ⚠ Tied knockout result but no PK scores found in ESPN data yet.`);
-      // Preserve any PK scores already stored — don't overwrite with null
     }
   } else if (status === 'finished') {
-    // Non-tie result: clear any stale PK scores
     update.homePkScore = null;
     update.awayPkScore = null;
   }
@@ -395,6 +520,8 @@ async function backfillPastMatches() {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 if (DEBUG) {
   runDebug().catch(err => { console.error('Debug failed:', err); process.exit(1); });
+} else if (REPAIR_PK) {
+  repairPkScores().catch(err => { console.error('Repair-PK failed:', err); process.exit(1); });
 } else {
   async function syncScores() {
     console.log(`[${new Date().toISOString()}] Starting live-scores sync…`);
