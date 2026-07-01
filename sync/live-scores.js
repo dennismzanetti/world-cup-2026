@@ -112,6 +112,71 @@ function parseMinute(statusObj) {
   return isNaN(mins) || mins === 0 ? null : mins;
 }
 
+// ─── Extract PK (penalty shootout) scores from ESPN summary data ─────────────
+// ESPN exposes shootout results in competition.situation.shootout or
+// competition.details[].type.text === 'Penalty' tallied by team.
+// We look for the most reliable source: the shootout object first, then
+// fall back to counting Penalty detail events per team.
+function parsePkScores(comp, homeTeamId, awayTeamId) {
+  // Strategy 1: competition.situation.shootout (present on some ESPN events)
+  const shootout = comp.situation?.shootout;
+  if (shootout) {
+    const homeShoot = shootout.find(s => s.team?.id === homeTeamId);
+    const awayShoot = shootout.find(s => s.team?.id === awayTeamId);
+    if (homeShoot != null && awayShoot != null) {
+      const h = parseInt(homeShoot.score ?? homeShoot.goals ?? homeShoot.made, 10);
+      const a = parseInt(awayShoot.score ?? awayShoot.goals ?? awayShoot.made, 10);
+      if (!isNaN(h) && !isNaN(a)) {
+        console.log(`     PK scores via shootout object: ${h}–${a}`);
+        return { homePkScore: h, awayPkScore: a };
+      }
+    }
+  }
+
+  // Strategy 2: count successful Penalty kicks in competition.details
+  const details = comp.details ?? [];
+  const penaltyDetails = details.filter(d => {
+    const typeText = (d.type?.text ?? '').toLowerCase();
+    return typeText.includes('penalty') && !typeText.includes('miss') && !typeText.includes('saved') && !typeText.includes('retake');
+  });
+  if (penaltyDetails.length > 0) {
+    let homePk = 0;
+    let awayPk = 0;
+    for (const d of penaltyDetails) {
+      const teamId = d.team?.id;
+      if (teamId === homeTeamId) homePk++;
+      else if (teamId === awayTeamId) awayPk++;
+    }
+    if (homePk > 0 || awayPk > 0) {
+      console.log(`     PK scores via penalty details count: ${homePk}–${awayPk}`);
+      return { homePkScore: homePk, awayPkScore: awayPk };
+    }
+  }
+
+  // Strategy 3: check scoringPlays for penalty shootout phase
+  const scoringPlays = comp.scoringPlays ?? [];
+  const pkPlays = scoringPlays.filter(p => {
+    const period = (p.period?.type ?? '').toLowerCase();
+    const text   = (p.type?.text ?? '').toLowerCase();
+    return period.includes('shootout') || period.includes('penalty') || text.includes('penalty kick');
+  });
+  if (pkPlays.length > 0) {
+    let homePk = 0;
+    let awayPk = 0;
+    for (const p of pkPlays) {
+      const teamId = p.team?.id;
+      if (teamId === homeTeamId) homePk++;
+      else if (teamId === awayTeamId) awayPk++;
+    }
+    if (homePk > 0 || awayPk > 0) {
+      console.log(`     PK scores via scoringPlays: ${homePk}–${awayPk}`);
+      return { homePkScore: homePk, awayPkScore: awayPk };
+    }
+  }
+
+  return null;
+}
+
 // ─── DEBUG: dump Firestore docs + today's ESPN events ────────────────────────
 async function runDebug() {
   console.log('\n════════════════════════════════════════════════════');
@@ -254,6 +319,26 @@ async function updateMatchFromEvent(event) {
     updatedAt: FieldValue.serverTimestamp(),
   };
   if (!docData.espnId) update.espnId = eventId;
+
+  // ── PK scores: only relevant for finished knockout ties ────────────────────
+  if (status === 'finished' && finalHomeScore === finalAwayScore) {
+    const homeTeamId = homeComp.team?.id;
+    const awayTeamId = awayComp.team?.id;
+    const pkScores = parsePkScores(comp, homeTeamId, awayTeamId);
+    if (pkScores) {
+      // Respect the "flipped" flag so home/away always match the Firestore doc orientation
+      update.homePkScore = flipped ? pkScores.awayPkScore : pkScores.homePkScore;
+      update.awayPkScore = flipped ? pkScores.homePkScore : pkScores.awayPkScore;
+      console.log(`     ✓ PK shootout: ${docData.home} ${update.homePkScore}–${update.awayPkScore} ${docData.away}`);
+    } else {
+      console.log(`     ⚠ Tied knockout result but no PK scores found in ESPN data yet.`);
+      // Preserve any PK scores already stored — don't overwrite with null
+    }
+  } else if (status === 'finished') {
+    // Non-tie result: clear any stale PK scores
+    update.homePkScore = null;
+    update.awayPkScore = null;
+  }
 
   await docRef.update(update);
   console.log(`  ✓ Updated: ${docData.home} ${finalHomeScore}–${finalAwayScore} ${docData.away}  [${status}${minute ? ` ${minute}'` : ''}]`);
