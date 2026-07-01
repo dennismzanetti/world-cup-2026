@@ -12,6 +12,8 @@
 # Manual triggers (workflow_dispatch inputs):
 #   force_reseed  — delete all match docs and re-seed from scratch
 #   debug         — dump Firestore docs + ESPN team names, then exit (no writes)
+#   repair_pk     — re-check all finished tied knockout matches and write
+#                   missing homePkScore/awayPkScore values from ESPN
 
 name: Sync Live Scores
 
@@ -29,6 +31,10 @@ on:
         default: false
       debug:
         description: 'Debug mode: dump Firestore docs + ESPN names (no writes)'
+        type: boolean
+        default: false
+      repair_pk:
+        description: 'Repair PK: backfill missing PK scores on finished tied knockout matches'
         type: boolean
         default: false
   repository_dispatch:
@@ -66,6 +72,9 @@ jobs:
           fi
           if [ "${{ github.event.inputs.debug }}" = "true" ]; then
             ARGS="$ARGS --debug"
+          fi
+          if [ "${{ github.event.inputs.repair_pk }}" = "true" ]; then
+            ARGS="$ARGS --repair-pk"
           fi
           node live-scores.js $ARGS
         env:
